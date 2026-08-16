@@ -21,11 +21,7 @@ pub struct VirtioDevice {
 
 impl VirtioDevice {
     pub const fn new() -> Self { Self { negotiated: VirtioFeatures(0), ready: false } }
-
-    /// Negotiate only features supported by both host and guest.
-    pub const fn negotiate(device: VirtioFeatures, driver: VirtioFeatures) -> VirtioFeatures {
-        device.intersection(driver)
-    }
+    pub const fn negotiate(device: VirtioFeatures, driver: VirtioFeatures) -> VirtioFeatures { device.intersection(driver) }
 
     pub fn initialize(&mut self, device: VirtioFeatures, driver: VirtioFeatures) -> bool {
         let negotiated = Self::negotiate(device, driver);
@@ -45,8 +41,8 @@ mod tests {
 
     #[test]
     fn negotiation_requires_common_features() {
-        let host = VirtioFeatures(VirtioFeatures::VERSION_1.0 | VirtioFeatures::RING_EVENT_IDX.0);
-        let guest = VirtioFeatures(VirtioFeatures::VERSION_1.0 | VirtioFeatures::RING_INDIRECT_DESC.0);
+        let host = VirtioFeatures((1 << 32) | (1 << 29));
+        let guest = VirtioFeatures((1 << 32) | (1 << 28));
         let mut dev = VirtioDevice::new();
         assert!(dev.initialize(host, guest));
         assert!(dev.features().contains(VirtioFeatures::VERSION_1));
