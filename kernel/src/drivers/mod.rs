@@ -48,7 +48,7 @@ pub use linux_activation::{build_activation_order, validate_activation_order, Ac
 pub use linux_activation_rollback::{activation_failed, build_rollback_order, RollbackError as LinuxRollbackError};
 pub use linux_transaction_orchestrator::{ActivationOrchestrator, OrchestratorError as LinuxOrchestratorError, OrchestratorState as LinuxOrchestratorState};
 pub use linux_transaction_bridge::{BridgeError as LinuxBridgeError, TransactionBridge};
-pub use linux_driver_ops::{DriverLifecycle, DriverOperation, DriverOperationError, DriverOperationState};
+pub use linux_driver_ops::{DriverLifecycle, DriverOp, DriverOpError, DriverState};
 pub use virtio::{VirtioDevice, VirtioFeatures};
 pub use universal::{validate_request, DriverAbi, DriverAction, DriverError, DriverOs, DriverRequest, DriverResult};
 pub use installer::{plan_install, InstallError, InstallPlan, InstallerPackage, PackageFormat};
