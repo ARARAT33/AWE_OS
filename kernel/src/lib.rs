@@ -6,6 +6,7 @@ pub mod boot_state;
 pub mod device;
 pub mod drivers;
 pub mod entry;
+pub mod formats;
 pub mod interrupts;
 pub mod ipc;
 pub mod logging;
