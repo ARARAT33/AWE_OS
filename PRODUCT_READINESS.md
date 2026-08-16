@@ -4,7 +4,7 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**35% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**36% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
 The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
 
@@ -32,7 +32,10 @@ The percentage is based on implemented product gates, not documentation or archi
 - [x] Physical frame allocator is driven by the loader memory map.
 - [x] Four-level x86_64 page-table data structures and address decomposition are implemented and unit-tested.
 - [ ] Page tables are installed and activated on x86_64.
-- [ ] IDT/APIC/timer initialization is active.
+- [x] x86_64 IDT gate construction and `lidt` loading primitives exist.
+- [x] x86_64 PIT channel-0 programming exists as a deterministic first timer source.
+- [ ] IDT/timer initialization is active in the boot path.
+- [ ] Local APIC timer replaces/augments the legacy PIT.
 - [ ] SMP bring-up is active.
 - [ ] Heap allocation is active and stress-tested in a booted kernel.
 
@@ -70,6 +73,7 @@ The percentage is based on implemented product gates, not documentation or archi
 - [x] Automated QEMU smoke-test pipeline is defined and checks for real kernel output.
 - [ ] Fuzzing for boot image/protocol parsers.
 - [x] Kernel unit/integration tests cover boot validation, frame allocation, heap invariants and paging primitives.
+- [x] Architecture-level IDT and PIT primitives have deterministic unit coverage where hardware I/O is not required.
 - [ ] Performance benchmarks and regression thresholds.
 - [ ] Hardware compatibility matrix.
 - [ ] Upgrade and recovery testing.
