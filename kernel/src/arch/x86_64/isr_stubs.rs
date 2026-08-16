@@ -1,6 +1,11 @@
 #![no_std]
 
 use core::arch::global_asm;
+use core::sync::atomic::{AtomicU64, Ordering};
+
+/// Number of timer interrupts observed by the low-level ISR path.
+/// Kept lock-free because the handler executes in interrupt context.
+static TIMER_IRQ_COUNT: AtomicU64 = AtomicU64::new(0);
 
 global_asm!(r#"
 .section .text
@@ -34,7 +39,22 @@ awe_isr_timer:
 
 extern "C" { pub fn awe_isr_timer(); }
 
+/// Lowest-level timer acknowledgement point. It is intentionally bounded:
+/// no allocation, locking, logging, or context switch is performed here.
 #[no_mangle]
 pub extern "C" fn awe_timer_interrupt(_saved_registers: *mut u64) {
-    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+    TIMER_IRQ_COUNT.fetch_add(1, Ordering::Relaxed);
+}
+
+pub fn timer_irq_count() -> u64 { TIMER_IRQ_COUNT.load(Ordering::Acquire) }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn irq_counter_is_monotonic() {
+        let before = timer_irq_count();
+        awe_timer_interrupt(core::ptr::null_mut());
+        assert_eq!(timer_irq_count(), before + 1);
+    }
 }
