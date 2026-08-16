@@ -4,7 +4,7 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**44% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**46% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
 The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
 
@@ -20,9 +20,10 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 - Non-escalating capability derivation and explicit revocation state.
 - Process states and consumable CPU, memory and IPC budgets.
 - Allocation-free token-bucket rate limiter for repeated privileged operations.
-- Bounded scheduler queue with duplicate runnable-entry protection and regression tests.
-- Terminal boot-failure state: once a required startup invariant fails, the boot state cannot advance to `Running` accidentally.
-- Monotonic boot-phase state machine with deterministic failure reporting.
+- Bounded scheduler queue with duplicate runnable-entry protection.
+- Bounded fixed-priority scheduler primitive with FIFO ordering within each priority level.
+- Typed physical/virtual address wrappers with overflow-safe page alignment.
+- Terminal boot-failure state and monotonic boot phases.
 - AWE Capsule and XenoSense specifications have corresponding kernel security foundations.
 - Cloud security gate validates formatting, workspace compilation, tests, strict Clippy and the release contract on every main push/PR.
 
@@ -48,6 +49,7 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 - [x] Scheduler/process/syscall/security module boundaries.
 - [x] Physical frame allocator from loader memory map.
 - [x] Four-level x86_64 page-table structures and address decomposition.
+- [x] Typed physical/virtual address alignment primitives.
 - [ ] Page tables installed and activated on x86_64.
 - [x] x86_64 IDT gate construction and `lidt` primitive.
 - [x] x86_64 PIT channel-0 programming.
@@ -61,6 +63,7 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 - [x] Consumable process resource budgets.
 - [x] Bounded privileged-operation rate limiter.
 - [x] Bounded duplicate-safe scheduler queue.
+- [x] Fixed-priority scheduler primitive.
 
 ### P2 — Hardware and storage
 - [ ] PCI/PCIe enumeration.
