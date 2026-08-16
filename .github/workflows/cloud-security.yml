@@ -1,0 +1,56 @@
+name: AWEOS Cloud Security Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: aweos-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: aweos-${{ runner.os }}-
+      - name: Format gate
+        run: cargo fmt --all -- --check
+      - name: Compile every workspace crate
+        run: cargo check --workspace
+      - name: Execute every workspace test
+        run: cargo test --workspace --all-targets
+      - name: Security-focused tests
+        run: cargo test --workspace security --all-targets
+      - name: Strict Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Dependency audit surface
+        run: cargo tree --workspace --locked
+
+  cloud-release-contract:
+    runs-on: ubuntu-latest
+    needs: cloud-security
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify release contract exists
+        run: |
+          test -f PRODUCT_READINESS.md
+          test -f docs/AWE_CAPSULE.md
+          test -f docs/AWE_XENOSENSE.md
+          grep -q "Definition of done" PRODUCT_READINESS.md
+          grep -q "AWE Capsule" docs/AWE_CAPSULE.md
