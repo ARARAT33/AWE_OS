@@ -1,6 +1,6 @@
 #![no_std]
 #[cfg(target_arch="x86_64")]
-core::arch::global_asm!(include_str!("x86_64_switch.S"),options(att_syntax));
+core::arch::global_asm!(include_str!("x86_64_switch.S"));
 use super::context_switch::SwitchFrame;
 #[derive(Clone,Copy,PartialEq,Eq,Debug)]pub enum BackendError{InvalidCurrent,InvalidNext,IdenticalTarget}
 #[cfg(target_arch="x86_64")]
