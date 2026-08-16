@@ -2,6 +2,7 @@
 
 pub mod boot;
 pub mod idt;
+pub mod interrupts;
 
 pub const PAGE_TABLE_ENTRIES: usize = 512;
 pub const PAGE_SIZE: u64 = 4096;
