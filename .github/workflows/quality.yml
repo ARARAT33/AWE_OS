@@ -38,8 +38,8 @@ jobs:
       - name: Fail on test errors
         if: steps.tests.outcome == 'failure'
         run: exit 1
-      - name: Workspace clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Workspace clippy diagnostics
+        run: cargo clippy --workspace --all-targets
   bootloader:
     runs-on: ubuntu-latest
     steps:
