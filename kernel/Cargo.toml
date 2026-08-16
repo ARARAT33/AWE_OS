@@ -1,11 +1,14 @@
 [package]
 name = "aweos-kernel"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 publish = false
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+awe-boot-protocol = { workspace = true }
 
 [profile.dev]
 panic = "abort"
@@ -15,4 +18,3 @@ panic = "abort"
 opt-level = 3
 lto = "fat"
 codegen-units = 1
-panic = "abort"
