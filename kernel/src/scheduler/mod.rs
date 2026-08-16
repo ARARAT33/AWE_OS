@@ -1,6 +1,7 @@
 #![no_std]
 
 pub mod clock;
+pub mod dispatch;
 pub mod priority;
 
 use crate::process::ProcessId;
