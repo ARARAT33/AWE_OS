@@ -8,6 +8,7 @@ pub mod core;
 pub mod learning;
 pub mod linux;
 pub mod linux_dependency;
+pub mod linux_dependency_graph;
 pub mod linux_install;
 pub mod linux_package;
 pub mod linux_resolver;
@@ -26,6 +27,7 @@ pub use core::{AdapterState, AndroidDriverAdapter, CoreError, DriverAdapter, Dri
 pub use learning::{DriverExperience, ExperienceDb, ProbeOutcome};
 pub use linux::LinuxLayer;
 pub use linux_dependency::{validate as validate_linux_dependencies, Dependency as LinuxDependency, DependencyError as LinuxDependencyError};
+pub use linux_dependency_graph::{validate_graph as validate_linux_dependency_graph, GraphError as LinuxGraphError};
 pub use linux_install::{plan, InstallError as LinuxInstallError, InstallPlan as LinuxInstallPlan};
 pub use linux_package::{prepare_probe, validate_package, LinuxPackageError, LinuxPackageHeader, LDRIVER_MAGIC, MAX_PAYLOAD};
 pub use linux_resolver::{resolve, LinuxCandidate, ResolveError};
