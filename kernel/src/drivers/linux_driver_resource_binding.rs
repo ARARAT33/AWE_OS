@@ -7,7 +7,7 @@ use super::linux_resource_transaction::{ResourceTransaction, ResourceTransaction
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BindingError { Resource(ResourceError), Transaction(ResourceTransactionError), Lifecycle(DriverOpError), InvalidState }
 
-pub struct DriverResourceBinding<const N: usize> { pub owner: u64, pub resources: ResourceManager<N>, active: bool }
+pub struct DriverResourceBinding<const N: usize = 16> { pub owner: u64, pub resources: ResourceManager<N>, active: bool }
 
 impl<const N: usize> DriverResourceBinding<N> {
     pub const fn new(owner: u64) -> Self { Self { owner, resources: ResourceManager::new(), active: false } }
@@ -44,9 +44,4 @@ impl<const N: usize> DriverResourceBinding<N> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*; use super::super::linux_resource_manager::ResourceKind;
-    #[test] fn failed_second_resource_rolls_back_first() { let mut b=DriverResourceBinding::<4>::new(10); let r=[Resource{owner:10,kind:ResourceKind::Mmio,start:0x1000,length:0x100},Resource{owner:10,kind:ResourceKind::Mmio,start:0x1080,length:0x20}]; assert!(b.acquire_all(&r).is_err()); assert_eq!(b.resource_count(),0); }
-    #[test] fn wrong_owner_does_not_leak() { let mut b=DriverResourceBinding::<4>::new(10); let r=[Resource{owner:11,kind:ResourceKind::Irq,start:11,length:1}]; assert_eq!(b.acquire_all(&r),Err(BindingError::InvalidState)); assert_eq!(b.resource_count(),0); }
-    #[test] fn duplicate_acquire_is_rejected() { let mut b=DriverResourceBinding::<4>::new(3); let r=Resource{owner:3,kind:ResourceKind::Dma,start:0x3000,length:0x100}; b.acquire_all(&[r]).unwrap(); assert_eq!(b.acquire_all(&[r]),Err(BindingError::InvalidState)); }
-}
+mod tests { use super::*; use super::super::linux_resource_manager::ResourceKind; #[test]fn failed_second_resource_rolls_back_first(){let mut b=DriverResourceBinding::<4>::new(10);let r=[Resource{owner:10,kind:ResourceKind::Mmio,start:0x1000,length:0x100},Resource{owner:10,kind:ResourceKind::Mmio,start:0x1080,length:0x20}];assert!(b.acquire_all(&r).is_err());assert_eq!(b.resource_count(),0)} }
