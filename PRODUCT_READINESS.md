@@ -4,7 +4,7 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**50% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**52% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
 The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
 
@@ -30,11 +30,13 @@ Implemented foundations now include:
 - Process states and consumable CPU, memory and IPC budgets.
 - Allocation-free token-bucket rate limiter.
 - Bounded scheduler queue and fixed-priority scheduling primitive.
+- Saturating deterministic scheduler tick clock.
 - Typed physical/virtual addresses with overflow-safe alignment.
 - Monotonic boot phases and terminal failure state.
 - Hardware driver contracts for MMIO, DMA, interrupt mode and device identity.
 - Bounded device-bus registry.
 - VirtIO feature negotiation primitive requiring VirtIO 1.x before activation.
+- Validated syscall dispatch gate with argument/error validation and resource-budget enforcement.
 - AWE Capsule and XenoSense security foundations.
 - Cloud CI security/release gates.
 
@@ -109,6 +111,7 @@ Implemented foundations now include:
 - [ ] Local APIC timer.
 - [ ] SMP bring-up.
 - [ ] Booted-kernel heap stress tests.
+- [x] Validated syscall dispatch gate.
 
 ## P2 — Hardware/storage
 - [x] Driver contracts and registry.
