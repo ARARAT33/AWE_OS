@@ -12,11 +12,11 @@ pub extern "C" fn interrupt_entry(frame: &mut InterruptFrame) -> InterruptAction
     }
     let vector = frame.vector as u8;
     if is_exception_with_error_code(vector) {
-        InterruptAction::Exception(vector)
+        InterruptAction::Exception
     } else if vector == 32 {
         InterruptAction::Timer
     } else {
-        InterruptAction::Unhandled(vector)
+        InterruptAction::Unhandled
     }
 }
 
