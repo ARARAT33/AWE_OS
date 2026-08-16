@@ -4,7 +4,7 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**38% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**40% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
 The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
 
@@ -14,10 +14,13 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 
 ## New implemented kernel primitives
 
-- Intent-carrying authorization: privileged requests can declare required rights, impact class and a non-zero resource budget before authorization succeeds.
-- Bounded causal provenance journal: fixed-size, allocation-free security event storage suitable for the trusted path; overflow is bounded rather than allowed to allocate or block the kernel.
-- Explicit process states and resource budgets for CPU ticks, memory bytes and IPC messages.
-- AWE Capsule and XenoSense specifications now have corresponding kernel security foundations rather than remaining documentation-only concepts.
+- Intent-carrying authorization with required rights, impact class and resource budget.
+- Bounded, allocation-free causal provenance journal for security-sensitive events.
+- Non-escalating capability derivation: child authority is the intersection of parent and requested rights.
+- Explicit empty/revoked capability state.
+- Process states and consumable CPU, memory and IPC budgets with underflow-safe rejection.
+- AWE Capsule and XenoSense specifications now have corresponding kernel security foundations.
+- Cloud security gate validates formatting, workspace compilation, tests, strict Clippy and the release contract on every main push/PR.
 
 ## Product target
 
@@ -49,7 +52,8 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 - [ ] Booted-kernel heap stress tests.
 - [x] Intent authorization primitive.
 - [x] Bounded provenance journal.
-- [x] Process resource-budget model.
+- [x] Non-escalating capability derivation/revocation model.
+- [x] Consumable process resource budgets.
 
 ### P2 — Hardware and storage
 - [ ] PCI/PCIe enumeration.
@@ -78,9 +82,10 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 ### P5 — Production quality
 - [ ] Reproducible release builds.
 - [ ] Signed release images.
-- [x] Automated QEMU smoke-test pipeline is defined.
-- [ ] Fuzzing for boot image/protocol parsers.
+- [x] Cloud CI security/release gates.
 - [x] Foundational kernel unit/integration coverage.
+- [ ] Real QEMU boot/release-image test.
+- [ ] Fuzzing for boot image/protocol parsers.
 - [ ] Performance benchmarks and regression thresholds.
 - [ ] Hardware compatibility matrix.
 - [ ] Upgrade and recovery testing.
