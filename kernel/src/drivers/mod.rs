@@ -33,6 +33,7 @@ pub mod linux_recovery_pipeline;
 pub mod linux_resource_manager;
 pub mod linux_resource_transaction;
 pub mod linux_driver_resource_binding;
+pub mod linux_driver_execution_guard;
 pub mod virtio;
 pub mod universal;
 pub mod installer;
@@ -71,6 +72,7 @@ pub use linux_recovery_pipeline::{RecoveryPipeline, RecoveryPipelineError, Recov
 pub use linux_resource_manager::{Resource, ResourceError, ResourceKind, ResourceManager};
 pub use linux_resource_transaction::{ResourceTransaction, ResourceTransactionError};
 pub use linux_driver_resource_binding::{BindingError, DriverResourceBinding};
+pub use linux_driver_execution_guard::{ExecutionGuard, ExecutionGuardError};
 pub use virtio::{VirtioDevice, VirtioFeatures};
 pub use universal::{validate_request, DriverAbi, DriverAction, DriverError, DriverOs, DriverRequest, DriverResult};
 pub use installer::{plan_install, InstallError, InstallPlan, InstallerPackage, PackageFormat};
