@@ -14,6 +14,16 @@ pub enum Architecture {
     RiscV64 = 6,
 }
 
+impl Architecture {
+    pub const fn is_64_bit(self) -> bool {
+        matches!(self, Self::X86_64 | Self::Aarch64 | Self::RiscV64)
+    }
+
+    pub const fn is_supported(self) -> bool {
+        matches!(self, Self::X86_64 | Self::Aarch64 | Self::RiscV64)
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct MemoryRegion {
@@ -68,5 +78,34 @@ impl BootInfo {
 }
 
 pub const fn validate(info: &BootInfo) -> bool {
-    info.magic == AWE_BOOT_MAGIC && info.version == AWE_BOOT_VERSION && info.size >= core::mem::size_of::<BootInfo>() as u32
+    info.magic == AWE_BOOT_MAGIC
+        && info.version == AWE_BOOT_VERSION
+        && info.size >= core::mem::size_of::<BootInfo>() as u32
+        && info.cpu_count != 0
+        && info.architecture.is_supported()
+        && (info.memory_region_count == 0 || !info.memory_regions.is_null())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn valid_boot_info_passes() {
+        let info = BootInfo::empty(Architecture::X86_64);
+        assert!(validate(&info));
+    }
+
+    #[test]
+    fn invalid_magic_fails() {
+        let mut info = BootInfo::empty(Architecture::X86_64);
+        info.magic = 0;
+        assert!(!validate(&info));
+    }
+
+    #[test]
+    fn unsupported_architecture_fails() {
+        let info = BootInfo::empty(Architecture::X86);
+        assert!(!validate(&info));
+    }
 }
