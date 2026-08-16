@@ -11,6 +11,7 @@ pub mod linux_install;
 pub mod linux_package;
 pub mod linux_resolver;
 pub mod linux_runtime;
+pub mod linux_transaction;
 pub mod virtio;
 pub mod universal;
 pub mod installer;
@@ -27,6 +28,7 @@ pub use linux_install::{plan, InstallError as LinuxInstallError, InstallPlan as 
 pub use linux_package::{prepare_probe, validate_package, LinuxPackageError, LinuxPackageHeader, LDRIVER_MAGIC, MAX_PAYLOAD};
 pub use linux_resolver::{resolve, LinuxCandidate, ResolveError};
 pub use linux_runtime::{LinuxDriverDescriptor, LinuxRuntime, LinuxRuntimeError};
+pub use linux_transaction::{DriverTransaction, TransactionError, TransactionState};
 pub use virtio::{VirtioDevice, VirtioFeatures};
 pub use universal::{validate_request, DriverAbi, DriverAction, DriverError, DriverOs, DriverRequest, DriverResult};
 pub use installer::{plan_install, InstallError, InstallPlan, InstallerPackage, PackageFormat};
