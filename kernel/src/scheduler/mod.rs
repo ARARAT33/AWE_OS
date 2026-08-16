@@ -31,8 +31,6 @@ impl<const N: usize> RunQueue<N> {
     }
 }
 
-/// Scheduler tick result. `Continue` keeps the current task running; `Reschedule`
-/// asks the dispatcher to select another runnable task.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum TickAction { Continue, Reschedule }
 
@@ -51,6 +49,37 @@ impl SchedulerClock {
     pub fn reset(&mut self) { self.remaining = self.quantum; }
 }
 
+/// Small deterministic bridge between an interrupt-side reschedule request and
+/// the scheduler dispatcher. The interrupt path only sets a flag; the safe
+/// scheduling boundary consumes it and selects the next runnable process.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DispatchAction { KeepCurrent, SwitchTo(ProcessId) }
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Scheduler<const N: usize> {
+    queue: RunQueue<N>,
+    current: Option<ProcessId>,
+    reschedule_pending: bool,
+}
+
+impl<const N: usize> Scheduler<N> {
+    pub const fn new() -> Self { Self { queue: RunQueue::new(), current: None, reschedule_pending: false } }
+    pub const fn current(&self) -> Option<ProcessId> { self.current }
+    pub const fn reschedule_pending(&self) -> bool { self.reschedule_pending }
+    pub fn enqueue(&mut self, id: ProcessId) -> bool { self.queue.push(id) }
+    pub fn request_reschedule(&mut self) { self.reschedule_pending = true; }
+
+    pub fn schedule_boundary(&mut self) -> DispatchAction {
+        if !self.reschedule_pending { return DispatchAction::KeepCurrent; }
+        self.reschedule_pending = false;
+        if let Some(current) = self.current { let _ = self.queue.push(current); }
+        match self.queue.pop() {
+            Some(next) => { self.current = Some(next); DispatchAction::SwitchTo(next) }
+            None => DispatchAction::KeepCurrent,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,10 +92,19 @@ mod tests {
     #[test] fn duplicate_is_rejected() { let mut q: RunQueue<2> = RunQueue::new(); assert!(q.push(ProcessId(1))); assert!(!q.push(ProcessId(1))); }
     #[test] fn scheduler_clock_requests_reschedule_at_quantum_boundary() {
         let mut clock = SchedulerClock::new(3);
-        assert_eq!(clock.tick(), TickAction::Continue);
-        assert_eq!(clock.tick(), TickAction::Continue);
-        assert_eq!(clock.tick(), TickAction::Reschedule);
+        assert_eq!(clock.tick(), TickAction::Continue); assert_eq!(clock.tick(), TickAction::Continue); assert_eq!(clock.tick(), TickAction::Reschedule);
         assert_eq!(clock.remaining(), 3);
+    }
+    #[test] fn boundary_switches_to_next_runnable_process() {
+        let mut scheduler: Scheduler<4> = Scheduler::new();
+        assert!(scheduler.enqueue(ProcessId(1))); assert!(scheduler.enqueue(ProcessId(2)));
+        scheduler.request_reschedule(); assert_eq!(scheduler.schedule_boundary(), DispatchAction::SwitchTo(ProcessId(1)));
+        scheduler.request_reschedule(); assert_eq!(scheduler.schedule_boundary(), DispatchAction::SwitchTo(ProcessId(2)));
+        assert!(!scheduler.reschedule_pending());
+    }
+    #[test] fn no_request_keeps_current() {
+        let mut scheduler: Scheduler<2> = Scheduler::new();
+        assert_eq!(scheduler.schedule_boundary(), DispatchAction::KeepCurrent);
     }
     #[test] fn zero_quantum_fails_safe() { let mut clock = SchedulerClock::new(0); assert_eq!(clock.tick(), TickAction::Reschedule); }
 }
