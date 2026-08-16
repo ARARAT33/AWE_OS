@@ -4,7 +4,7 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**42% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**44% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
 The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
 
@@ -15,13 +15,15 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 ## New implemented kernel primitives
 
 - Intent-carrying authorization with required rights, impact class and resource budget.
-- Deterministic security policy engine with explicit allow/deny reasons for malformed intent, missing capability, excessive impact and excessive budget.
-- Bounded, allocation-free causal provenance journal for security-sensitive events.
-- Non-escalating capability derivation: child authority is the intersection of parent and requested rights.
-- Explicit empty/revoked capability state.
-- Process states and consumable CPU, memory and IPC budgets with underflow-safe rejection.
+- Deterministic security policy engine with explicit allow/deny reasons.
+- Bounded, allocation-free causal provenance journal.
+- Non-escalating capability derivation and explicit revocation state.
+- Process states and consumable CPU, memory and IPC budgets.
 - Allocation-free token-bucket rate limiter for repeated privileged operations.
-- AWE Capsule and XenoSense specifications now have corresponding kernel security foundations.
+- Bounded scheduler queue with duplicate runnable-entry protection and regression tests.
+- Terminal boot-failure state: once a required startup invariant fails, the boot state cannot advance to `Running` accidentally.
+- Monotonic boot-phase state machine with deterministic failure reporting.
+- AWE Capsule and XenoSense specifications have corresponding kernel security foundations.
 - Cloud security gate validates formatting, workspace compilation, tests, strict Clippy and the release contract on every main push/PR.
 
 ## Product target
@@ -37,6 +39,7 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 - [ ] Real x86_64 UEFI image boots in QEMU.
 - [ ] Kernel reaches deterministic `Running` state in automated boot test.
 - [x] Boot failure paths are diagnosable over serial console.
+- [x] Monotonic boot phases and terminal failure state.
 
 ### P1 — Kernel foundation
 - [x] Rust `no_std` kernel workspace.
@@ -52,12 +55,12 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 - [ ] Local APIC timer.
 - [ ] SMP bring-up.
 - [ ] Booted-kernel heap stress tests.
-- [x] Intent authorization primitive.
-- [x] Deterministic security policy engine.
+- [x] Intent authorization and deterministic policy engine.
 - [x] Bounded provenance journal.
 - [x] Non-escalating capability derivation/revocation model.
 - [x] Consumable process resource budgets.
 - [x] Bounded privileged-operation rate limiter.
+- [x] Bounded duplicate-safe scheduler queue.
 
 ### P2 — Hardware and storage
 - [ ] PCI/PCIe enumeration.
