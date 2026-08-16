@@ -3,6 +3,7 @@
 pub mod arch;
 pub mod boot_phase;
 pub mod boot_state;
+pub mod drivers;
 pub mod entry;
 pub mod interrupts;
 pub mod memory;
