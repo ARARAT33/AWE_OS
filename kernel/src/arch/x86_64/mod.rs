@@ -5,6 +5,8 @@ pub mod entry;
 pub mod idt;
 pub mod interrupts;
 pub mod isr;
+pub mod isr_stubs;
+pub mod timer;
 
 pub const PAGE_TABLE_ENTRIES: usize = 512;
 pub const PAGE_SIZE: u64 = 4096;
