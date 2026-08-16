@@ -4,6 +4,7 @@ members = [
     "boot/aweloader",
     "kernel",
     "kernel-bin",
+    "tools/aweosa-builder",
 ]
 resolver = "2"
 
