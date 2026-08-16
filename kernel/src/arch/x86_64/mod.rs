@@ -1,6 +1,7 @@
 #![no_std]
 
 pub mod boot;
+pub mod entry;
 pub mod idt;
 pub mod interrupts;
 pub mod isr;
