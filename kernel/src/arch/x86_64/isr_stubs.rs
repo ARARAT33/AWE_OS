@@ -3,8 +3,6 @@
 use core::arch::global_asm;
 use core::sync::atomic::{AtomicU64, Ordering};
 
-/// Number of timer interrupts observed by the low-level ISR path.
-/// Kept lock-free because the handler executes in interrupt context.
 static TIMER_IRQ_COUNT: AtomicU64 = AtomicU64::new(0);
 
 global_asm!(r#"
@@ -37,11 +35,8 @@ awe_isr_timer:
 .size awe_isr_timer, .-awe_isr_timer
 "#);
 
-extern "C" { pub fn awe_isr_timer(); }
+unsafe extern "C" { pub fn awe_isr_timer(); }
 
-/// Lowest-level timer acknowledgement point. It is intentionally bounded:
-/// no allocation, locking, logging, or context switch is performed here.
-#[no_mangle]
 pub extern "C" fn awe_timer_interrupt(_saved_registers: *mut u64) {
     TIMER_IRQ_COUNT.fetch_add(1, Ordering::Relaxed);
 }
