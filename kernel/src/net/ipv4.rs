@@ -30,7 +30,7 @@ impl Header {
         let header_len = (ihl as usize) * 4;
         if packet.len() < header_len { return Err(NetError::BufferTooSmall); }
         let total_len = u16::from_be_bytes([packet[2], packet[3]]);
-        if total_len as usize < header_len || total_len as usize > packet.len() {
+        if (total_len as usize) < header_len || (total_len as usize) > packet.len() {
             return Err(NetError::BufferTooSmall);
         }
         Ok(Self {
