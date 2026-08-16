@@ -4,7 +4,7 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**54% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**56% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
 The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
 
@@ -33,6 +33,9 @@ Implemented foundations now include:
 - Saturating deterministic scheduler tick clock.
 - Typed physical/virtual addresses with overflow-safe alignment.
 - Deterministic early page mapper with duplicate-map rejection and fail-closed validation.
+- Bounded early boot identity mapper with overflow and capacity rejection.
+- x86_64 IDT gate encoding and safe early timer-vector installation primitive.
+- x86_64 CR3/RFLAGS/I/O primitives.
 - Monotonic boot phases and terminal failure state.
 - Hardware driver contracts for MMIO, DMA, interrupt mode and device identity.
 - Bounded device-bus registry.
