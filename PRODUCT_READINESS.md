@@ -84,6 +84,10 @@ Implemented foundations include cross-OS provenance manifests, verified-only bin
 - [ ] Signed/measured release image verification in the boot path.
 - [ ] Automated QEMU boot certification.
 
+## Definition of done
+
+AWE_OS is considered product-ready only when the required boot, kernel, driver, security, recovery and release gates are implemented and their automated CI/QEMU validation is green. Documentation or architectural placeholders alone do not satisfy a gate.
+
 ## Next 60% gate
 
 The next milestone is a real booted CellKernel execution path: architecture paging activation, kernel heap, IDT/timer integration, scheduler execution, syscall trap entry, process isolation, IPC, and DMA/IOMMU foundations. Documentation alone never advances this percentage.
