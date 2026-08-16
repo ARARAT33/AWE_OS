@@ -1,8 +1,8 @@
 [build]
-target = "x86_64-aweos.json"
+target = "x86_64-unknown-none"
 
-[target.x86_64-aweos]
-rustflags = ["-C", "code-model=kernel"]
-
-[unstable]
-build-std = ["core", "compiler_builtins"]
+[target.x86_64-unknown-none]
+rustflags = [
+    "-C", "link-arg=-Tkernel-bin/linker.ld",
+    "-C", "relocation-model=static",
+]
