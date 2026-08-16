@@ -32,5 +32,5 @@ awe_isr_timer:
 .att_syntax prefix
 "#);
 unsafe extern "C"{pub fn awe_isr_timer();}
-pub extern "C" fn awe_timer_interrupt(_saved_registers:*mut u64){TIMER_IRQ_COUNT.fetch_add(1,Ordering::Relaxed)}
+pub extern "C" fn awe_timer_interrupt(_saved_registers:*mut u64){TIMER_IRQ_COUNT.fetch_add(1,Ordering::Relaxed);}
 pub fn timer_irq_count()->u64{TIMER_IRQ_COUNT.load(Ordering::Acquire)}
