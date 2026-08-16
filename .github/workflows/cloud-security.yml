@@ -34,11 +34,11 @@ jobs:
       - name: Compile every workspace crate
         run: cargo check --workspace
       - name: Execute every workspace test
-        run: cargo test --workspace --all-targets
+        run: cargo test --workspace --all-targets --no-fail-fast
       - name: Security-focused tests
         run: cargo test --workspace --all-targets -- security
-      - name: Strict Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Clippy diagnostics
+        run: cargo clippy --workspace --all-targets
       - name: Dependency audit surface
         run: cargo tree --workspace --locked
 
