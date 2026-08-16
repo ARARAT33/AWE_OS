@@ -8,7 +8,7 @@ use aweos_kernel::entry::{kernel_entry, KernelBootStatus};
 #[used]
 #[unsafe(link_section = ".multiboot2_header")]
 #[unsafe(no_mangle)]
-static MULTIBOOT2_HEADER: [u32; 4] = [0xE85250D6, 0, 16, 0x17ADA8E8];
+static MULTIBOOT2_HEADER: [u32; 4] = [0xE85250D6, 0, 16, 0x17ADAF1A];
 
 global_asm!(r#"
 .section .text.boot
