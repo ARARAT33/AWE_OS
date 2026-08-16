@@ -4,22 +4,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**56% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**58% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
 The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
-
-## Hardware and driver intelligence
-
-AWE_OS targets real hardware, virtual machines and cloud/server environments through one capability-controlled Driver HAL. It does not execute foreign kernel ABIs directly inside CellKernel.
-
-Implemented foundations now include:
-- cross-OS driver provenance manifests for Native AWE, Linux, Android, Windows, BSD and other ports;
-- verified-only driver binding;
-- bounded driver compatibility registry;
-- offline/online driver database architecture with staged, authenticated and rollback-safe updates;
-- bounded driver experience database that records probe outcomes and supports deterministic stability selection;
-- fail-closed behavior for unknown/unverified hardware;
-- hardened bootloader contract with validation, measurement and fail-closed goals.
 
 ## Implemented kernel foundations
 
@@ -31,6 +18,7 @@ Implemented foundations now include:
 - Allocation-free token-bucket rate limiter.
 - Bounded scheduler queue and fixed-priority scheduling primitive.
 - Saturating deterministic scheduler tick clock.
+- Deterministic allocation-free scheduler dispatcher with explicit current-process rotation and yield semantics.
 - Typed physical/virtual addresses with overflow-safe alignment.
 - Deterministic early page mapper with duplicate-map rejection and fail-closed validation.
 - Bounded early boot identity mapper with overflow and capacity rejection.
@@ -43,6 +31,12 @@ Implemented foundations now include:
 - Validated syscall dispatch gate with argument/error validation and resource-budget enforcement.
 - AWE Capsule and XenoSense security foundations.
 - Cloud CI security/release gates.
+
+## Hardware and driver intelligence
+
+AWE_OS targets real hardware, virtual machines and cloud/server environments through one capability-controlled Driver HAL. Foreign kernel ABIs are not executed directly inside CellKernel.
+
+Implemented foundations include cross-OS provenance manifests, verified-only binding, bounded compatibility registry, offline/online driver database architecture, staged authenticated updates, rollback-safe updates, deterministic driver experience tracking and fail-closed behavior for unknown/unverified hardware.
 
 ## Driver roadmap
 
@@ -59,7 +53,7 @@ Implemented foundations now include:
 
 ### PC/server hardware
 - [ ] PCI enumeration.
-- [ ] ACPI tables and power-management discovery.
+- [ ] ACPI tables and power-management.
 - [ ] APIC/IOAPIC.
 - [ ] NVMe/AHCI.
 - [ ] xHCI/USB.
