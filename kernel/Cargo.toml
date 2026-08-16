@@ -1,0 +1,18 @@
+[package]
+name = "aweos-kernel"
+version = "0.2.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
