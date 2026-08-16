@@ -1,5 +1,5 @@
 #![no_std]
-#![no_main]
+#![cfg_attr(not(test), no_main)]
 
 use core::arch::global_asm;
 use awe_boot_protocol::{Architecture, BootInfo, MemoryRegion, AWE_BOOT_MAGIC};
@@ -49,33 +49,24 @@ pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u32) -> ! {
     serial_init();
     serial_write(b"AWEOS CellKernel\r\n");
     serial_write(b"AWEOS boot: x86_64 Multiboot2 entry\r\n");
-
     let info = if boot_magic == MULTIBOOT2_BOOTLOADER_MAGIC {
         parse_multiboot2(boot_info_addr as usize)
     } else {
         serial_write(b"AWEOS: invalid Multiboot2 boot magic\r\n");
         BootInfo::empty(Architecture::X86_64)
     };
-
     match kernel_entry(&info) {
         KernelBootStatus::Ready => {
             serial_write(b"AWEOS: boot protocol validated\r\n");
             serial_write(b"AWEOS: kernel state = RUNNING\r\n");
         }
         KernelBootStatus::InvalidBootInfo => serial_write(b"AWEOS: invalid boot info\r\n"),
-        KernelBootStatus::UnsupportedArchitecture => {
-            serial_write(b"AWEOS: unsupported architecture\r\n")
-        }
+        KernelBootStatus::UnsupportedArchitecture => serial_write(b"AWEOS: unsupported architecture\r\n"),
         KernelBootStatus::NoCpu => serial_write(b"AWEOS: no CPU reported\r\n"),
-        KernelBootStatus::NoUsableMemory => {
-            serial_write(b"AWEOS: no usable memory reported\r\n")
-        }
+        KernelBootStatus::NoUsableMemory => serial_write(b"AWEOS: no usable memory reported\r\n"),
     }
-
     serial_write(b"AWEOS: kernel is alive\r\n");
-    loop {
-        unsafe { core::arch::asm!("hlt", options(nomem, nostack, preserves_flags)); }
-    }
+    loop { unsafe { core::arch::asm!("hlt", options(nomem, nostack, preserves_flags)); } }
 }
 
 #[cfg(not(test))]
@@ -83,12 +74,10 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
     if addr == 0 { return BootInfo::empty(Architecture::X86_64); }
     let total_size = unsafe { core::ptr::read_unaligned(addr as *const u32) } as usize;
     if !(16..=1024 * 1024).contains(&total_size) { return BootInfo::empty(Architecture::X86_64); }
-
     let regions_ptr = core::ptr::addr_of_mut!(MEMORY_REGIONS) as *mut MemoryRegion;
     let mut region_count = 0u32;
     let (mut framebuffer_address, mut framebuffer_size, mut framebuffer_width, mut framebuffer_height,
         mut framebuffer_pitch, mut acpi_rsdp) = (0u64, 0u64, 0u32, 0u32, 0u32, 0u64);
-
     let mut offset = 8usize;
     while offset + 8 <= total_size {
         let tag = unsafe { core::ptr::read_unaligned((addr + offset) as *const u32) };
@@ -121,7 +110,6 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
         }
         offset = (offset + size + 7) & !7;
     }
-
     BootInfo { magic: AWE_BOOT_MAGIC, version: awe_boot_protocol::AWE_BOOT_VERSION,
         size: core::mem::size_of::<BootInfo>() as u32, architecture: Architecture::X86_64,
         cpu_count: 1, memory_regions: regions_ptr, memory_region_count: region_count,
