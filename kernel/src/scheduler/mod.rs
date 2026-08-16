@@ -1,48 +1,43 @@
 #![no_std]
 
-use super::process::ProcessId;
+pub mod clock;
+pub mod priority;
 
-pub const MAX_RUNNABLE: usize = 256;
+use crate::process::ProcessId;
 
-/// Bounded FIFO scheduler queue. It deliberately performs no allocation and
-/// refuses both overflow and duplicate runnable entries.
-pub struct Scheduler {
-    queue: [Option<ProcessId>; MAX_RUNNABLE],
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct RunQueue<const N: usize> {
+    items: [Option<ProcessId>; N],
     head: usize,
     tail: usize,
     len: usize,
 }
 
-impl Scheduler {
-    pub const fn new() -> Self { Self { queue: [None; MAX_RUNNABLE], head: 0, tail: 0, len: 0 } }
+impl<const N: usize> RunQueue<N> {
+    pub const fn new() -> Self { Self { items: [None; N], head: 0, tail: 0, len: 0 } }
+    pub const fn len(&self) -> usize { self.len }
+    pub const fn is_empty(&self) -> bool { self.len == 0 }
 
-    pub fn enqueue(&mut self, process: ProcessId) -> bool {
-        if self.len == MAX_RUNNABLE || self.contains(process) { return false; }
-        self.queue[self.tail] = Some(process);
-        self.tail = (self.tail + 1) % MAX_RUNNABLE;
+    pub fn push(&mut self, id: ProcessId) -> bool {
+        if N == 0 || self.len == N || self.contains(id) { return false; }
+        self.items[self.tail] = Some(id);
+        self.tail = (self.tail + 1) % N;
         self.len += 1;
         true
     }
 
-    pub fn dequeue(&mut self) -> Option<ProcessId> {
+    pub fn pop(&mut self) -> Option<ProcessId> {
         if self.len == 0 { return None; }
-        let process = self.queue[self.head].take();
-        self.head = (self.head + 1) % MAX_RUNNABLE;
+        let id = self.items[self.head].take();
+        self.head = (self.head + 1) % N;
         self.len -= 1;
-        process
+        id
     }
 
-    pub const fn len(&self) -> usize { self.len }
-    pub const fn is_empty(&self) -> bool { self.len == 0 }
-    pub const fn is_full(&self) -> bool { self.len == MAX_RUNNABLE }
-
-    fn contains(&self, process: ProcessId) -> bool {
+    fn contains(&self, id: ProcessId) -> bool {
         let mut i = 0;
         while i < self.len {
-            let index = (self.head + i) % MAX_RUNNABLE;
-            if let Some(candidate) = self.queue[index] {
-                if candidate == process { return true; }
-            }
+            if self.items[(self.head + i) % N] == Some(id) { return true; }
             i += 1;
         }
         false
@@ -52,27 +47,23 @@ impl Scheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
-    fn fifo_order_and_duplicate_protection() {
-        let mut scheduler = Scheduler::new();
-        let a = ProcessId(10);
-        let b = ProcessId(11);
-        assert!(scheduler.enqueue(a));
-        assert!(scheduler.enqueue(b));
-        assert!(!scheduler.enqueue(a));
-        assert_eq!(scheduler.dequeue(), Some(a));
-        assert_eq!(scheduler.dequeue(), Some(b));
-        assert!(scheduler.is_empty());
+    fn fifo_and_capacity_are_deterministic() {
+        let mut q: RunQueue<2> = RunQueue::new();
+        assert!(q.push(ProcessId(1)));
+        assert!(q.push(ProcessId(2)));
+        assert!(!q.push(ProcessId(3)));
+        assert_eq!(q.pop(), Some(ProcessId(1)));
+        assert!(q.push(ProcessId(3)));
+        assert_eq!(q.pop(), Some(ProcessId(2)));
+        assert_eq!(q.pop(), Some(ProcessId(3)));
+        assert!(q.pop().is_none());
     }
 
     #[test]
-    fn queue_never_exceeds_bound() {
-        let mut scheduler = Scheduler::new();
-        for id in 0..MAX_RUNNABLE as u64 {
-            assert!(scheduler.enqueue(ProcessId(id + 1)));
-        }
-        assert!(scheduler.is_full());
-        assert!(!scheduler.enqueue(ProcessId(MAX_RUNNABLE as u64 + 1)));
+    fn duplicate_is_rejected() {
+        let mut q: RunQueue<2> = RunQueue::new();
+        assert!(q.push(ProcessId(1)));
+        assert!(!q.push(ProcessId(1)));
     }
 }
