@@ -4,6 +4,7 @@ pub mod context;
 pub mod context_switch;
 pub mod context_switch_abi;
 pub mod x86_64_backend;
+pub mod dispatch;
 
 use core::sync::atomic::{AtomicU64, Ordering};
 
