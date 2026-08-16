@@ -21,12 +21,12 @@ jobs:
           components: rustfmt, clippy
       - name: Format check
         run: cargo fmt --all -- --check
-      - name: Root check
-        run: cargo check --target x86_64-aweos.json
+      - name: Workspace check
+        run: cargo check --workspace
       - name: Kernel check
-        run: cargo check --manifest-path kernel/Cargo.toml
+        run: cargo check -p aweos-kernel
       - name: Kernel clippy
-        run: cargo clippy --manifest-path kernel/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy -p aweos-kernel --all-targets -- -D warnings
 
   bootloader:
     runs-on: ubuntu-latest
