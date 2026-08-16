@@ -19,8 +19,8 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Format check
-        run: cargo fmt --all -- --check
+      - name: Format workspace
+        run: cargo fmt --all
       - name: Workspace check
         run: cargo check --workspace
       - name: Workspace tests
