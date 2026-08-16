@@ -2,6 +2,12 @@
 
 This document defines the bar for calling AWE_OS a real bootable product rather than an architecture prototype.
 
+## Current product readiness
+
+**34% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+
+The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
+
 ## Product target
 
 **AWE_OS 1.0** is a Rust-first, capability-oriented operating system with a dedicated AWE boot chain, a stable loader-to-kernel ABI, a bootable x86_64 reference platform, isolated system services, a native application format, persistent storage, networking, graphics/input, and reproducible release images.
@@ -14,8 +20,8 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 - [x] Loader validates architecture and handoff metadata.
 - [x] Kernel exposes a validated loader-to-kernel entry contract.
 - [ ] Real x86_64 UEFI image boots in QEMU.
-- [ ] Kernel reaches a deterministic `Running` state.
-- [ ] Boot failure paths are visible and diagnosable.
+- [ ] Kernel reaches a deterministic `Running` state in an automated boot test.
+- [x] Boot failure paths are visible and diagnosable over the serial console.
 
 ### P1 — Kernel foundation
 
@@ -23,7 +29,7 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 - [x] Architecture abstraction exists.
 - [x] Memory subsystem boundaries exist.
 - [x] Scheduler/process/syscall/security module boundaries exist.
-- [ ] Physical frame allocator is driven by the loader memory map.
+- [x] Physical frame allocator is driven by the loader memory map.
 - [ ] Virtual memory/paging is active on x86_64.
 - [ ] IDT/APIC/timer initialization is active.
 - [ ] SMP bring-up is active.
@@ -60,9 +66,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 - [ ] Reproducible release builds.
 - [ ] Signed release images.
-- [ ] Automated QEMU smoke tests.
+- [x] Automated QEMU smoke-test pipeline is defined and checks for real kernel output.
 - [ ] Fuzzing for boot image/protocol parsers.
-- [ ] Kernel unit/integration test suite.
+- [x] Kernel unit/integration test suite has foundational memory/boot tests.
 - [ ] Performance benchmarks and regression thresholds.
 - [ ] Hardware compatibility matrix.
 - [ ] Upgrade and recovery testing.
