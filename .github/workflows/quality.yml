@@ -1,33 +1,41 @@
 name: AWEOS Quality Gate
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   rust:
+    name: Rust workspace
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Format workspace
-        run: cargo fmt --all
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
       - name: Workspace check
-        run: cargo check --workspace
+        run: cargo check --workspace --locked
+
       - name: Workspace tests
         id: tests
         shell: bash
-        continue-on-error: false
         run: |
           set -o pipefail
-          cargo test --workspace --no-fail-fast 2>&1 | tee test-output.log
+          cargo test --workspace --locked --no-fail-fast 2>&1 | tee test-output.log
           exit ${PIPESTATUS[0]}
+
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -35,16 +43,21 @@ jobs:
           name: aweos-test-output-${{ github.run_id }}
           path: test-output.log
           if-no-files-found: warn
-      - name: Workspace clippy diagnostics
+
+      - name: Workspace Clippy
         if: steps.tests.outcome == 'success'
-        run: cargo clippy --workspace --all-targets
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
   bootloader:
+    name: UEFI loader
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           targets: x86_64-unknown-uefi
+
       - name: Check AWE loader
-        run: cargo check --manifest-path boot/aweloader/Cargo.toml --target x86_64-unknown-uefi
+        run: cargo check --locked --manifest-path boot/aweloader/Cargo.toml --target x86_64-unknown-uefi
