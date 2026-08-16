@@ -1,5 +1,10 @@
 #![no_std]
 
+pub mod context;
+pub mod context_switch;
+pub mod context_switch_abi;
+pub mod x86_64_backend;
+
 use core::sync::atomic::{AtomicU64, Ordering};
 
 #[repr(transparent)]
@@ -26,22 +31,9 @@ impl ResourceBudget {
     pub const fn permits_cpu(&self, ticks: u64) -> bool { ticks <= self.cpu_ticks }
     pub const fn permits_memory(&self, bytes: u64) -> bool { bytes <= self.memory_bytes }
     pub const fn permits_ipc(&self, messages: u64) -> bool { messages <= self.ipc_messages }
-
-    pub fn consume_cpu(&mut self, ticks: u64) -> bool {
-        if ticks > self.cpu_ticks { return false; }
-        self.cpu_ticks -= ticks;
-        true
-    }
-    pub fn consume_memory(&mut self, bytes: u64) -> bool {
-        if bytes > self.memory_bytes { return false; }
-        self.memory_bytes -= bytes;
-        true
-    }
-    pub fn consume_ipc(&mut self, messages: u64) -> bool {
-        if messages > self.ipc_messages { return false; }
-        self.ipc_messages -= messages;
-        true
-    }
+    pub fn consume_cpu(&mut self, ticks: u64) -> bool { if ticks > self.cpu_ticks { return false; } self.cpu_ticks -= ticks; true }
+    pub fn consume_memory(&mut self, bytes: u64) -> bool { if bytes > self.memory_bytes { return false; } self.memory_bytes -= bytes; true }
+    pub fn consume_ipc(&mut self, messages: u64) -> bool { if messages > self.ipc_messages { return false; } self.ipc_messages -= messages; true }
 }
 
 #[repr(C)]
@@ -51,20 +43,11 @@ pub struct ProcessDescriptor { pub id: ProcessId, pub state: ProcessState, pub b
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn process_ids_are_unique() {
-        let table = ProcessTable::new();
-        assert_eq!(table.allocate_id().0, 1);
-        assert_eq!(table.allocate_id().0, 2);
-    }
-    #[test]
-    fn budgets_are_bounded_and_consumable() {
-        let mut budget = ResourceBudget { cpu_ticks: 10, memory_bytes: 4096, ipc_messages: 3 };
-        assert!(budget.consume_cpu(10));
-        assert!(!budget.consume_cpu(1));
-        assert!(budget.consume_memory(1024));
-        assert!(!budget.consume_memory(4096));
-        assert!(budget.consume_ipc(3));
-        assert!(!budget.consume_ipc(1));
+    #[test] fn process_ids_are_unique() { let table=ProcessTable::new(); assert_eq!(table.allocate_id().0,1); assert_eq!(table.allocate_id().0,2); }
+    #[test] fn budgets_are_bounded_and_consumable() {
+        let mut budget=ResourceBudget{cpu_ticks:10,memory_bytes:4096,ipc_messages:3};
+        assert!(budget.consume_cpu(10)); assert!(!budget.consume_cpu(1));
+        assert!(budget.consume_memory(1024)); assert!(!budget.consume_memory(4096));
+        assert!(budget.consume_ipc(3)); assert!(!budget.consume_ipc(1));
     }
 }
