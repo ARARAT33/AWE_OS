@@ -26,14 +26,14 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Workspace check
-        run: cargo check --workspace --locked
+        run: cargo check --workspace
 
       - name: Workspace tests
         id: tests
         shell: bash
         run: |
           set -o pipefail
-          cargo test --workspace --locked --no-fail-fast 2>&1 | tee test-output.log
+          cargo test --workspace --no-fail-fast 2>&1 | tee test-output.log
           exit ${PIPESTATUS[0]}
 
       - name: Upload test diagnostics
@@ -46,7 +46,7 @@ jobs:
 
       - name: Workspace Clippy
         if: steps.tests.outcome == 'success'
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
   bootloader:
     name: UEFI loader
@@ -60,4 +60,4 @@ jobs:
           targets: x86_64-unknown-uefi
 
       - name: Check AWE loader
-        run: cargo check --locked --manifest-path boot/aweloader/Cargo.toml --target x86_64-unknown-uefi
+        run: cargo check --manifest-path boot/aweloader/Cargo.toml --target x86_64-unknown-uefi
