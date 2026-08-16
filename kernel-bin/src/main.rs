@@ -16,9 +16,10 @@ static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] =
 #[unsafe(no_mangle)]
 static MULTIBOOT2_HEADER: [u32; 4] = [0xE85250D6, 0, 16, 0x17ADAF1A];
 
-// Rust 1.97/LLVM uses Intel syntax for global_asm! by default.
-// Keep this entry stub explicitly in Intel syntax so it is identical in
-// normal and `cargo test` builds.
+// The bare-metal boot entry must not be linked into Cargo's host-side test
+// harness, which supplies its own `_start`. The boot-image build is non-test
+// and therefore keeps the complete Multiboot2 entry point.
+#[cfg(not(test))]
 global_asm!(r#"
 .section .text.boot
 .global _start
@@ -42,6 +43,7 @@ stack_bottom:
 stack_top:
 "#);
 
+#[cfg(not(test))]
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u32) -> ! {
     serial_init();
@@ -76,6 +78,7 @@ pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u32) -> ! {
     }
 }
 
+#[cfg(not(test))]
 fn parse_multiboot2(addr: usize) -> BootInfo {
     if addr == 0 {
         return BootInfo::empty(Architecture::X86_64);
@@ -180,6 +183,7 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
     }
 }
 
+#[cfg(not(test))]
 fn serial_init() {
     unsafe {
         core::arch::asm!(
@@ -208,6 +212,7 @@ fn serial_init() {
     }
 }
 
+#[cfg(not(test))]
 fn serial_write(bytes: &[u8]) {
     for &byte in bytes {
         unsafe {
