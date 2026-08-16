@@ -4,7 +4,7 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**40% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**42% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
 The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
 
@@ -15,10 +15,12 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 ## New implemented kernel primitives
 
 - Intent-carrying authorization with required rights, impact class and resource budget.
+- Deterministic security policy engine with explicit allow/deny reasons for malformed intent, missing capability, excessive impact and excessive budget.
 - Bounded, allocation-free causal provenance journal for security-sensitive events.
 - Non-escalating capability derivation: child authority is the intersection of parent and requested rights.
 - Explicit empty/revoked capability state.
 - Process states and consumable CPU, memory and IPC budgets with underflow-safe rejection.
+- Allocation-free token-bucket rate limiter for repeated privileged operations.
 - AWE Capsule and XenoSense specifications now have corresponding kernel security foundations.
 - Cloud security gate validates formatting, workspace compilation, tests, strict Clippy and the release contract on every main push/PR.
 
@@ -51,9 +53,11 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 - [ ] SMP bring-up.
 - [ ] Booted-kernel heap stress tests.
 - [x] Intent authorization primitive.
+- [x] Deterministic security policy engine.
 - [x] Bounded provenance journal.
 - [x] Non-escalating capability derivation/revocation model.
 - [x] Consumable process resource budgets.
+- [x] Bounded privileged-operation rate limiter.
 
 ### P2 — Hardware and storage
 - [ ] PCI/PCIe enumeration.
