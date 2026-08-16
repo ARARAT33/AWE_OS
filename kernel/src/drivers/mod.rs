@@ -23,6 +23,7 @@ pub mod linux_transaction_orchestrator;
 pub mod linux_transaction_bridge;
 pub mod linux_driver_ops;
 pub mod linux_multi_instance;
+pub mod linux_dependency_multi_instance;
 pub mod virtio;
 pub mod universal;
 pub mod installer;
@@ -51,6 +52,7 @@ pub use linux_transaction_orchestrator::{ActivationOrchestrator, OrchestratorErr
 pub use linux_transaction_bridge::{BridgeError as LinuxBridgeError, TransactionBridge};
 pub use linux_driver_ops::{DriverLifecycle, DriverOp, DriverOpError, DriverState};
 pub use linux_multi_instance::{DriverInstance, MultiInstanceError, MultiInstanceManager};
+pub use linux_dependency_multi_instance::{DependencyMultiInstanceManager, DependencyMultiError};
 pub use virtio::{VirtioDevice, VirtioFeatures};
 pub use universal::{validate_request, DriverAbi, DriverAction, DriverError, DriverOs, DriverRequest, DriverResult};
 pub use installer::{plan_install, InstallError, InstallPlan, InstallerPackage, PackageFormat};
