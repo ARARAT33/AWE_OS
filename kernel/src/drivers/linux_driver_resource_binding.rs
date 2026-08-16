@@ -24,8 +24,12 @@ impl<const N: usize> DriverResourceBinding<N> {
     }
 
     pub fn acquire_all(&mut self, requested: &[Resource]) -> Result<(), BindingError> {
-        let mut tx = ResourceTransaction::new(&mut self.resources, self.owner);
+        let mut tx = ResourceTransaction::begin(&mut self.resources);
         for resource in requested.iter().copied() {
+            if resource.owner != self.owner {
+                let _ = tx.rollback();
+                return Err(BindingError::InvalidState);
+            }
             tx.acquire(resource).map_err(BindingError::Transaction)?;
         }
         tx.commit().map_err(BindingError::Transaction)?;
@@ -73,6 +77,14 @@ mod tests {
         assert!(binding.acquire_all(&requested).is_err());
         assert_eq!(binding.resource_count(), 0);
         assert!(!binding.active());
+    }
+
+    #[test]
+    fn rejects_wrong_owner_without_leaking() {
+        let mut binding = DriverResourceBinding::<4>::new(10);
+        let requested = [Resource { owner: 11, kind: ResourceKind::Irq, start: 11, length: 1 }];
+        assert_eq!(binding.acquire_all(&requested), Err(BindingError::InvalidState));
+        assert_eq!(binding.resource_count(), 0);
     }
 
     #[test]
