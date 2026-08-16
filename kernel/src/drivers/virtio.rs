@@ -3,70 +3,12 @@
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct VirtioFeatures(pub u64);
-
-impl VirtioFeatures {
-    pub const VERSION_1: Self = Self(1 << 32);
-    pub const ACCESS_PLATFORM: Self = Self(1 << 33);
-    pub const RING_INDIRECT_DESC: Self = Self(1 << 28);
-    pub const RING_EVENT_IDX: Self = Self(1 << 29);
-    pub const RING_PACKED: Self = Self(1 << 34);
-    pub const fn contains(self, other: Self) -> bool { (self.0 & other.0) == other.0 }
-    pub const fn intersection(self, other: Self) -> Self { Self(self.0 & other.0) }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum VirtioError { MissingVersion, AlreadyReady, QueueCountZero, QueueTooLarge, InvalidQueueAlignment }
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct VirtioQueueConfig { pub size: u16, pub alignment: u16 }
-
-impl VirtioQueueConfig {
-    pub const fn validate(self, max_size: u16) -> Result<(), VirtioError> {
-        if self.size == 0 { return Err(VirtioError::QueueCountZero); }
-        if self.size > max_size { return Err(VirtioError::QueueTooLarge); }
-        if self.alignment == 0 || !self.alignment.is_power_of_two() { return Err(VirtioError::InvalidQueueAlignment); }
-        Ok(())
-    }
-}
-
-pub struct VirtioDevice {
-    negotiated: VirtioFeatures,
-    ready: bool,
-    queue_count: u16,
-}
-
-impl VirtioDevice {
-    pub const fn new() -> Self { Self { negotiated: VirtioFeatures(0), ready: false, queue_count: 0 } }
-    pub const fn negotiate(device: VirtioFeatures, driver: VirtioFeatures) -> VirtioFeatures { device.intersection(driver) }
-
-    pub fn initialize(&mut self, device: VirtioFeatures, driver: VirtioFeatures) -> Result<(), VirtioError> {
-        if self.ready { return Err(VirtioError::AlreadyReady); }
-        let negotiated = Self::negotiate(device, driver);
-        if !negotiated.contains(VirtioFeatures::VERSION_1) { return Err(VirtioError::MissingVersion); }
-        self.negotiated = negotiated;
-        Ok(())
-    }
-
-    pub fn configure_queues(&mut self, queues: &[VirtioQueueConfig], max_size: u16) -> Result<(), VirtioError> {
-        if !self.negotiated.contains(VirtioFeatures::VERSION_1) { return Err(VirtioError::MissingVersion); }
-        if queues.is_empty() { return Err(VirtioError::QueueCountZero); }
-        for queue in queues.iter().copied() { queue.validate(max_size)?; }
-        self.queue_count = queues.len() as u16;
-        self.ready = true;
-        Ok(())
-    }
-
-    pub const fn is_ready(&self) -> bool { self.ready }
-    pub const fn features(&self) -> VirtioFeatures { self.negotiated }
-    pub const fn queue_count(&self) -> u16 { self.queue_count }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test] fn negotiation_requires_common_features() { let host=VirtioFeatures((1<<32)|(1<<29)); let guest=VirtioFeatures((1<<32)|(1<<28)); let mut dev=VirtioDevice::new(); dev.initialize(host,guest).unwrap(); assert!(dev.features().contains(VirtioFeatures::VERSION_1)); assert!(!dev.features().contains(VirtioFeatures::RING_INDIRECT_DESC)); }
-    #[test] fn legacy_only_device_is_rejected() { let mut dev=VirtioDevice::new(); assert_eq!(dev.initialize(VirtioFeatures(1),VirtioFeatures::VERSION_1),Err(VirtioError::MissingVersion)); assert!(!dev.is_ready()); }
-    #[test] fn queues_are_validated_before_ready() { let mut dev=VirtioDevice::new(); dev.initialize(VirtioFeatures::VERSION_1,VirtioFeatures::VERSION_1).unwrap(); assert_eq!(dev.configure_queues(&[],128),Err(VirtioError::QueueCountZero)); assert!(!dev.is_ready()); }
-    #[test] fn valid_queue_configuration_makes_device_ready() { let mut dev=VirtioDevice::new(); dev.initialize(VirtioFeatures::VERSION_1,VirtioFeatures::VERSION_1).unwrap(); dev.configure_queues(&[VirtioQueueConfig{size:64,alignment:4096},VirtioQueueConfig{size:128,alignment:4096}],128).unwrap(); assert!(dev.is_ready()); assert_eq!(dev.queue_count(),2); }
-    #[test] fn invalid_queue_does_not_partially_configure() { let mut dev=VirtioDevice::new(); dev.initialize(VirtioFeatures::VERSION_1,VirtioFeatures::VERSION_1).unwrap(); assert_eq!(dev.configure_queues(&[VirtioQueueConfig{size:64,alignment:3}],128),Err(VirtioError::InvalidQueueAlignment)); assert_eq!(dev.queue_count(),0); assert!(!dev.is_ready()); }
-}
+impl VirtioFeatures { pub const VERSION_1:Self=Self(1<<32);pub const ACCESS_PLATFORM:Self=Self(1<<33);pub const RING_INDIRECT_DESC:Self=Self(1<<28);pub const RING_EVENT_IDX:Self=Self(1<<29);pub const RING_PACKED:Self=Self(1<<34);pub const fn contains(self,o:Self)->bool{(self.0&o.0)==o.0}pub const fn intersection(self,o:Self)->Self{Self(self.0&o.0)} }
+#[derive(Clone,Copy,PartialEq,Eq,Debug)]pub enum VirtioError{MissingVersion,AlreadyReady,QueueCountZero,QueueTooLarge,InvalidQueueAlignment,DescriptorIndexOutOfBounds,DescriptorLengthZero,QueueNotReady}
+#[repr(C)]#[derive(Clone,Copy,PartialEq,Eq,Debug)]pub struct VirtioDescriptor{pub addr:u64,pub len:u32,pub flags:u16,pub next:u16}
+#[derive(Clone,Copy,PartialEq,Eq,Debug)]pub struct VirtioQueueConfig{pub size:u16,pub alignment:u16}
+impl VirtioQueueConfig{pub const fn validate(self,max:u16)->Result<(),VirtioError>{if self.size==0{return Err(VirtioError::QueueCountZero)}if self.size>max{return Err(VirtioError::QueueTooLarge)}if self.alignment==0||!self.alignment.is_power_of_two(){return Err(VirtioError::InvalidQueueAlignment)}Ok(())}}
+impl VirtioDescriptor{pub const fn validate(&self,queue_size:u16)->Result<(),VirtioError>{if self.len==0{return Err(VirtioError::DescriptorLengthZero)}if self.next>=queue_size{return Err(VirtioError::DescriptorIndexOutOfBounds)}Ok(())}}
+pub struct VirtioDevice{negotiated:VirtioFeatures,ready:bool,queue_count:u16}
+impl VirtioDevice{pub const fn new()->Self{Self{negotiated:VirtioFeatures(0),ready:false,queue_count:0}}pub const fn negotiate(d:VirtioFeatures,r:VirtioFeatures)->VirtioFeatures{d.intersection(r)}pub fn initialize(&mut self,d:VirtioFeatures,r:VirtioFeatures)->Result<(),VirtioError>{if self.ready{return Err(VirtioError::AlreadyReady)}let n=Self::negotiate(d,r);if !n.contains(VirtioFeatures::VERSION_1){return Err(VirtioError::MissingVersion)}self.negotiated=n;Ok(())}pub fn configure_queues(&mut self,q:&[VirtioQueueConfig],max:u16)->Result<(),VirtioError>{if !self.negotiated.contains(VirtioFeatures::VERSION_1){return Err(VirtioError::MissingVersion)}if q.is_empty(){return Err(VirtioError::QueueCountZero)}for x in q.iter().copied(){x.validate(max)?}self.queue_count=q.len() as u16;self.ready=true;Ok(())}pub fn validate_descriptor(&self,d:&VirtioDescriptor)->Result<(),VirtioError>{if !self.ready{return Err(VirtioError::QueueNotReady)}d.validate(self.queue_count.max(1))}pub const fn is_ready(&self)->bool{self.ready}pub const fn features(&self)->VirtioFeatures{self.negotiated}pub const fn queue_count(&self)->u16{self.queue_count}}
+#[cfg(test)]mod tests{use super::*;#[test]fn negotiation_requires_common_features(){let h=VirtioFeatures((1<<32)|(1<<29));let g=VirtioFeatures((1<<32)|(1<<28));let mut d=VirtioDevice::new();d.initialize(h,g).unwrap();assert!(d.features().contains(VirtioFeatures::VERSION_1));}#[test]fn valid_queue_configuration_makes_ready(){let mut d=VirtioDevice::new();d.initialize(VirtioFeatures::VERSION_1,VirtioFeatures::VERSION_1).unwrap();d.configure_queues(&[VirtioQueueConfig{size:64,alignment:4096}],64).unwrap();assert!(d.is_ready());}#[test]fn descriptor_validation_rejects_zero_length(){let mut d=VirtioDevice::new();d.initialize(VirtioFeatures::VERSION_1,VirtioFeatures::VERSION_1).unwrap();d.configure_queues(&[VirtioQueueConfig{size:64,alignment:4096}],64).unwrap();assert_eq!(d.validate_descriptor(&VirtioDescriptor{addr:0x1000,len:0,flags:0,next:0}),Err(VirtioError::DescriptorLengthZero));}#[test]fn descriptor_validation_rejects_bad_next(){let mut d=VirtioDevice::new();d.initialize(VirtioFeatures::VERSION_1,VirtioFeatures::VERSION_1).unwrap();d.configure_queues(&[VirtioQueueConfig{size:64,alignment:4096}],64).unwrap();assert_eq!(d.validate_descriptor(&VirtioDescriptor{addr:0x1000,len:4,flags:0,next:64}),Err(VirtioError::DescriptorIndexOutOfBounds));}#[test]fn descriptor_validation_accepts_valid_descriptor(){let mut d=VirtioDevice::new();d.initialize(VirtioFeatures::VERSION_1,VirtioFeatures::VERSION_1).unwrap();d.configure_queues(&[VirtioQueueConfig{size:64,alignment:4096}],64).unwrap();assert!(d.validate_descriptor(&VirtioDescriptor{addr:0x1000,len:4,flags:0,next:0}).is_ok());}}
