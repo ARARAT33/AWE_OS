@@ -29,6 +29,8 @@ jobs:
           cp kernel-bin/grub.cfg dist/iso/boot/grub/grub.cfg
           grub-mkrescue -o dist/aweos-x86_64.iso dist/iso
       - name: QEMU unattended boot smoke test
+        id: qemu
+        shell: bash
         run: |
           set +e
           timeout 12s qemu-system-x86_64 \
@@ -37,17 +39,32 @@ jobs:
             -serial stdio \
             -no-reboot \
             > dist/qemu.log 2>&1
-          status=$?
-          set -e
-          cat dist/qemu.log
+          qemu_status=$?
           grep -q "AWEOS: boot protocol validated" dist/qemu.log
+          boot_ok=$?
           grep -q "AWEOS: kernel state = RUNNING" dist/qemu.log
+          running_ok=$?
           grep -q "AWEOS: kernel is alive" dist/qemu.log
-          test "$status" -eq 124 || test "$status" -eq 0
+          alive_ok=$?
+          echo "qemu_status=$qemu_status" >> "$GITHUB_OUTPUT"
+          echo "boot_ok=$boot_ok" >> "$GITHUB_OUTPUT"
+          echo "running_ok=$running_ok" >> "$GITHUB_OUTPUT"
+          echo "alive_ok=$alive_ok" >> "$GITHUB_OUTPUT"
+          cat dist/qemu.log
+          if [ "$qemu_status" -ne 124 ] && [ "$qemu_status" -ne 0 ]; then exit 1; fi
+          if [ "$boot_ok" -ne 0 ] || [ "$running_ok" -ne 0 ] || [ "$alive_ok" -ne 0 ]; then exit 1; fi
       - name: Upload ISO and boot log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: aweos-x86_64-iso
           path: |
             dist/aweos-x86_64.iso
             dist/qemu.log
+      - name: Boot diagnostics summary
+        if: always()
+        run: |
+          echo "QEMU status: ${{ steps.qemu.outputs.qemu_status }}"
+          echo "boot marker: ${{ steps.qemu.outputs.boot_ok }}"
+          echo "running marker: ${{ steps.qemu.outputs.running_ok }}"
+          echo "alive marker: ${{ steps.qemu.outputs.alive_ok }}"
