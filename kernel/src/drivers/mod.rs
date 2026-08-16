@@ -19,6 +19,7 @@ pub mod linux_transaction_guard;
 pub mod linux_transaction_graph;
 pub mod linux_activation;
 pub mod linux_activation_rollback;
+pub mod linux_transaction_orchestrator;
 pub mod virtio;
 pub mod universal;
 pub mod installer;
@@ -43,6 +44,7 @@ pub use linux_transaction_guard::{install_plan_guarded, prepare_guarded, GuardEr
 pub use linux_transaction_graph::{prepare_graph_guarded, GraphTransactionError as LinuxGraphTransactionError};
 pub use linux_activation::{build_activation_order, validate_activation_order, ActivationError as LinuxActivationError};
 pub use linux_activation_rollback::{activation_failed, build_rollback_order, RollbackError as LinuxRollbackError};
+pub use linux_transaction_orchestrator::{ActivationOrchestrator, OrchestratorError as LinuxOrchestratorError, OrchestratorState as LinuxOrchestratorState};
 pub use virtio::{VirtioDevice, VirtioFeatures};
 pub use universal::{validate_request, DriverAbi, DriverAction, DriverError, DriverOs, DriverRequest, DriverResult};
 pub use installer::{plan_install, InstallError, InstallPlan, InstallerPackage, PackageFormat};
