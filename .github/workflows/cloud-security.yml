@@ -36,7 +36,7 @@ jobs:
       - name: Execute every workspace test
         run: cargo test --workspace --all-targets
       - name: Security-focused tests
-        run: cargo test --workspace security --all-targets
+        run: cargo test --workspace --all-targets -- security
       - name: Strict Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Dependency audit surface
