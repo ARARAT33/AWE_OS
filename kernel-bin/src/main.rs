@@ -49,10 +49,14 @@ pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u32) -> ! {
     serial_init();
     serial_write(b"AWEOS CellKernel\r\n");
     serial_write(b"AWEOS boot: x86_64 Multiboot2 entry\r\n");
-    let info = if boot_magic == MULTIBOOT2_BOOTLOADER_MAGIC {
+    // GRUB's Multiboot2 handoff is validated from the pointed-to information
+    // block as well as the magic value. Some firmware/GRUB combinations do
+    // not preserve EAX through an intermediate entry shim, but a non-zero,
+    // structurally valid Multiboot2 block is still authoritative.
+    let info = if boot_magic == MULTIBOOT2_BOOTLOADER_MAGIC || boot_info_addr != 0 {
         parse_multiboot2(boot_info_addr as usize)
     } else {
-        serial_write(b"AWEOS: invalid Multiboot2 boot magic\r\n");
+        serial_write(b"AWEOS: invalid Multiboot2 handoff\r\n");
         BootInfo::empty(Architecture::X86_64)
     };
     match kernel_entry(&info) {
