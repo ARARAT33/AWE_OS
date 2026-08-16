@@ -5,6 +5,7 @@ pub mod context_switch;
 pub mod context_switch_abi;
 pub mod x86_64_backend;
 pub mod dispatch;
+pub mod scheduler;
 
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -13,7 +14,6 @@ use core::sync::atomic::{AtomicU64, Ordering};
 pub struct ProcessId(pub u64);
 
 pub struct ProcessTable { next_id: AtomicU64 }
-
 impl ProcessTable {
     pub const fn new() -> Self { Self { next_id: AtomicU64::new(1) } }
     pub fn allocate_id(&self) -> ProcessId { ProcessId(self.next_id.fetch_add(1, Ordering::Relaxed)) }
@@ -26,7 +26,6 @@ pub enum ProcessState { Created = 0, Runnable = 1, Running = 2, Blocked = 3, Exi
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct ResourceBudget { pub cpu_ticks: u64, pub memory_bytes: u64, pub ipc_messages: u64 }
-
 impl ResourceBudget {
     pub const fn unlimited() -> Self { Self { cpu_ticks: u64::MAX, memory_bytes: u64::MAX, ipc_messages: u64::MAX } }
     pub const fn permits_cpu(&self, ticks: u64) -> bool { ticks <= self.cpu_ticks }
