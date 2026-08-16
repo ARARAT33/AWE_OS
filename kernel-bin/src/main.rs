@@ -2,8 +2,13 @@
 #![no_main]
 
 use core::arch::global_asm;
-use awe_boot_protocol::{Architecture, BootInfo};
+use awe_boot_protocol::{Architecture, BootInfo, MemoryRegion, AWE_BOOT_MAGIC};
 use aweos_kernel::entry::{kernel_entry, KernelBootStatus};
+
+const MULTIBOOT2_BOOTLOADER_MAGIC: u32 = 0x36D7_6289;
+const MAX_MEMORY_REGIONS: usize = 128;
+
+static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] = [MemoryRegion { base: 0, length: 0, kind: 2, reserved: 0 }; MAX_MEMORY_REGIONS];
 
 #[used]
 #[unsafe(link_section = ".multiboot2_header")]
@@ -19,6 +24,9 @@ _start:
     mov $stack_top, %rsp
     and $-16, %rsp
     xor %rbp, %rbp
+    # GRUB Multiboot2: EAX=boot magic, EBX=information structure.
+    mov %eax, %edi
+    mov %ebx, %esi
     call rust_main
 1:
     hlt
@@ -33,20 +41,99 @@ stack_top:
 "#);
 
 #[unsafe(no_mangle)]
-pub extern "C" fn rust_main() -> ! {
+pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u32) -> ! {
     serial_init();
     serial_write(b"AWEOS CellKernel\r\n");
-    serial_write(b"AWEOS boot: x86_64 kernel entry\r\n");
+    serial_write(b"AWEOS boot: x86_64 Multiboot2 entry\r\n");
 
-    let info = BootInfo::empty(Architecture::X86_64);
+    let info = if boot_magic == MULTIBOOT2_BOOTLOADER_MAGIC {
+        parse_multiboot2(boot_info_addr as usize)
+    } else {
+        serial_write(b"AWEOS: invalid Multiboot2 boot magic\r\n");
+        BootInfo::empty(Architecture::X86_64)
+    };
+
     match kernel_entry(&info) {
-        KernelBootStatus::Ready => serial_write(b"AWEOS: boot protocol validated\r\n"),
-        _ => serial_write(b"AWEOS: boot protocol validation FAILED\r\n"),
+        KernelBootStatus::Ready => {
+            serial_write(b"AWEOS: boot protocol validated\r\n");
+            serial_write(b"AWEOS: kernel state = RUNNING\r\n");
+        }
+        KernelBootStatus::InvalidBootInfo => serial_write(b"AWEOS: invalid boot info\r\n"),
+        KernelBootStatus::UnsupportedArchitecture => serial_write(b"AWEOS: unsupported architecture\r\n"),
+        KernelBootStatus::NoCpu => serial_write(b"AWEOS: no CPU reported\r\n"),
     }
 
     serial_write(b"AWEOS: kernel is alive\r\n");
     loop {
         unsafe { core::arch::asm!("hlt", options(nomem, nostack, preserves_flags)); }
+    }
+}
+
+fn parse_multiboot2(addr: usize) -> BootInfo {
+    if addr == 0 { return BootInfo::empty(Architecture::X86_64); }
+    let total_size = unsafe { core::ptr::read_unaligned(addr as *const u32) } as usize;
+    if total_size < 16 || total_size > 1024 * 1024 { return BootInfo::empty(Architecture::X86_64); }
+
+    let regions_ptr = core::ptr::addr_of_mut!(MEMORY_REGIONS) as *mut MemoryRegion;
+    let mut region_count = 0u32;
+    let mut framebuffer_address = 0u64;
+    let mut framebuffer_size = 0u64;
+    let mut framebuffer_width = 0u32;
+    let mut framebuffer_height = 0u32;
+    let mut framebuffer_pitch = 0u32;
+    let mut acpi_rsdp = 0u64;
+
+    let mut offset = 8usize;
+    while offset + 8 <= total_size {
+        let tag = unsafe { core::ptr::read_unaligned((addr + offset) as *const u32) };
+        let size = unsafe { core::ptr::read_unaligned((addr + offset + 4) as *const u32) } as usize;
+        if size < 8 || offset + size > total_size || tag == 0 { break; }
+
+        match tag {
+            6 if size >= 16 => {
+                let entry_size = unsafe { core::ptr::read_unaligned((addr + offset + 8) as *const u32) } as usize;
+                if entry_size >= 24 {
+                    let mut entry = offset + 16;
+                    while entry + entry_size <= offset + size && (region_count as usize) < MAX_MEMORY_REGIONS {
+                        let base = unsafe { core::ptr::read_unaligned((addr + entry) as *const u64) };
+                        let length = unsafe { core::ptr::read_unaligned((addr + entry + 8) as *const u64) };
+                        let kind = unsafe { core::ptr::read_unaligned((addr + entry + 16) as *const u32) };
+                        unsafe { core::ptr::write(regions_ptr.add(region_count as usize), MemoryRegion { base, length, kind, reserved: 0 }); }
+                        region_count += 1;
+                        entry += entry_size;
+                    }
+                }
+            }
+            8 if size >= 32 => {
+                framebuffer_address = unsafe { core::ptr::read_unaligned((addr + offset + 8) as *const u64) };
+                framebuffer_pitch = unsafe { core::ptr::read_unaligned((addr + offset + 16) as *const u32) };
+                framebuffer_width = unsafe { core::ptr::read_unaligned((addr + offset + 20) as *const u32) };
+                framebuffer_height = unsafe { core::ptr::read_unaligned((addr + offset + 24) as *const u32) };
+                framebuffer_size = (framebuffer_pitch as u64).saturating_mul(framebuffer_height as u64);
+            }
+            14 | 15 if size >= 16 => acpi_rsdp = (addr + offset + 8) as u64,
+            _ => {}
+        }
+        offset = (offset + size + 7) & !7;
+    }
+
+    BootInfo {
+        magic: AWE_BOOT_MAGIC,
+        version: awe_boot_protocol::AWE_BOOT_VERSION,
+        size: core::mem::size_of::<BootInfo>() as u32,
+        architecture: Architecture::X86_64,
+        cpu_count: 1,
+        memory_regions: regions_ptr,
+        memory_region_count: region_count,
+        framebuffer_address,
+        framebuffer_size,
+        framebuffer_width,
+        framebuffer_height,
+        framebuffer_pitch,
+        acpi_rsdp,
+        device_tree: 0,
+        kernel_base: 0,
+        kernel_size: 0,
     }
 }
 
@@ -68,15 +155,9 @@ fn serial_write(bytes: &[u8]) {
     for &byte in bytes {
         unsafe {
             core::arch::asm!(
-                "mov dx, 0x3FD",
-                "1: in al, dx",
-                "test al, 0x20",
-                "jz 1b",
-                "mov dx, 0x3F8",
-                "mov al, cl",
-                "out dx, al",
-                byte = in("cl") byte,
-                out("al") _, out("dx") _,
+                "mov dx, 0x3FD", "1: in al, dx", "test al, 0x20", "jz 1b",
+                "mov dx, 0x3F8", "mov al, cl", "out dx, al",
+                byte = in("cl") byte, out("al") _, out("dx") _,
                 options(nostack, preserves_flags)
             );
         }
@@ -86,7 +167,5 @@ fn serial_write(bytes: &[u8]) {
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     serial_write(b"AWEOS: KERNEL PANIC\r\n");
-    loop {
-        unsafe { core::arch::asm!("cli; hlt", options(nomem, nostack, preserves_flags)); }
-    }
+    loop { unsafe { core::arch::asm!("cli; hlt", options(nomem, nostack, preserves_flags)); } }
 }
