@@ -2,6 +2,8 @@
 
 use awe_boot_protocol::Architecture;
 
+pub mod pit;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PlatformFeatures {
     pub paging: bool,
@@ -60,5 +62,11 @@ mod tests {
     fn x86_64_has_product_baseline_features() {
         let f = PlatformFeatures::for_architecture(Architecture::X86_64);
         assert!(f.paging && f.interrupts && f.smp && f.acpi);
+    }
+
+    #[test]
+    fn pit_rejects_invalid_rate() {
+        assert!(pit::Pit::new(0).is_none());
+        assert!(pit::Pit::new(1000).is_some());
     }
 }
