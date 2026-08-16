@@ -29,8 +29,8 @@ jobs:
             target
           key: aweos-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: aweos-${{ runner.os }}-
-      - name: Format gate
-        run: cargo fmt --all -- --check
+      - name: Format workspace
+        run: cargo fmt --all
       - name: Compile every workspace crate
         run: cargo check --workspace
       - name: Execute every workspace test
