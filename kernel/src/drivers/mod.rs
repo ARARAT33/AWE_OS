@@ -28,6 +28,7 @@ pub mod linux_driver_health;
 pub mod linux_fault_recovery;
 pub mod linux_driver_registry;
 pub mod linux_driver_supervisor;
+pub mod linux_fault_impact;
 pub mod virtio;
 pub mod universal;
 pub mod installer;
@@ -61,6 +62,7 @@ pub use linux_driver_health::{DriverHealth, DriverHealthMonitor, HealthError, He
 pub use linux_fault_recovery::{FaultRecovery, RecoveryError};
 pub use linux_driver_registry::{DriverRecord, DriverRegistry, RegistryError};
 pub use linux_driver_supervisor::{DriverSupervisor, SupervisorError};
+pub use linux_fault_impact::{FaultImpact, FaultImpactError};
 pub use virtio::{VirtioDevice, VirtioFeatures};
 pub use universal::{validate_request, DriverAbi, DriverAction, DriverError, DriverOs, DriverRequest, DriverResult};
 pub use installer::{plan_install, InstallError, InstallPlan, InstallerPackage, PackageFormat};
