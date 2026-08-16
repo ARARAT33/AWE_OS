@@ -35,11 +35,12 @@ jobs:
           name: aweos-test-output-${{ github.run_id }}
           path: test-output.log
           if-no-files-found: warn
-      - name: Fail on test errors
+      - name: Workspace clippy diagnostics
+        if: steps.tests.outcome == 'success'
+        run: cargo clippy --workspace --all-targets
+      - name: Test gate
         if: steps.tests.outcome == 'failure'
         run: exit 1
-      - name: Workspace clippy diagnostics
-        run: cargo clippy --workspace --all-targets
   bootloader:
     runs-on: ubuntu-latest
     steps:
