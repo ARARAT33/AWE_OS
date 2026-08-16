@@ -5,6 +5,11 @@ use core::arch::global_asm;
 use awe_boot_protocol::{Architecture, BootInfo};
 use aweos_kernel::entry::{kernel_entry, KernelBootStatus};
 
+#[used]
+#[unsafe(link_section = ".multiboot2_header")]
+#[unsafe(no_mangle)]
+static MULTIBOOT2_HEADER: [u32; 4] = [0xE85250D6, 0, 16, 0x17ADA8E8];
+
 global_asm!(r#"
 .section .text.boot
 .global _start
@@ -48,24 +53,12 @@ pub extern "C" fn rust_main() -> ! {
 fn serial_init() {
     unsafe {
         core::arch::asm!(
-            "mov dx, 0x3F8 + 1",
-            "mov al, 0",
-            "out dx, al",
-            "mov dx, 0x3F8 + 3",
-            "mov al, 0x80",
-            "out dx, al",
-            "mov dx, 0x3F8",
-            "mov al, 3",
-            "out dx, al",
-            "mov dx, 0x3F8 + 3",
-            "mov al, 3",
-            "out dx, al",
-            "mov dx, 0x3F8 + 2",
-            "mov al, 0xC7",
-            "out dx, al",
-            "mov dx, 0x3F8 + 4",
-            "mov al, 0x0B",
-            "out dx, al",
+            "mov dx, 0x3F9", "xor al, al", "out dx, al",
+            "mov dx, 0x3FB", "mov al, 0x80", "out dx, al",
+            "mov dx, 0x3F8", "mov al, 3", "out dx, al",
+            "mov dx, 0x3FB", "mov al, 3", "out dx, al",
+            "mov dx, 0x3FA", "mov al, 0xC7", "out dx, al",
+            "mov dx, 0x3FC", "mov al, 0x0B", "out dx, al",
             out("al") _, out("dx") _, options(nostack, preserves_flags)
         );
     }
@@ -75,16 +68,15 @@ fn serial_write(bytes: &[u8]) {
     for &byte in bytes {
         unsafe {
             core::arch::asm!(
-                "1:",
-                "in al, dx",
+                "mov dx, 0x3FD",
+                "1: in al, dx",
                 "test al, 0x20",
                 "jz 1b",
                 "mov dx, 0x3F8",
-                "mov al, {value}",
+                "mov al, {byte}",
                 "out dx, al",
-                value = in(reg_byte) byte,
-                out("al") _,
-                out("dx") _,
+                byte = in(reg) u32::from(byte),
+                out("al") _, out("dx") _,
                 options(nostack, preserves_flags)
             );
         }
