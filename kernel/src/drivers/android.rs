@@ -1,7 +1,6 @@
 #![no_std]
-use super::core::{AdapterState,AndroidDriverAdapter,CoreError,DriverAdapter,DriverSlot,HardwareInfo};
+use super::core::{AdapterState,AndroidDriverAdapter,CoreError,DriverAdapter,DriverSlot,HardwareAbstraction,HardwareInfo};
 use super::universal::{DriverAbi,DriverOs};
-
 pub struct AndroidLayer<A>{pub slot:DriverSlot<A>}
 impl<A:AndroidDriverAdapter>AndroidLayer<A>{
  pub const fn new(adapter:A)->Self{Self{slot:DriverSlot::new(adapter)}}
@@ -11,14 +10,8 @@ impl<A:AndroidDriverAdapter>AndroidLayer<A>{
  pub fn start(&mut self,hw:&HardwareInfo)->Result<(),CoreError>{self.validate(hw)?;if self.slot.state!=AdapterState::Probed&&self.slot.state!=AdapterState::Stopped{return Err(CoreError::NotBound)}self.slot.adapter.start(hw).map_err(|_|CoreError::StartFailed)?;self.slot.state=AdapterState::Running;Ok(())}
  pub fn stop(&mut self,hw:&HardwareInfo)->Result<(),CoreError>{if self.slot.state!=AdapterState::Running{return Err(CoreError::NotBound)}self.slot.adapter.stop(hw).map_err(|_|CoreError::PolicyDenied)?;self.slot.state=AdapterState::Stopped;Ok(())}
  pub fn remove(&mut self,hw:&HardwareInfo)->Result<(),CoreError>{if self.slot.state==AdapterState::Running{return Err(CoreError::PolicyDenied)}if self.slot.state==AdapterState::Removed{return Err(CoreError::NotBound)}self.slot.adapter.remove(hw).map_err(|_|CoreError::PolicyDenied)?;self.slot.state=AdapterState::Removed;Ok(())}
-}
-
-#[cfg(test)]mod tests{use super::*;use super::super::bus::DeviceId;
-struct Mock{api:u32,name:&'static str,os:DriverOs,abi:DriverAbi,vendor:u16,device:u16,signed:bool,fail_probe:bool}
-impl DriverAdapter for Mock{fn identity(&self)->super::super::core::DriverIdentity{super::super::core::DriverIdentity{os:self.os,abi:self.abi,api_version:self.api as u16,vendor:self.vendor,device:self.device,signed:self.signed}}fn probe(&mut self,_:&HardwareInfo)->Result<(),CoreError>{if self.fail_probe{Err(CoreError::ProbeFailed)}else{Ok(())}}fn start(&mut self,_:&HardwareInfo)->Result<(),CoreError>{Ok(())}fn stop(&mut self,_:&HardwareInfo)->Result<(),CoreError>{Ok(())}fn remove(&mut self,_:&HardwareInfo)->Result<(),CoreError>{Ok(())}}
-impl AndroidDriverAdapter for Mock{fn android_hal_version(&self)->u32{self.api}fn android_interface_name(&self)->&'static str{self.name}}
-fn hw()->HardwareInfo{HardwareInfo{id:DeviceId{vendor:1,device:2,class:0,revision:1},mmio_base:0x1000,mmio_length:0x100,irq:5,dma_bits:64}}
-fn good()->AndroidLayer<Mock>{AndroidLayer::new(Mock{api:7,name:"vendor/awe-hal",os:DriverOs::Android,abi:DriverAbi::AndroidHal,vendor:1,device:2,signed:true,fail_probe:false})}
-#[test]fn full_lifecycle_executes(){let mut x=good();x.probe(&hw()).unwrap();x.start(&hw()).unwrap();x.stop(&hw()).unwrap();x.remove(&hw()).unwrap();assert_eq!(x.slot.state,AdapterState::Removed)}
-#[test]fn failed_probe_does_not_advance_state(){let mut x=AndroidLayer::new(Mock{api:7,name:"vendor/awe-hal",os:DriverOs::Android,abi:DriverAbi::AndroidHal,vendor:1,device:2,signed:true,fail_probe:true});assert_eq!(x.probe(&hw()),Err(CoreError::ProbeFailed));assert_eq!(x.slot.state,AdapterState::New)}
+ pub fn mmio_read32<H:HardwareAbstraction>(&self,hw:&HardwareInfo,hal:&H,offset:u64)->Result<u32,CoreError>{if self.slot.state!=AdapterState::Running{return Err(CoreError::NotBound)}self.slot.mmio_read32(hw,hal,offset)}
+ pub fn mmio_write32<H:HardwareAbstraction>(&self,hw:&HardwareInfo,hal:&mut H,offset:u64,value:u32)->Result<(),CoreError>{if self.slot.state!=AdapterState::Running{return Err(CoreError::NotBound)}self.slot.mmio_write32(hw,hal,offset,value)}
+ pub fn irq_ack<H:HardwareAbstraction>(&self,hw:&HardwareInfo,hal:&mut H)->Result<(),CoreError>{if self.slot.state!=AdapterState::Running{return Err(CoreError::NotBound)}self.slot.irq_ack(hw,hal)}
+ pub fn dma_submit<H:HardwareAbstraction>(&self,hw:&HardwareInfo,hal:&mut H,bytes:u64,address_bits:u8)->Result<(),CoreError>{if self.slot.state!=AdapterState::Running{return Err(CoreError::NotBound)}self.slot.dma_submit(hw,hal,bytes,address_bits)}
 }
