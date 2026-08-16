@@ -3,6 +3,7 @@ members = [
     "boot/protocol",
     "boot/aweloader",
     "kernel",
+    "kernel-bin",
 ]
 resolver = "2"
 
