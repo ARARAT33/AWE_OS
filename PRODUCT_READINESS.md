@@ -4,7 +4,7 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**34% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**35% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
 The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
 
@@ -30,10 +30,11 @@ The percentage is based on implemented product gates, not documentation or archi
 - [x] Memory subsystem boundaries exist.
 - [x] Scheduler/process/syscall/security module boundaries exist.
 - [x] Physical frame allocator is driven by the loader memory map.
-- [ ] Virtual memory/paging is active on x86_64.
+- [x] Four-level x86_64 page-table data structures and address decomposition are implemented and unit-tested.
+- [ ] Page tables are installed and activated on x86_64.
 - [ ] IDT/APIC/timer initialization is active.
 - [ ] SMP bring-up is active.
-- [ ] Heap allocation is active and stress-tested.
+- [ ] Heap allocation is active and stress-tested in a booted kernel.
 
 ### P2 — Hardware and storage
 
@@ -68,7 +69,7 @@ The percentage is based on implemented product gates, not documentation or archi
 - [ ] Signed release images.
 - [x] Automated QEMU smoke-test pipeline is defined and checks for real kernel output.
 - [ ] Fuzzing for boot image/protocol parsers.
-- [x] Kernel unit/integration test suite has foundational memory/boot tests.
+- [x] Kernel unit/integration tests cover boot validation, frame allocation, heap invariants and paging primitives.
 - [ ] Performance benchmarks and regression thresholds.
 - [ ] Hardware compatibility matrix.
 - [ ] Upgrade and recovery testing.
