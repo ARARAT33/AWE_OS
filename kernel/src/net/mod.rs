@@ -4,6 +4,8 @@
 
 #![allow(dead_code)]
 
+pub mod ipv4;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NetError {
     BufferTooSmall,
