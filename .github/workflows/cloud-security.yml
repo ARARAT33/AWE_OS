@@ -34,7 +34,23 @@ jobs:
       - name: Compile every workspace crate
         run: cargo check --workspace
       - name: Execute every workspace test
-        run: cargo test --workspace --all-targets --no-fail-fast
+        id: tests
+        shell: bash
+        run: |
+          set +e
+          cargo test --workspace --all-targets --no-fail-fast -- --nocapture 2>&1 | tee workspace-tests.log
+          status=${PIPESTATUS[0]}
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload workspace test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aweos-workspace-test-log
+          path: workspace-tests.log
+      - name: Fail if workspace tests failed
+        if: steps.tests.outputs.status != '0'
+        run: exit 1
       - name: Security-focused tests
         run: cargo test --workspace --all-targets -- security
       - name: Clippy diagnostics
