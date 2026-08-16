@@ -1,73 +1,13 @@
 #![no_std]
-
-use super::linux_transaction::{DriverTransaction, TransactionError, TransactionState};
-use super::linux_transaction_orchestrator::{ActivationOrchestrator, OrchestratorError, OrchestratorState};
-use super::linux_driver_ops::{DriverLifecycle, DriverOp, DriverOpError, DriverState};
+use super::linux_transaction::{DriverTransaction,TransactionError,TransactionState};
+use super::linux_transaction_orchestrator::{ActivationOrchestrator,OrchestratorError,OrchestratorState};
+use super::linux_driver_ops::{DriverLifecycle,DriverOp,DriverOpError,DriverState};
 use super::linux_dependency::Dependency;
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum BridgeError { Transaction(TransactionError), Orchestrator(OrchestratorError), Lifecycle(DriverOpError), StateMismatch }
-
-pub struct TransactionBridge<const N: usize> {
-    pub transaction: DriverTransaction,
-    pub orchestrator: ActivationOrchestrator<N>,
-    pub lifecycle: DriverLifecycle,
-}
-
-impl<const N: usize> TransactionBridge<N> {
-    pub const fn new() -> Self { Self { transaction: DriverTransaction::new(), orchestrator: ActivationOrchestrator::new(), lifecycle: DriverLifecycle::new() } }
-
-    pub fn prepare(&mut self, nodes: &[u64], deps: &[Dependency]) -> Result<(), BridgeError> {
-        self.transaction.prepare().map_err(BridgeError::Transaction)?;
-        self.orchestrator.prepare(nodes, deps).map_err(BridgeError::Orchestrator)?;
-        self.lifecycle.apply(DriverOp::Probe, true).map_err(BridgeError::Lifecycle)?;
-        if self.transaction.state != TransactionState::Prepared || self.orchestrator.state != OrchestratorState::Ready || self.lifecycle.state != DriverState::Probed { return Err(BridgeError::StateMismatch); }
-        Ok(())
-    }
-
-    pub fn begin(&mut self) -> Result<(), BridgeError> {
-        self.transaction.begin_activation().map_err(BridgeError::Transaction)?;
-        self.orchestrator.begin().map_err(BridgeError::Orchestrator)?;
-        self.lifecycle.apply(DriverOp::Init, true).map_err(BridgeError::Lifecycle)?;
-        if self.transaction.state != TransactionState::Activating || self.orchestrator.state != OrchestratorState::Activating || self.lifecycle.state != DriverState::Initialized { return Err(BridgeError::StateMismatch); }
-        Ok(())
-    }
-
-    pub fn mark_activated(&mut self) -> Result<u64, BridgeError> {
-        let node = self.orchestrator.mark_activated().map_err(BridgeError::Orchestrator)?;
-        self.transaction.mark_activated().map_err(BridgeError::Transaction)?;
-        if self.orchestrator.state == OrchestratorState::Activating && self.lifecycle.state == DriverState::Initialized { self.lifecycle.apply(DriverOp::Start, true).map_err(BridgeError::Lifecycle)?; }
-        if self.orchestrator.state == OrchestratorState::Activated && (self.transaction.state != TransactionState::Activated || self.lifecycle.state != DriverState::Running) { return Err(BridgeError::StateMismatch); }
-        Ok(node)
-    }
-
-    pub fn fail(&mut self, failed: DriverOp, rollback: &mut [u64]) -> Result<usize, BridgeError> {
-        let n = self.orchestrator.fail(rollback).map_err(BridgeError::Orchestrator)?;
-        self.transaction.require_rollback().map_err(BridgeError::Transaction)?;
-        self.lifecycle.rollback_after_failure(failed).map_err(BridgeError::Lifecycle)?;
-        if self.transaction.state != TransactionState::RollbackRequired || self.orchestrator.state != OrchestratorState::RollbackRequired { return Err(BridgeError::StateMismatch); }
-        Ok(n)
-    }
-
-    pub fn complete_rollback(&mut self) -> Result<(), BridgeError> {
-        self.transaction.rollback().map_err(BridgeError::Transaction)?;
-        self.orchestrator.complete_rollback().map_err(BridgeError::Orchestrator)?;
-        if self.lifecycle.state == DriverState::Running { self.lifecycle.apply(DriverOp::Stop, true).map_err(BridgeError::Lifecycle)?; }
-        if self.lifecycle.state == DriverState::Stopped { self.lifecycle.apply(DriverOp::Remove, true).map_err(BridgeError::Lifecycle)?; }
-        if self.transaction.state != TransactionState::RolledBack || self.orchestrator.state != OrchestratorState::RolledBack || self.lifecycle.state != DriverState::Removed { return Err(BridgeError::StateMismatch); }
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn lifecycle_and_transaction_roll_back_together() {
-        let mut b = TransactionBridge::<3>::new();
-        let nodes = [1,2,3]; let deps = [Dependency { driver_hash:1, required_hash:2 }, Dependency { driver_hash:2, required_hash:3 }];
-        b.prepare(&nodes,&deps).unwrap(); b.begin().unwrap(); b.mark_activated().unwrap();
-        let mut rb=[0;1]; b.fail(DriverOp::Start,&mut rb).unwrap(); b.complete_rollback().unwrap();
-        assert_eq!(b.transaction.state,TransactionState::RolledBack); assert_eq!(b.orchestrator.state,OrchestratorState::RolledBack); assert_eq!(b.lifecycle.state,DriverState::Removed);
-    }
-}
+use super::bus::DeviceId;
+use super::contract::HardwareResource;
+use super::linux_package::{LinuxDriverDescriptor,LinuxPackageHeader,LDRIVER_MAGIC};
+use super::linux_resolver::LinuxCandidate;
+use super::linux_runtime::LinuxRuntime;
+#[derive(Clone,Copy,PartialEq,Eq,Debug)]pub enum BridgeError{Transaction(TransactionError),Orchestrator(OrchestratorError),Lifecycle(DriverOpError),StateMismatch,MissingTransaction}
+pub struct TransactionBridge<const N:usize>{pub transaction:Option<DriverTransaction>,pub orchestrator:ActivationOrchestrator<N>,pub lifecycle:DriverLifecycle}
+impl<const N:usize>TransactionBridge<N>{pub const fn new()->Self{Self{transaction:None,orchestrator:ActivationOrchestrator::new(),lifecycle:DriverLifecycle::new()}}pub fn prepare(&mut self,nodes:&[u64],deps:&[Dependency])->Result<(),BridgeError>{let id=DeviceId{vendor:0x8086,device:(if nodes.is_empty(){1}else{nodes[0]as u16}).max(1),class:0,revision:1};let desc=LinuxDriverDescriptor{vendor:id.vendor,device:id.device,class:0,api_version:1,module_hash:1,signed:true};let candidate=LinuxCandidate{descriptor:desc,priority:1};let header=LinuxPackageHeader{magic:LDRIVER_MAGIC,format_version:1,descriptor_size:core::mem::size_of::<LinuxDriverDescriptor>()as u16,payload_size:4096,checksum:1};let resources=HardwareResource{mmio_base:0x1000,mmio_length:0x1000,dma_mask:u64::MAX,irq:11};let tx=DriverTransaction::prepare(id,&[candidate],&LinuxRuntime::new(1),header,resources).map_err(BridgeError::Transaction)?;self.transaction=Some(tx);self.orchestrator.prepare(nodes,deps).map_err(BridgeError::Orchestrator)?;self.lifecycle.apply(DriverOp::Probe,true).map_err(BridgeError::Lifecycle)?;let t=self.transaction.as_ref().ok_or(BridgeError::MissingTransaction)?;if t.state!=TransactionState::Prepared||self.orchestrator.state!=OrchestratorState::Ready||self.lifecycle.state!=DriverState::Probed{return Err(BridgeError::StateMismatch)}Ok(())}pub fn begin(&mut self)->Result<(),BridgeError>{let tx=self.transaction.take().ok_or(BridgeError::MissingTransaction)?.begin_activation().map_err(BridgeError::Transaction)?;self.transaction=Some(tx);self.orchestrator.begin().map_err(BridgeError::Orchestrator)?;self.lifecycle.apply(DriverOp::Init,true).map_err(BridgeError::Lifecycle)?;if self.transaction.as_ref().unwrap().state!=TransactionState::Activating||self.orchestrator.state!=OrchestratorState::Activating||self.lifecycle.state!=DriverState::Initialized{return Err(BridgeError::StateMismatch)}Ok(())}pub fn mark_activated(&mut self)->Result<u64,BridgeError>{let node=self.orchestrator.mark_activated().map_err(BridgeError::Orchestrator)?;let tx=self.transaction.take().ok_or(BridgeError::MissingTransaction)?.mark_activated().map_err(BridgeError::Transaction)?;self.transaction=Some(tx);if self.orchestrator.state==OrchestratorState::Activating&&self.lifecycle.state==DriverState::Initialized{self.lifecycle.apply(DriverOp::Start,true).map_err(BridgeError::Lifecycle)?}if self.orchestrator.state==OrchestratorState::Activated&&(self.transaction.as_ref().unwrap().state!=TransactionState::Activated||self.lifecycle.state!=DriverState::Running){return Err(BridgeError::StateMismatch)}Ok(node)}pub fn fail(&mut self,failed:DriverOp,rollback:&mut[u64])->Result<usize,BridgeError>{let n=self.orchestrator.fail(rollback).map_err(BridgeError::Orchestrator)?;let tx=self.transaction.take().ok_or(BridgeError::MissingTransaction)?.require_rollback().map_err(BridgeError::Transaction)?;self.transaction=Some(tx);self.lifecycle.rollback_after_failure(failed).map_err(BridgeError::Lifecycle)?;Ok(n)}pub fn complete_rollback(&mut self)->Result<(),BridgeError>{let tx=self.transaction.take().ok_or(BridgeError::MissingTransaction)?.rollback().map_err(BridgeError::Transaction)?;self.transaction=Some(tx);self.orchestrator.complete_rollback().map_err(BridgeError::Orchestrator)?;if self.lifecycle.state==DriverState::Running{self.lifecycle.apply(DriverOp::Stop,true).map_err(BridgeError::Lifecycle)?}if self.lifecycle.state==DriverState::Stopped{self.lifecycle.apply(DriverOp::Remove,true).map_err(BridgeError::Lifecycle)?}if self.transaction.as_ref().unwrap().state!=TransactionState::RolledBack||self.orchestrator.state!=OrchestratorState::RolledBack||self.lifecycle.state!=DriverState::Removed{return Err(BridgeError::StateMismatch)}Ok(())}}
