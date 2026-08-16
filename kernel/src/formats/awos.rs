@@ -1,33 +1,21 @@
 //! AWOS native application container.
-//! The kernel-side representation is intentionally format-only; loading and
-//! execution remain separate policy decisions so malformed applications cannot
-//! become executable merely by being parsed.
+//! Dependency-free, bounded and `no_std` friendly.
 
 pub const MAGIC: [u8; 4] = *b"AWOS";
 pub const VERSION: u16 = 1;
 pub const HEADER_LEN: usize = 40;
 pub const MAX_MANIFEST: usize = 8192;
+pub const FLAG_SIGNED: u16 = 1 << 0;
+pub const KNOWN_FLAGS: u16 = FLAG_SIGNED;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Error {
-    TooSmall,
-    BadMagic,
-    BadVersion,
-    InvalidHeader,
-    OutOfBounds,
-}
+pub enum Error { TooSmall, BadMagic, BadVersion, InvalidHeader, OutOfBounds }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Header {
-    pub version: u16,
-    pub flags: u16,
-    pub abi: u32,
-    pub manifest_len: u32,
-    pub code_len: u32,
-    pub data_len: u32,
-    pub signature_len: u32,
-    pub entry_offset: u32,
-    pub reserved: u32,
+    pub version: u16, pub flags: u16, pub abi: u32, pub manifest_len: u32,
+    pub code_len: u32, pub data_len: u32, pub signature_len: u32,
+    pub entry_offset: u32, pub reserved: u32,
 }
 
 impl Header {
@@ -47,15 +35,16 @@ impl Header {
             entry_offset: u32::from_le_bytes([bytes[28], bytes[29], bytes[30], bytes[31]]),
             reserved: u32::from_le_bytes([bytes[32], bytes[33], bytes[34], bytes[35]]),
         };
-        if h.reserved != 0 || h.manifest_len as usize > MAX_MANIFEST || h.code_len == 0 {
+        if h.reserved != 0 || h.flags & !KNOWN_FLAGS != 0 || h.manifest_len as usize > MAX_MANIFEST || h.code_len == 0 {
             return Err(Error::InvalidHeader);
         }
+        if h.entry_offset >= h.code_len { return Err(Error::InvalidHeader); }
+        if h.flags & FLAG_SIGNED != 0 && h.signature_len == 0 { return Err(Error::InvalidHeader); }
         Ok(h)
     }
 
     pub fn total_len(&self) -> Result<usize, Error> {
-        HEADER_LEN
-            .checked_add(self.manifest_len as usize)
+        HEADER_LEN.checked_add(self.manifest_len as usize)
             .and_then(|v| v.checked_add(self.code_len as usize))
             .and_then(|v| v.checked_add(self.data_len as usize))
             .and_then(|v| v.checked_add(self.signature_len as usize))
@@ -64,11 +53,8 @@ impl Header {
 }
 
 pub struct Package<'a> {
-    pub header: Header,
-    pub manifest: &'a [u8],
-    pub code: &'a [u8],
-    pub data: &'a [u8],
-    pub signature: &'a [u8],
+    pub header: Header, pub manifest: &'a [u8], pub code: &'a [u8],
+    pub data: &'a [u8], pub signature: &'a [u8],
 }
 
 impl<'a> Package<'a> {
@@ -76,18 +62,11 @@ impl<'a> Package<'a> {
         let header = Header::parse(bytes)?;
         let total = header.total_len()?;
         if bytes.len() < total { return Err(Error::OutOfBounds); }
-        if header.entry_offset as usize >= header.code_len as usize { return Err(Error::InvalidHeader); }
         let m0 = HEADER_LEN;
         let m1 = m0 + header.manifest_len as usize;
         let c1 = m1 + header.code_len as usize;
         let d1 = c1 + header.data_len as usize;
         let s1 = d1 + header.signature_len as usize;
-        Ok(Self {
-            header,
-            manifest: &bytes[m0..m1],
-            code: &bytes[m1..c1],
-            data: &bytes[c1..d1],
-            signature: &bytes[d1..s1],
-        })
+        Ok(Self { header, manifest: &bytes[m0..m1], code: &bytes[m1..c1], data: &bytes[c1..d1], signature: &bytes[d1..s1] })
     }
 }
