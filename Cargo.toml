@@ -1,7 +1,16 @@
-[package]
-name = "aweos-kernel"
-version = "0.1.0"
+[workspace]
+members = [
+    "boot/protocol",
+    "boot/aweloader",
+    "kernel",
+]
+resolver = "2"
+
+[workspace.package]
 edition = "2024"
+
+[workspace.dependencies]
+awe-boot-protocol = { path = "boot/protocol" }
 
 [profile.dev]
 panic = "abort"
@@ -11,4 +20,3 @@ panic = "abort"
 opt-level = 3
 lto = "fat"
 codegen-units = 1
-panic = "abort"
