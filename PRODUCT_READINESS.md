@@ -4,74 +4,97 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**46% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**48% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
 The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
 
-## Security/performance principle
+## Hardware and driver direction
 
-AWE_OS follows **small trusted core + bounded work + explicit capabilities + deterministic failure**. Experimental features must not silently modify the trusted computing base.
+AWE_OS targets **real hardware, virtual machines and cloud/server environments**. VirtIO is the first virtualization target; PCI/ACPI and common PC hardware follow. Broad Linux hardware coverage is a strategic goal, implemented through a stable AWE Driver HAL and legally/technically reviewed ports or clean-room reimplementations rather than blindly embedding the Linux kernel.
 
-## New implemented kernel primitives
+## Implemented kernel foundations
 
 - Intent-carrying authorization with required rights, impact class and resource budget.
 - Deterministic security policy engine with explicit allow/deny reasons.
 - Bounded, allocation-free causal provenance journal.
 - Non-escalating capability derivation and explicit revocation state.
 - Process states and consumable CPU, memory and IPC budgets.
-- Allocation-free token-bucket rate limiter for repeated privileged operations.
-- Bounded scheduler queue with duplicate runnable-entry protection.
-- Bounded fixed-priority scheduler primitive with FIFO ordering within each priority level.
-- Typed physical/virtual address wrappers with overflow-safe page alignment.
-- Terminal boot-failure state and monotonic boot phases.
-- AWE Capsule and XenoSense specifications have corresponding kernel security foundations.
-- Cloud security gate validates formatting, workspace compilation, tests, strict Clippy and the release contract on every main push/PR.
+- Allocation-free token-bucket rate limiter.
+- Bounded scheduler queue and fixed-priority scheduling primitive.
+- Typed physical/virtual addresses with overflow-safe alignment.
+- Monotonic boot phases and terminal failure state.
+- Hardware driver contract model for MMIO, DMA, interrupt mode and device identity.
+- Bounded device-bus registry.
+- VirtIO feature negotiation primitive requiring VirtIO 1.x before device activation.
+- AWE Capsule and XenoSense specifications with kernel security foundations.
+- Cloud CI security/release gates.
 
-## Product target
+## Driver product roadmap
 
-**AWE_OS 1.0** is a Rust-first, capability-oriented operating system with a dedicated AWE boot chain, a stable loader-to-kernel ABI, a bootable x86_64 reference platform, isolated system services, a native application format, persistent storage, networking, graphics/input, and reproducible release images.
+### Virtualization
+- [x] Driver HAL and device contracts.
+- [x] VirtIO feature negotiation foundation.
+- [ ] VirtIO PCI transport.
+- [ ] VirtIO block driver.
+- [ ] VirtIO network driver.
+- [ ] VirtIO console/entropy/input drivers.
+- [ ] VirtIO GPU driver.
+- [ ] Automated QEMU end-to-end device tests.
+
+### PC hardware
+- [ ] PCI enumeration.
+- [ ] ACPI tables and power-management discovery.
+- [ ] APIC/IOAPIC.
+- [ ] NVMe/AHCI.
+- [ ] xHCI/USB.
+- [ ] HID keyboard/mouse.
+- [ ] Ethernet.
+- [ ] Wi-Fi.
+- [ ] Audio.
+- [ ] GPU/display.
+
+### Linux-derived hardware coverage
+- [ ] Driver-port compatibility layer.
+- [ ] Linux driver provenance/license manifest.
+- [ ] Automated device-ID coverage database.
+- [ ] Priority ports for common Ethernet/Wi-Fi/storage/GPU/audio hardware.
+- [ ] Hardware compatibility lab/matrix.
 
 ## Release gates
 
 ### P0 — Boot contract
 - [x] AWE boot magic/version and fixed-width ABI.
 - [x] Loader validates architecture and handoff metadata.
-- [x] Kernel exposes a validated loader-to-kernel entry contract.
+- [x] Kernel exposes validated loader-to-kernel entry contract.
 - [ ] Real x86_64 UEFI image boots in QEMU.
 - [ ] Kernel reaches deterministic `Running` state in automated boot test.
 - [x] Boot failure paths are diagnosable over serial console.
-- [x] Monotonic boot phases and terminal failure state.
 
 ### P1 — Kernel foundation
 - [x] Rust `no_std` kernel workspace.
 - [x] Architecture abstraction.
-- [x] Memory subsystem boundaries.
-- [x] Scheduler/process/syscall/security module boundaries.
-- [x] Physical frame allocator from loader memory map.
-- [x] Four-level x86_64 page-table structures and address decomposition.
-- [x] Typed physical/virtual address alignment primitives.
+- [x] Memory subsystem boundaries and typed addresses.
+- [x] Scheduler/process/syscall/security boundaries.
+- [x] Physical frame allocator.
+- [x] x86_64 page-table structures.
 - [ ] Page tables installed and activated on x86_64.
 - [x] x86_64 IDT gate construction and `lidt` primitive.
-- [x] x86_64 PIT channel-0 programming.
+- [x] x86_64 PIT programming primitive.
 - [ ] IDT/timer initialization active in boot path.
 - [ ] Local APIC timer.
 - [ ] SMP bring-up.
 - [ ] Booted-kernel heap stress tests.
-- [x] Intent authorization and deterministic policy engine.
-- [x] Bounded provenance journal.
-- [x] Non-escalating capability derivation/revocation model.
-- [x] Consumable process resource budgets.
-- [x] Bounded privileged-operation rate limiter.
-- [x] Bounded duplicate-safe scheduler queue.
-- [x] Fixed-priority scheduler primitive.
 
 ### P2 — Hardware and storage
+- [x] Driver contracts and device registry foundation.
+- [x] VirtIO feature negotiation foundation.
 - [ ] PCI/PCIe enumeration.
 - [ ] ACPI discovery.
+- [ ] VirtIO transport.
 - [ ] VirtIO block/network.
 - [ ] NVMe/AHCI.
 - [ ] AWEFS/VFS with crash-safe metadata.
-- [ ] Keyboard/mouse/framebuffer.
+- [ ] USB/HID/framebuffer.
 
 ### P3 — User space
 - [ ] Init/service manager.
@@ -103,6 +126,6 @@ AWE_OS follows **small trusted core + bounded work + explicit capabilities + det
 
 ## Definition of done
 
-A release is **Product** only when the reference ISO/EFI image boots unattended in QEMU, initializes the kernel, starts user space, mounts persistent storage, brings up networking, launches a native application, and passes automated release gates.
+A release is **Product** only when the reference image boots unattended in QEMU, initializes the kernel, starts user space, mounts persistent storage, brings up networking, launches a native application, and passes automated release gates.
 
 Architecture documents and stubs are never counted as implemented features.
