@@ -73,9 +73,9 @@ fn serial_write(bytes: &[u8]) {
                 "test al, 0x20",
                 "jz 1b",
                 "mov dx, 0x3F8",
-                "mov al, {byte}",
+                "mov al, cl",
                 "out dx, al",
-                byte = in(reg) u32::from(byte),
+                byte = in("cl") byte,
                 out("al") _, out("dx") _,
                 options(nostack, preserves_flags)
             );
