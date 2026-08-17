@@ -230,9 +230,7 @@ mod tests {
         table
             .set_state(ServiceId(1), ServiceState::Starting)
             .unwrap();
-        table
-            .set_state(ServiceId(1), ServiceState::Failed)
-            .unwrap();
+        table.set_state(ServiceId(1), ServiceState::Failed).unwrap();
         table.restart(ServiceId(1)).unwrap();
         assert_eq!(table.state(ServiceId(1)), Some(ServiceState::Starting));
     }
@@ -244,16 +242,11 @@ mod tests {
         table
             .set_state(ServiceId(1), ServiceState::Starting)
             .unwrap();
-        table
-            .set_state(ServiceId(1), ServiceState::Failed)
-            .unwrap();
+        table.set_state(ServiceId(1), ServiceState::Failed).unwrap();
         table
             .set_state(ServiceId(1), ServiceState::Quarantined)
             .unwrap();
-        assert_eq!(
-            table.restart(ServiceId(1)),
-            Err(ServiceError::Quarantined)
-        );
+        assert_eq!(table.restart(ServiceId(1)), Err(ServiceError::Quarantined));
     }
 
     #[test]
