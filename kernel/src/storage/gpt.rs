@@ -37,6 +37,7 @@ pub struct GptHeader {
     pub partition_entry_lba: u64,
     pub partition_count: u32,
     pub partition_entry_size: u32,
+    pub partition_array_crc32: u32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -72,6 +73,7 @@ pub fn parse_header(sector: &[u8], disk_last_lba: u64) -> Result<GptHeader, GptE
     let partition_entry_lba = le_u64(sector, 72);
     let partition_count = le_u32(sector, 80);
     let partition_entry_size = le_u32(sector, 84) as usize;
+    let partition_array_crc32 = le_u32(sector, 88);
 
     if current_lba > disk_last_lba
         || backup_lba > disk_last_lba
@@ -112,6 +114,7 @@ pub fn parse_header(sector: &[u8], disk_last_lba: u64) -> Result<GptHeader, GptE
         partition_entry_lba,
         partition_count,
         partition_entry_size: partition_entry_size as u32,
+        partition_array_crc32,
     })
 }
 
@@ -207,6 +210,7 @@ mod tests {
         sector[72..80].copy_from_slice(&2u64.to_le_bytes());
         sector[80..84].copy_from_slice(&1u32.to_le_bytes());
         sector[84..88].copy_from_slice(&(GPT_PARTITION_ENTRY_MIN_SIZE as u32).to_le_bytes());
+        sector[88..92].copy_from_slice(&0u32.to_le_bytes());
         let crc = {
             let mut copy = sector;
             copy[16..20].fill(0);
