@@ -1,18 +1,31 @@
 #![no_std]
 #![cfg_attr(not(test), no_main)]
+#![allow(dead_code)]
+#![allow(unused_attributes)]
+#![allow(bad_asm_style)]
 
+#[cfg(not(test))]
 use awe_boot_protocol::{AWE_BOOT_MAGIC, Architecture, BootInfo, MemoryRegion};
+#[cfg(not(test))]
 use aweos_kernel::entry::{KernelBootStatus, kernel_entry};
 #[cfg(target_arch = "x86_64")]
+#[cfg(not(test))]
 use aweos_kernel::memory::activate_bootstrap_identity_map;
 
+#[cfg(not(test))]
 const MULTIBOOT2_BOOTLOADER_MAGIC: u32 = 0x36D7_6289;
+#[cfg(not(test))]
 const MAX_MEMORY_REGIONS: usize = 128;
+#[cfg(not(test))]
 const FALLBACK_MEMORY_BASE: u64 = 0x0100_0000;
+#[cfg(not(test))]
 const FALLBACK_MEMORY_LENGTH: u64 = 0x0200_0000;
+#[cfg(not(test))]
 const MULTIBOOT2_MIN_SIZE: usize = 16;
+#[cfg(not(test))]
 const MULTIBOOT2_MAX_SIZE: usize = 1024 * 1024;
 
+#[cfg(not(test))]
 static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] = [MemoryRegion {
     base: 0,
     length: 0,
