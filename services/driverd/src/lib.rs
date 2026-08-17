@@ -6,12 +6,14 @@
 
 mod catalog;
 mod contract;
+mod dependency;
 mod protocol;
 mod registry;
 mod supervisor;
 
 pub use catalog::{BuiltinDriver, BUILTIN_DRIVER_COUNT, BUILTIN_DRIVERS, descriptors};
 pub use contract::{DriverLifecycle, DriverManifest, DriverTrust, LifecycleError, lifecycle_maps_to_state, transition};
+pub use dependency::{DependencyError, DependencyGraph, DriverDependency, DriverHealth, ResourceOwnership};
 pub use protocol::{DriverClass, DriverCommand, DriverEvent, DriverId, DriverReply, DriverState};
 pub use registry::{DriverDescriptor, DriverRegistry, RegistryError};
 pub use supervisor::{DriverSupervisor, SupervisorError};
