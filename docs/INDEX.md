@@ -10,6 +10,13 @@ This directory is the engineering documentation surface for AWE_OS. Code is auth
 4. [AWE_OS_100_PERCENT_MASTER_PLAN.md](AWE_OS_100_PERCENT_MASTER_PLAN.md) — complete roadmap to 1.0.
 5. [MILESTONE_60_2.md](MILESTONE_60_2.md) — implemented 60.2 CellKernel/service contract freeze.
 6. [MILESTONE_60_5.md](MILESTONE_60_5.md) — implemented 60.5 system service/process model freeze.
+7. [MILESTONE_61_0.md](MILESTONE_61_0.md) — implemented 61.0 Architecture Freeze and service transport boundary.
+8. [MILESTONE_61_5.md](MILESTONE_61_5.md) — implemented 61.5 canonical device-boundary freeze.
+9. [MILESTONE_62_0.md](MILESTONE_62_0.md) — implemented 62.0 driver capability/resource integration.
+10. [MILESTONE_62_5.md](MILESTONE_62_5.md) — implemented 62.5 native driver manifest/lifecycle freeze.
+11. [MILESTONE_63_0.md](MILESTONE_63_0.md) — implemented 63.0 dependency/ownership/health gate.
+12. [MILESTONE_64_0.md](MILESTONE_64_0.md) — implemented 64.0 hardware-access boundary.
+13. [MILESTONE_65_0.md](MILESTONE_65_0.md) — implemented 65.0 hardware execution checkpoint; release certification remains evidence-driven.
 
 ## Boot and kernel
 
