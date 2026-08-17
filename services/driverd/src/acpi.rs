@@ -3,19 +3,6 @@
 //! Minimal, strict ACPI table parser used by driverd for platform discovery.
 //! Parsing is bounds-checked, checksum-verified and allocation-free.
 
-#[repr(C, packed)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Rsdp {
-    pub signature: [u8; 8],
-    pub checksum: u8,
-    pub oem_id: [u8; 6],
-    pub revision: u8,
-    pub rsdt_address: u32,
-    pub length: u32,
-    pub xsdt_address: u64,
-    pub extended_checksum: u8,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SdtHeader {
     pub signature: [u8; 4],
@@ -34,7 +21,6 @@ pub struct AcpiTableRef {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AcpiError {
     TooShort,
-    BadSignature,
     BadChecksum,
     InvalidLength,
     TableOverflow,
@@ -51,16 +37,16 @@ pub fn checksum_ok(bytes: &[u8]) -> bool {
 }
 
 pub fn parse_header(bytes: &[u8]) -> Result<SdtHeader, AcpiError> {
-    if bytes.len() < 9 { return Err(AcpiError::TooShort); }
+    if bytes.len() < 10 { return Err(AcpiError::TooShort); }
     let length = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
-    if length < 9 { return Err(AcpiError::InvalidLength); }
+    if length < 10 { return Err(AcpiError::InvalidLength); }
     if length as usize > bytes.len() { return Err(AcpiError::TableOverflow); }
     if !checksum_ok(&bytes[..length as usize]) { return Err(AcpiError::BadChecksum); }
     Ok(SdtHeader {
         signature: [bytes[0], bytes[1], bytes[2], bytes[3]],
         length,
         revision: bytes[8],
-        checksum: bytes[9.min(bytes.len() - 1)],
+        checksum: bytes[9],
     })
 }
 
