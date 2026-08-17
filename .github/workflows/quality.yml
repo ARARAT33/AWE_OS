@@ -47,6 +47,23 @@ jobs:
           cargo test --workspace --no-fail-fast 2>&1 | tee test-output.log
           exit ${PIPESTATUS[0]}
 
+      - name: Apply automatic Clippy fixes
+        if: steps.tests.outcome == 'success'
+        run: |
+          cargo clippy --fix --workspace --all-targets --allow-dirty --allow-staged -- -D warnings || true
+          cargo fmt --all
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore: apply clippy fixes"
+            git push
+          fi
+
+      - name: Workspace Clippy
+        if: steps.tests.outcome == 'success'
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -54,10 +71,6 @@ jobs:
           name: aweos-test-output-${{ github.run_id }}
           path: test-output.log
           if-no-files-found: warn
-
-      - name: Workspace Clippy
-        if: steps.tests.outcome == 'success'
-        run: cargo clippy --workspace --all-targets -- -D warnings
 
   bootloader:
     name: UEFI loader
