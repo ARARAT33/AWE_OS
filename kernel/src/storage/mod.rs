@@ -181,8 +181,7 @@ mod tests {
         block[header_offset + 80..header_offset + 84].copy_from_slice(&1u32.to_le_bytes());
         block[header_offset + 84..header_offset + 88]
             .copy_from_slice(&(gpt::GPT_PARTITION_ENTRY_MIN_SIZE as u32).to_le_bytes());
-        block[header_offset + 88..header_offset + 92]
-            .copy_from_slice(&partition_crc.to_le_bytes());
+        block[header_offset + 88..header_offset + 92].copy_from_slice(&partition_crc.to_le_bytes());
         let mut header_copy = block;
         header_copy[header_offset + 16..header_offset + 20].fill(0);
         let header_crc =
