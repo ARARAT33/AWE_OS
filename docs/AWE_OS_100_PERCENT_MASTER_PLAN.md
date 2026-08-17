@@ -1,312 +1,206 @@
-# AWE_OS 100% Master Implementation Plan
+# AWE_OS 100% Product Master Plan v2
 
-> Status: **master execution plan**
+> **Goal:** ship AWE_OS as a real, independently bootable, modular and security-first operating-system product.
 >
-> Goal: make AWE_OS a production-grade, independently bootable operating-system platform with a native AWE ecosystem, `.asd` drivers, `.awos` applications, compatibility layers for Linux/Windows/Android applications, and the AWEOSA App Builder.
+> **Rule:** 100% is a release certification state, not a documentation state. A feature receives progress credit only after implementation + tests + runtime/emulator evidence + CI + recovery/error handling + documentation.
 
-## 0. Non-negotiable definition of 100%
+## 1. Product definition
 
-A subsystem counts as complete only when it has:
+AWE_OS 1.0 is complete only when a clean build produces signed, reproducible boot artifacts; the system boots reliably on the supported hardware/emulator matrix; CellKernel, userspace, storage, networking, native applications and the desktop operate together; privileged components are isolated and capability-controlled; updates and recovery are safe; and all mandatory CI gates are green.
 
-1. implemented code;
-2. unit/integration tests;
-3. boot/runtime validation where applicable;
-4. error handling and recovery;
-5. documentation/specification;
-6. CI validation;
-7. reproducible build artifacts;
-8. hardware or emulator validation;
-9. security review for privileged components;
-10. no known critical blockers.
+## 2. Architecture invariants
 
-Documentation, interfaces, stubs, mocks, or compatibility shims alone never count as a completed feature.
+- CellKernel stays small, deterministic and privileged.
+- Drivers, storage, networking, UI and compatibility layers remain modular services/components.
+- No compatibility layer is allowed to become a hidden kernel dependency.
+- Capability checks happen at the service boundary and again at sensitive resource boundaries.
+- Every untrusted parser/package/driver boundary is bounded and fail-closed.
+- Fixed-capacity or explicitly budgeted structures are preferred in privileged code.
+- Public ABIs are versioned; incompatible changes require an explicit migration policy.
+- Performance claims require repeatable benchmarks.
+- Recovery paths are part of the feature, not a later add-on.
 
-## 1. Stage 1 — Build and repository correctness
+## 3. Product scorecard — 100 points
 
-- [ ] Workspace is warning-clean.
-- [ ] `cargo fmt --check` passes.
-- [ ] Workspace check/tests/Clippy pass.
-- [ ] Lockfile/build reproducibility policy is fixed.
-- [ ] Host tools and cross-compilation toolchains are pinned.
-- [ ] CI has separate fast checks, kernel checks, boot checks, emulator checks and release checks.
-- [ ] Every privileged subsystem has tests.
+| Area | Weight | Release gate |
+|---|---:|---|
+| Boot/platform | 10 | UEFI/QEMU boot, CPU/interrupt/memory validation |
+| CellKernel | 15 | scheduler, processes, VM, syscalls, IPC, capabilities |
+| Drivers/device model | 15 | device discovery, isolation, DMA/IOMMU boundary, recovery |
+| Storage/filesystem | 8 | VFS + native filesystem + recovery + persistent tests |
+| Networking | 7 | Ethernet/IP/TCP/UDP/DNS + policy + integration tests |
+| Userspace/services | 8 | init/service manager + identity + core services |
+| AWOSA/native ABI | 5 | stable runtime and SDK contract |
+| `.asd` driver ecosystem | 5 | signed package/install/upgrade/rollback/recovery |
+| `.awos` app ecosystem | 5 | signed package/install/run/update/remove + dependencies |
+| Compatibility | 10 | tested Linux/Windows/Android subsets, explicitly bounded |
+| AYUI desktop | 5 | compositor/windowing/input/display + core UX |
+| App Builder/SDK | 3 | create/build/test/debug/package workflows |
+| Security/update/recovery | 3 | trust chain, sandboxing, update rollback, recovery |
+| Testing/hardware/release | 6 | QEMU + hardware matrix + fuzz/stress + reproducible release |
+| **Total** | **100** | **all mandatory gates green** |
 
-## 2. Stage 2 — Boot chain and platform bring-up
+## 4. Stage A — Engineering foundation
 
-- [ ] AWE Loader fully validates AWE images.
-- [ ] BootInfo ABI is versioned and validated.
-- [ ] x86_64 UEFI boot reaches CellKernel reliably.
-- [ ] GDT/TSS/IDT and exception paths are complete.
-- [ ] APIC/IOAPIC and timer interrupt paths are complete.
-- [ ] SMP bring-up and CPU topology are implemented.
-- [ ] Physical memory discovery is complete.
-- [ ] Page tables, mapper, frame allocator and kernel heap are production-ready.
-- [ ] Kernel panic/recovery diagnostics are robust.
-- [ ] QEMU boot smoke test is mandatory in CI.
+- [ ] Pin Rust/toolchains and build inputs.
+- [ ] Make `fmt`, `check`, tests and Clippy warning-clean.
+- [ ] Split CI into fast, kernel, boot, device, runtime, security and release gates.
+- [ ] Publish reproducible build metadata and artifact manifests.
+- [ ] Add architecture-contract tests preventing forbidden module dependencies.
+- [ ] Keep all privileged modules covered by deterministic unit tests.
 
-## 3. Stage 3 — CellKernel core
+## 5. Stage B — Boot and hardware bring-up
 
-- [ ] Scheduler with preemption and priority policy.
-- [ ] Process/thread lifecycle.
+- [ ] Version and validate BootInfo ABI.
+- [ ] Complete GDT/TSS/IDT, exception and timer paths.
+- [ ] Complete APIC/IOAPIC routing.
+- [ ] Bring up SMP and CPU topology.
+- [ ] Complete physical frame discovery/allocation.
+- [ ] Complete virtual memory, page tables and kernel heap.
+- [ ] Add robust panic/diagnostic path.
+- [ ] Require QEMU boot smoke tests in CI.
+
+## 6. Stage C — CellKernel execution core
+
+- [ ] Preemptive priority scheduler and accounting.
+- [ ] Process/thread lifecycle and context switching.
 - [ ] User/kernel address-space separation.
-- [ ] Context switching.
-- [ ] Syscall entry/exit and ABI validation.
-- [ ] IPC channels/mailboxes with bounded backpressure.
-- [ ] Signals/events/notifications where required.
-- [ ] Capability-based authorization.
-- [ ] Kernel synchronization primitives.
-- [ ] Timekeeping, clocks and timers.
-- [ ] Kernel logging and tracing.
-- [ ] Resource accounting and limits.
+- [ ] Syscall ABI and argument validation.
+- [ ] Bounded IPC with backpressure and quotas.
+- [ ] Events/notifications and synchronization primitives.
+- [ ] Capability lifecycle, revocation and audit/provenance.
+- [ ] Monotonic time, timers and resource limits.
+- [ ] Kernel tracing and structured diagnostics.
 
-## 4. Stage 4 — Hardware abstraction and drivers
+## 7. Stage D — Modular device platform
 
-### 4.1 Native AWE driver model
-
-Create a stable driver ABI and lifecycle:
+Native driver lifecycle:
 
 `discover -> identify -> probe -> bind -> initialize -> run -> suspend -> resume -> stop -> remove -> recover`
 
-Required pieces:
+- [ ] Stable driver ABI and manifest.
+- [ ] Device identity and dependency graph with cycle rejection.
+- [ ] Explicit MMIO/PIO/DMA/interrupt ownership.
+- [ ] DMA/IOMMU enforcement boundary.
+- [ ] Driver health monitoring and bounded restart policy.
+- [ ] Signed-driver trust and ABI compatibility.
+- [ ] PCI/PCIe, ACPI, APIC/IOAPIC, VirtIO.
+- [ ] NVMe/AHCI, USB/xHCI, HID, display, Ethernet, Wi-Fi, Bluetooth, audio, power/thermal and RTC.
 
-- [ ] Driver manifest and capability declaration.
-- [ ] Device/bus identity model.
-- [ ] Dependency graph.
-- [ ] Resource ownership.
-- [ ] DMA/IOMMU safety model.
-- [ ] Interrupt abstraction.
-- [ ] MMIO/PIO abstraction.
-- [ ] Power-management hooks.
-- [ ] Driver health monitoring.
-- [ ] Fault isolation and restart.
-- [ ] Signed-driver verification.
-- [ ] Driver version/ABI compatibility policy.
+### `.asd` driver package
 
-### 4.2 `.asd` — AWE System Driver format
+- [ ] Versioned canonical container.
+- [ ] Manifest, hardware IDs, capabilities, ABI, architecture and firmware requirements.
+- [ ] Strong hashes and signatures.
+- [ ] `asdpack` / `asddump` tooling.
+- [ ] Install, verify, upgrade, rollback, uninstall and recovery.
+- [ ] Tamper/malformed-package fuzz tests.
 
-`.asd` is the native AWE driver package format. It must be a real, versioned, signed package format rather than a renamed binary.
+## 8. Stage E — Storage
 
-Proposed contents:
-
-```text
-manifest.asd.json
-metadata
-capabilities
-hardware IDs
-ABI version
-architecture targets
-firmware requirements
-permissions
-binary payload(s)
-symbol/contract metadata
-hashes
-signature
-optional recovery image
-```
-
-- [ ] Define `.asd` container specification.
-- [ ] Define canonical serialization.
-- [ ] Define SHA-256/strong hash manifest.
-- [ ] Define signing and trust roots.
-- [ ] Define driver ABI version negotiation.
-- [ ] Build `asdpack`/`asddump` tooling.
-- [ ] Install/upgrade/rollback/uninstall support.
-- [ ] Driver sandboxing/isolation policy.
-- [ ] CI validates malformed/tampered `.asd` packages.
-
-### 4.3 Hardware driver families
-
-Implement and validate in priority order:
-
-- [ ] PCI/PCIe
-- [ ] ACPI
-- [ ] APIC/IOAPIC
-- [ ] timers/HPET where needed
-- [ ] VirtIO
-- [ ] NVMe
-- [ ] AHCI/SATA
-- [ ] USB host controller
-- [ ] HID keyboard/mouse/touch
-- [ ] framebuffer/display
-- [ ] GPU acceleration
-- [ ] Ethernet
-- [ ] Wi-Fi
-- [ ] Bluetooth
-- [ ] audio
-- [ ] storage/removable media
-- [ ] cameras and common input devices
-- [ ] power/battery/thermal
-- [ ] RTC
-
-VirtIO is the first complete reference driver platform; real hardware coverage follows.
-
-## 5. Stage 5 — Filesystem and storage
-
-- [ ] VFS.
-- [ ] Native AWE filesystem specification.
-- [ ] Implement native filesystem.
-- [ ] File permissions/capabilities.
-- [ ] Journaling/recovery policy.
-- [ ] Block cache.
+- [ ] VFS and native AWE filesystem.
+- [ ] Permissions/capabilities.
+- [ ] Journaling and crash recovery.
+- [ ] Block cache and storage service.
 - [ ] NVMe/AHCI integration.
-- [ ] Mount/unmount lifecycle.
-- [ ] fsck/recovery tooling.
+- [ ] Mount lifecycle and fsck/recovery tools.
 - [ ] Read-only recovery environment.
-- [ ] Encryption-at-rest design and implementation where appropriate.
+- [ ] Encryption-at-rest where supported by the release design.
 
-## 6. Stage 6 — Networking
+## 9. Stage F — Networking
 
-- [ ] Network device abstraction.
-- [ ] Ethernet.
-- [ ] ARP/IPv4.
-- [ ] IPv6/ND.
-- [ ] ICMP.
-- [ ] UDP.
-- [ ] TCP.
-- [ ] DNS resolver.
-- [ ] DHCP.
-- [ ] sockets API.
+- [ ] Network device service.
+- [ ] Ethernet, ARP/IPv4, IPv6/ND, ICMP.
+- [ ] UDP, TCP, DNS, DHCP and sockets.
 - [ ] TLS integration.
 - [ ] Firewall/security policy.
-- [ ] Network namespaces/isolation where required.
+- [ ] Isolation/namespaces where required.
 - [ ] Wi-Fi/Bluetooth integration.
+- [ ] Network stress, timeout, retry and recovery tests.
 
-## 7. Stage 7 — Userspace and system services
+## 10. Stage G — Userspace and services
 
 - [ ] User-space loader.
 - [ ] Init/service manager.
 - [ ] User/group identity model.
-- [ ] Environment/process management.
-- [ ] IPC service layer.
-- [ ] Device manager.
-- [ ] Filesystem manager.
-- [ ] Network manager.
+- [ ] Device, filesystem and network managers.
 - [ ] Update manager.
-- [ ] Logging/diagnostics service.
+- [ ] Logging/diagnostics.
 - [ ] Security policy service.
 - [ ] Crash reporting and recovery.
 
-## 8. Stage 8 — AWOSA runtime
+Canonical services must have versioned contracts, bounded resources and explicit capability admission.
 
-AWOSA is the native application/service runtime layer.
+## 11. Stage H — AWOSA native runtime
 
-- [ ] Stable native runtime ABI.
-- [ ] Memory/process APIs.
-- [ ] Filesystem APIs.
-- [ ] Networking APIs.
-- [ ] UI APIs.
-- [ ] Device APIs.
-- [ ] IPC APIs.
-- [ ] permissions/capabilities APIs.
-- [ ] async/concurrency primitives.
-- [ ] runtime version negotiation.
-- [ ] SDK and headers/bindings.
+- [ ] Stable runtime ABI.
+- [ ] Process/memory/filesystem/network/UI/device/IPC APIs.
+- [ ] Capability and permission APIs.
+- [ ] Async/concurrency primitives.
+- [ ] Runtime version negotiation.
+- [ ] SDK, headers and bindings.
+- [ ] ABI compatibility tests.
 
-## 9. Stage 9 — `.awos` native application format
+## 12. Stage I — `.awos` native application platform
 
-`.awos` is the native AWE application package/executable distribution format.
+- [ ] Executable/package format and manifest.
+- [ ] Dependencies, resources and architecture targets.
+- [ ] Publisher identity, signatures and sandbox policy.
+- [ ] Update/rollback metadata.
+- [ ] `awospack` and verification tools.
+- [ ] Install/run/update/remove commands.
+- [ ] Repository/index and dependency resolution.
+- [ ] Package integrity and permission tests.
 
-- [ ] Define executable/package specification.
-- [ ] Define manifest.
-- [ ] Define dependencies.
-- [ ] Define permissions/capabilities.
-- [ ] Define architecture targets.
-- [ ] Define resources/assets.
-- [ ] Define signatures and publisher identity.
-- [ ] Define sandbox policy.
-- [ ] Define update/rollback metadata.
-- [ ] Implement `awospack`.
-- [ ] Implement install/run/uninstall/verify commands.
-- [ ] Implement package repository/index format.
-- [ ] Implement dependency resolution.
-
-## 10. Stage 10 — Compatibility layers
-
-Compatibility means executing applications through controlled translation/runtime layers; it does **not** mean pretending native support exists.
-
-### Linux
-
-- [ ] POSIX/Linux syscall compatibility target.
-- [ ] Linux userspace ABI subset.
-- [ ] ELF application loader compatibility.
-- [ ] libc compatibility strategy.
-- [ ] filesystem/network API mappings.
-- [ ] process/thread/signal mappings.
-- [ ] graphics integration.
-- [ ] tested application compatibility matrix.
-
-### Windows
-
-- [ ] Windows API compatibility strategy.
-- [ ] PE loader/runtime strategy.
-- [ ] Win32 API mapping layer.
-- [ ] registry/config compatibility where required.
-- [ ] graphics/audio/input mappings.
-- [ ] application isolation.
-- [ ] compatibility test matrix.
-
-### Android
-
-- [ ] Android application packaging strategy.
-- [ ] Android runtime boundary.
-- [ ] Binder-compatible IPC strategy where required.
-- [ ] Android API mapping.
-- [ ] graphics/input/audio integration.
-- [ ] permissions mapping.
-- [ ] compatibility test matrix.
-
-### Driver compatibility
-
-- [ ] Linux driver compatibility is explicitly separated from Linux application compatibility.
-- [ ] Windows driver compatibility is explicitly separated from Windows application compatibility.
-- [ ] Android HAL/driver integration is explicitly separated from Android application compatibility.
-- [ ] Native `.asd` drivers remain the preferred trusted path.
-
-## 11. Stage 11 — AYUI desktop
+## 13. Stage J — AYUI desktop
 
 - [ ] Display server/compositor.
-- [ ] Window manager.
-- [ ] GPU acceleration.
-- [ ] Input system.
-- [ ] Fonts/text rendering.
-- [ ] accessibility.
-- [ ] themes.
-- [ ] notifications.
-- [ ] clipboard.
-- [ ] drag/drop.
-- [ ] multi-monitor.
-- [ ] settings.
-- [ ] file manager.
-- [ ] terminal.
-- [ ] system monitor.
-- [ ] application launcher.
+- [ ] Window manager and input system.
+- [ ] GPU acceleration path.
+- [ ] Fonts/text/accessibility.
+- [ ] Themes, notifications, clipboard and drag/drop.
+- [ ] Multi-monitor.
+- [ ] Settings, Files, Terminal, System Monitor and launcher.
 
-## 12. Stage 12 — AWEOSA App Builder
+## 14. Stage K — Compatibility, always isolated
 
-Create a first-party application development environment for AWE_OS.
+### Linux
+- [ ] POSIX/Linux ABI subset.
+- [ ] ELF loader boundary.
+- [ ] libc/process/thread/signal mappings.
+- [ ] filesystem/network/graphics integration.
+- [ ] tested application matrix.
+
+### Windows
+- [ ] PE/Win32 compatibility strategy.
+- [ ] registry/config boundary.
+- [ ] graphics/audio/input mappings.
+- [ ] isolation and compatibility matrix.
+
+### Android
+- [ ] package/runtime boundary.
+- [ ] Binder-compatible IPC where required.
+- [ ] API/permission/graphics/input/audio mappings.
+- [ ] compatibility matrix.
+
+Compatibility must never be described as native support. Native `.asd` drivers remain the preferred trusted driver path.
+
+## 15. Stage L — AWEOSA App Builder and SDK
 
 - [ ] CLI project generator.
 - [ ] GUI project creator.
-- [ ] `.awos` project template.
 - [ ] AWOSA SDK integration.
-- [ ] code editor.
-- [ ] syntax highlighting.
-- [ ] build/run/debug buttons.
+- [ ] editor, syntax highlighting and build/run/debug.
 - [ ] simulator/emulator integration.
-- [ ] UI designer.
-- [ ] visual component library.
-- [ ] asset manager.
-- [ ] package/signing assistant.
-- [ ] permission/capability editor.
-- [ ] test runner.
+- [ ] UI designer and component library.
+- [ ] assets and package/signing assistant.
+- [ ] capability editor and test runner.
 - [ ] profiler/log viewer.
 - [ ] `.awos` exporter.
-- [ ] `.asd` driver-development mode with stronger safety checks.
-- [ ] templates for desktop, CLI, service, driver and compatibility applications.
+- [ ] safer `.asd` driver-development mode.
+- [ ] desktop/CLI/service/driver/compatibility templates.
 
-## 13. Stage 13 — Native application ecosystem
-
-First-party reference applications:
+## 16. Stage M — First-party ecosystem
 
 - [ ] AWE Terminal
 - [ ] AWE Files
@@ -319,110 +213,66 @@ First-party reference applications:
 - [ ] AWE Update Center
 - [ ] AWE Recovery
 
-## 14. Stage 14 — Security
+## 17. Stage N — Security hardening
 
-- [ ] Secure boot/trust-chain integration.
-- [ ] Signed boot artifacts.
-- [ ] Signed drivers.
-- [ ] Signed applications.
-- [ ] Capability security.
-- [ ] sandboxing.
-- [ ] least-privilege service model.
-- [ ] memory-safety audit.
-- [ ] fuzzing of parsers and package formats.
-- [ ] syscall fuzzing.
-- [ ] driver fault-injection tests.
-- [ ] update rollback protection.
-- [ ] secret/key handling policy.
-- [ ] security incident/recovery procedures.
+- [ ] Secure-boot/trust-chain integration.
+- [ ] Signed boot, driver and application artifacts.
+- [ ] Capability security and least privilege.
+- [ ] Sandboxing and fault isolation.
+- [ ] Memory-safety review of privileged boundaries.
+- [ ] Package/parser fuzzing.
+- [ ] Syscall fuzzing.
+- [ ] Driver fault injection.
+- [ ] Update rollback protection.
+- [ ] Key/secret handling policy.
+- [ ] Security incident and recovery procedures.
 
-## 15. Stage 15 — Update, recovery and lifecycle
+## 18. Stage O — Update, recovery and lifecycle
 
 - [ ] Atomic system updates.
-- [ ] A/B or equivalent rollback strategy.
-- [ ] Driver rollback.
-- [ ] Application rollback.
+- [ ] A/B or equivalent rollback.
+- [ ] Driver/application rollback.
 - [ ] Recovery boot target.
-- [ ] Offline repair tools.
-- [ ] backup/restore.
-- [ ] release channels.
-- [ ] signed release manifests.
-- [ ] reproducible release builds.
+- [ ] Offline repair.
+- [ ] Backup/restore.
+- [ ] Release channels and signed manifests.
+- [ ] Reproducible release builds.
 
-## 16. Stage 16 — Multi-architecture
+## 19. Stage P — Multi-architecture
 
-Primary production target:
+Production order:
 
-- [ ] x86_64
+1. x86_64
+2. ARM64
+3. RISC-V 64
 
-Then:
+An architecture is complete only after boot, memory, interrupts, scheduling, drivers, userspace and CI validation all pass.
 
-- [ ] ARM64
-- [ ] RISC-V 64
-- [ ] additional architectures only after the common ABI is stable.
+## 20. Stage Q — Evidence and release certification
 
-Every architecture must have boot, memory, interrupts, scheduling, drivers, userspace and CI validation before being marked complete.
+Every release candidate must pass:
 
-## 17. Stage 17 — Compatibility and quality gates
+- [ ] clean reproducible build;
+- [ ] unit/integration tests;
+- [ ] QEMU boot and device exercise;
+- [ ] storage/network/input/display runtime exercise;
+- [ ] hardware-in-the-loop matrix for supported devices;
+- [ ] crash/recovery tests;
+- [ ] suspend/resume where supported;
+- [ ] fuzz/stress/resource-exhaustion tests;
+- [ ] performance regression budget;
+- [ ] security gates;
+- [ ] signed release artifacts;
+- [ ] no unresolved critical/high release blocker.
 
-- [ ] QEMU end-to-end boot.
-- [ ] QEMU storage/network tests.
-- [ ] hardware-in-the-loop test matrix.
-- [ ] boot regression tests.
-- [ ] syscall regression tests.
-- [ ] driver conformance tests.
-- [ ] filesystem stress tests.
-- [ ] network stress tests.
-- [ ] application compatibility tests.
-- [ ] suspend/resume tests.
-- [ ] crash/recovery tests.
-- [ ] fuzzing.
-- [ ] performance benchmarks.
-- [ ] memory/leak/resource exhaustion tests.
+## 21. Progress accounting
 
-## 18. Stage 18 — Production release
+The percentage is computed from validated evidence, never from line count, file count, mock interfaces or documentation.
 
-AWE_OS 1.0 can only be marked **100/100** when:
+A milestone can move from implementation-complete to certified only after its required evidence gate is green. If a later regression breaks a gate, the affected milestone is automatically considered uncertified again.
 
-- [ ] clean installation is reproducible;
-- [ ] it boots on the supported hardware matrix;
-- [ ] storage and networking work;
-- [ ] userspace is stable;
-- [ ] desktop is usable;
-- [ ] native `.awos` applications can be built, installed, updated and removed;
-- [ ] `.asd` drivers can be installed, verified, upgraded, rolled back and recovered;
-- [ ] Linux/Windows/Android compatibility targets have documented tested subsets;
-- [ ] security gates pass;
-- [ ] recovery works;
-- [ ] release artifacts are signed and reproducible;
-- [ ] CI is green;
-- [ ] no critical/high unresolved release blockers remain.
+## 22. Execution order
 
-# Execution order
+`CI foundation -> boot -> kernel execution -> memory/process/syscalls -> device model -> PCI/ACPI/APIC -> VirtIO -> storage -> filesystem -> networking -> userspace -> AWOSA -> .awos -> .asd -> AYUI -> native apps -> compatibility -> App Builder -> security hardening -> update/recovery -> multi-architecture -> hardware matrix -> release 1.0`
 
-The project must be advanced in this order to avoid building UI on unstable foundations:
-
-`CI correctness -> boot -> kernel execution -> memory/process/syscalls -> device model -> PCI/ACPI -> VirtIO -> storage -> filesystem -> network -> userspace -> AWOSA -> .awos -> .asd -> AYUI -> native apps -> Linux compatibility -> Windows compatibility -> Android compatibility -> App Builder -> security hardening -> recovery/update -> hardware matrix -> release 1.0`.
-
-# Progress accounting
-
-The global percentage must be calculated from validated milestones, not file count or lines of code. A proposed default weighting is:
-
-- Boot/platform: 10%
-- Kernel: 15%
-- Drivers/device model: 15%
-- Storage/filesystem: 8%
-- Networking: 7%
-- Userspace/services: 8%
-- AWOSA/native ABI: 5%
-- `.asd` driver ecosystem: 5%
-- `.awos` application ecosystem: 5%
-- Compatibility layers: 10%
-- AYUI/desktop: 5%
-- App Builder/SDK: 3%
-- Security/update/recovery: 3%
-- Testing/hardware/release: 6%
-
-**Total: 100%.**
-
-A milestone may increase the percentage only after its acceptance criteria pass in CI or documented hardware/emulator validation. This keeps the 100% target honest.
+This order is intentionally modular: UI and ecosystem work must not hide instability in the privileged core.
