@@ -4,9 +4,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**60.5% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**61% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
-The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 60.5% gate specifically represents completion of the process/service ownership freeze inside the 60–61% Architecture Freeze block.
+The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 61% gate closes the complete 60.0–61.0 Architecture Freeze block.
 
 ## Implemented kernel foundations
 
@@ -35,56 +35,43 @@ The percentage follows the AWE_OS 60–100 master plan and advances only when th
 - AWE Capsule and XenoSense security foundations.
 - Cloud CI security/release gates.
 - **60.2 service-contract freeze:** CellKernel ABI 1.2, typed service IDs, explicit capability admission, typed IPC channels/opcodes, and contracts for the full canonical service roster.
-- **60.5 service/process freeze:** explicit service-to-process ownership, service classes, lifecycle states, bounded CPU/memory/IPC budgets, a fixed-capacity service registry, canonical seven-service roster, and fail-closed capability admission.
+- **60.5 service/process freeze:** explicit service-to-process ownership, service classes, lifecycle states, bounded CPU/memory/IPC budgets, fixed-capacity service registry, canonical seven-service roster, and fail-closed capability admission.
+- **60.6–61.0 transport freeze:** capability handles, service endpoints, versioned HELLO handshake, bounded shared-memory-style rings, async request tracking, event queues, canonical service/channel mapping, and frozen IPC opcode validation.
 
 ## 60.2 milestone — COMPLETE
 
-The 60.2 gate freezes the minimal kernel-to-service boundary:
-
-- [x] CellKernel ABI 1.2.
-- [x] Stable service identifiers for driverd/appd/ASAPP/AYUI/terminal/bus/update services.
-- [x] Explicit capability requirements for service admission.
-- [x] Fail-closed major/minor ABI validation.
-- [x] Forward-compatible minor-version validation.
-- [x] Typed IPC service channels.
-- [x] Stable IPC opcodes for hello/ping/start/stop/reset/query/event/handoff.
-- [x] driverd ABI 1.2 alignment.
-- [x] appd ABI 1.2 alignment.
-- [x] Unit coverage for capability, version and IPC invariants.
-
-The detailed specification is `docs/MILESTONE_60_2.md`.
+The 60.2 gate freezes the minimal kernel-to-service boundary.
 
 ## 60.5 milestone — COMPLETE
 
-The 60.5 gate freezes the process/service ownership model for the complete platform boundary without moving implementations into CellKernel:
+The 60.5 gate freezes the process/service ownership model for the complete platform boundary without moving implementations into CellKernel.
 
-- [x] `ServiceDescriptor` with stable `ServiceId` and owning `ProcessId`.
-- [x] Explicit service classes: system, hardware, application, interface, compatibility and update.
-- [x] Explicit lifecycle: declared, starting, running, stopping, failed, quarantined.
-- [x] Per-service CPU, memory and IPC budgets.
-- [x] Capability set attached to each service process.
-- [x] Fail-closed capability admission before startup.
-- [x] Allocation-free fixed-layout service descriptors.
-- [x] Bounded duplicate-safe `ServiceRegistry<N>`.
-- [x] Canonical seven-service roster frozen.
-- [x] All seven canonical services mapped to versioned service contracts.
-- [x] Unit tests for lifecycle, registry bounds/duplicates, roster stability and capability rejection.
+## 60.6–61.0 milestone — COMPLETE
+
+The 60.6–61.0 gate implements the execution-side service boundary required by the master plan:
+
+- [x] Explicit capability handles and endpoint identity.
+- [x] Service registration boundary through a bounded registry.
+- [x] Versioned HELLO handshake with major/minor compatibility checks.
+- [x] Wrong-service and wrong-endpoint rejection.
+- [x] Fixed-capacity shared-memory-style ring transport with deterministic backpressure.
+- [x] Bounded asynchronous request table with completion semantics.
+- [x] Bounded event transport.
+- [x] Stable mapping between all seven `ServiceId` values and IPC channels.
+- [x] Closed validation of the frozen IPC opcode set.
 - [x] CellKernel remains driver/application implementation free.
 
-The detailed specification is `docs/MILESTONE_60_5.md`.
+The detailed specification is `docs/MILESTONE_61_0.md`.
 
 ## Hardware and driver intelligence
 
 AWE_OS targets real hardware, virtual machines and cloud/server environments through one capability-controlled Driver HAL. Foreign kernel ABIs are not executed directly inside CellKernel.
-
-Implemented foundations include cross-OS provenance manifests, verified-only binding, bounded compatibility registry, offline/online driver database architecture, staged authenticated updates, rollback-safe updates, deterministic driver experience tracking and fail-closed behavior for unknown/unverified hardware.
 
 ## Driver roadmap
 
 ### Virtualization
 - [x] Driver HAL and device contracts.
 - [x] VirtIO feature negotiation foundation.
-- [x] Compatibility manifests and bounded learning state.
 - [ ] VirtIO PCI transport.
 - [ ] VirtIO block driver.
 - [ ] VirtIO network driver.
@@ -107,7 +94,7 @@ Implemented foundations include cross-OS provenance manifests, verified-only bin
 
 ### Cross-OS coverage
 - [x] Driver source/provenance model.
-- [x] Offline/online database architecture.
+- [x] Offline/online driver database architecture.
 - [x] Deterministic driver experience tracking.
 - [ ] Linux hardware-ID ingestion implementation.
 - [ ] Android vendor compatibility adapters.
@@ -126,10 +113,10 @@ Implemented foundations include cross-OS provenance manifests, verified-only bin
 - [ ] Signed/measured release image verification in the boot path.
 - [ ] Automated QEMU boot certification.
 
-## 60.5 milestone boundary
+## 61% milestone boundary
 
-The 60.5 milestone represents a genuine architecture-freeze gate: CellKernel has a bounded process model and a fixed service ownership contract; every canonical system service has a stable identity, process owner, lifecycle, resource budget and capability requirements; driver/application/UI/update implementations remain in their user-space service planes. The next planned block is 60.6–60.8 execution-side IPC/service transport.
+The 61% milestone represents completion of the entire 60.0–61.0 Architecture Freeze from the master plan: kernel/service ABI contracts, process/service ownership, service registry, capability handles, service handshake, bounded shared-memory transport, asynchronous requests/events, and stable service/channel/opcode mappings. No later driver, application, UI, compatibility, update or desktop implementation is counted toward 61%.
 
 ## Definition of done
 
-AWE_OS is considered product-ready only when the required boot, kernel, driver, security, recovery and release gates are implemented and their automated CI/QEMU validation is green. Documentation or architectural placeholders alone do not satisfy a gate.
+AWE_OS is considered product-ready only when the required boot, kernel, driver, security, recovery and release gates are implemented and their automated validation is green. Documentation or architectural placeholders alone do not satisfy a gate.
