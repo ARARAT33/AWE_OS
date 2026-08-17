@@ -1,7 +1,9 @@
 #![no_std]
-use core::arch::global_asm;use core::sync::atomic::{AtomicU64,Ordering};
-static TIMER_IRQ_COUNT:AtomicU64=AtomicU64::new(0);
-global_asm!(r#".intel_syntax noprefix
+use core::arch::global_asm;
+use core::sync::atomic::{AtomicU64, Ordering};
+static TIMER_IRQ_COUNT: AtomicU64 = AtomicU64::new(0);
+global_asm!(
+    r#".intel_syntax noprefix
 .section .text
 .global awe_isr_timer
 .type awe_isr_timer, @function
@@ -30,7 +32,14 @@ awe_isr_timer:
     iretq
 .size awe_isr_timer, .-awe_isr_timer
 .att_syntax prefix
-"#);
-unsafe extern "C"{pub fn awe_isr_timer();}
-pub extern "C" fn awe_timer_interrupt(_saved_registers:*mut u64){TIMER_IRQ_COUNT.fetch_add(1,Ordering::Relaxed);}
-pub fn timer_irq_count()->u64{TIMER_IRQ_COUNT.load(Ordering::Acquire)}
+"#
+);
+unsafe extern "C" {
+    pub fn awe_isr_timer();
+}
+pub extern "C" fn awe_timer_interrupt(_saved_registers: *mut u64) {
+    TIMER_IRQ_COUNT.fetch_add(1, Ordering::Relaxed);
+}
+pub fn timer_irq_count() -> u64 {
+    TIMER_IRQ_COUNT.load(Ordering::Acquire)
+}

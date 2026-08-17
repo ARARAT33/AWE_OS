@@ -39,20 +39,31 @@ pub struct PciDeviceTable<const N: usize> {
 
 impl<const N: usize> PciDeviceTable<N> {
     pub const fn new() -> Self {
-        Self { entries: [None; N], len: 0 }
+        Self {
+            entries: [None; N],
+            len: 0,
+        }
     }
 
-    pub const fn len(&self) -> usize { self.len }
+    pub const fn len(&self) -> usize {
+        self.len
+    }
 
     pub fn push(&mut self, device: PciDevice) -> Result<(), PciError> {
-        if self.len == N { return Err(PciError::Full); }
+        if self.len == N {
+            return Err(PciError::Full);
+        }
         self.entries[self.len] = Some(device);
         self.len += 1;
         Ok(())
     }
 
     pub fn get(&self, index: usize) -> Option<PciDevice> {
-        if index >= self.len { None } else { self.entries[index] }
+        if index >= self.len {
+            None
+        } else {
+            self.entries[index]
+        }
     }
 }
 
@@ -64,7 +75,11 @@ pub fn enumerate<C: PciConfigAccess, const N: usize>(
     while bus <= 0xFF {
         let mut slot = 0u8;
         while slot < 32 {
-            let location0 = PciLocation { bus: bus as u8, device: slot, function: 0 };
+            let location0 = PciLocation {
+                bus: bus as u8,
+                device: slot,
+                function: 0,
+            };
             let id = access.read_u32(location0, 0x00);
             if (id & 0xFFFF) != 0xFFFF {
                 let header = (access.read_u32(location0, 0x0C) >> 16) as u8;
@@ -72,7 +87,11 @@ pub fn enumerate<C: PciConfigAccess, const N: usize>(
                 let functions = if multifunction { 8 } else { 1 };
                 let mut function = 0u8;
                 while function < functions {
-                    let location = PciLocation { bus: bus as u8, device: slot, function };
+                    let location = PciLocation {
+                        bus: bus as u8,
+                        device: slot,
+                        function,
+                    };
                     let vendor_device = access.read_u32(location, 0x00);
                     if (vendor_device & 0xFFFF) != 0xFFFF {
                         let class_word = access.read_u32(location, 0x08);

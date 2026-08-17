@@ -1,7 +1,7 @@
 #![no_std]
 
-use crate::process::ProcessId;
 use super::RunQueue;
+use crate::process::ProcessId;
 
 /// Deterministic scheduler dispatcher for the early kernel. It keeps the
 /// current process separate from the runnable queue and never allocates.
@@ -11,11 +11,22 @@ pub struct Dispatcher<const N: usize> {
 }
 
 impl<const N: usize> Dispatcher<N> {
-    pub const fn new() -> Self { Self { queue: RunQueue::new(), current: None } }
-    pub const fn current(&self) -> Option<ProcessId> { self.current }
-    pub const fn runnable(&self) -> usize { self.queue.len() }
+    pub const fn new() -> Self {
+        Self {
+            queue: RunQueue::new(),
+            current: None,
+        }
+    }
+    pub const fn current(&self) -> Option<ProcessId> {
+        self.current
+    }
+    pub const fn runnable(&self) -> usize {
+        self.queue.len()
+    }
 
-    pub fn enqueue(&mut self, id: ProcessId) -> bool { self.queue.push(id) }
+    pub fn enqueue(&mut self, id: ProcessId) -> bool {
+        self.queue.push(id)
+    }
 
     /// Performs one deterministic scheduling decision. The previously running
     /// process is requeued only when the caller explicitly requests it; this

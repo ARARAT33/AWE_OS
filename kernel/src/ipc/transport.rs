@@ -129,9 +129,7 @@ impl<const N: usize> SharedRing<N> {
         if self.is_empty() {
             return Err(TransportError::Empty);
         }
-        let value = self.slots[self.head]
-            .take()
-            .expect("shared ring invariant");
+        let value = self.slots[self.head].take().expect("shared ring invariant");
         self.head = (self.head + 1) % N;
         self.len -= 1;
         Ok(value)

@@ -36,7 +36,12 @@ pub struct Intent {
 
 impl Intent {
     pub const fn new(code: IntentCode, required: Rights, impact: Impact, budget: u64) -> Self {
-        Self { code, required, impact, expected_resource_units: budget }
+        Self {
+            code,
+            required,
+            impact,
+            expected_resource_units: budget,
+        }
     }
 
     pub const fn is_consistent(&self) -> bool {
@@ -50,13 +55,16 @@ impl Intent {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::intent::*;
+    use super::*;
     use crate::security::capability::CapabilityId;
 
     #[test]
     fn intent_requires_matching_capability() {
-        let cap = Capability { id: CapabilityId(7), rights: Rights::READ };
+        let cap = Capability {
+            id: CapabilityId(7),
+            rights: Rights::READ,
+        };
         let request = Intent::new(READ, Rights::READ, Impact::Low, 1);
         assert!(request.authorize(cap));
         let write = Intent::new(WRITE, Rights::WRITE, Impact::Medium, 1);
@@ -65,7 +73,10 @@ mod tests {
 
     #[test]
     fn malformed_intent_is_rejected() {
-        let cap = Capability { id: CapabilityId(1), rights: Rights::ADMIN };
+        let cap = Capability {
+            id: CapabilityId(1),
+            rights: Rights::ADMIN,
+        };
         let malformed = Intent::new(ADMIN, Rights::NONE, Impact::Critical, 0);
         assert!(!malformed.authorize(cap));
     }

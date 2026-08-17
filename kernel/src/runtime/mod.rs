@@ -39,7 +39,9 @@ pub struct RuntimeContext {
 }
 
 impl RuntimeContext {
-    pub const fn new(capabilities: CapabilitySet) -> Self { Self { capabilities } }
+    pub const fn new(capabilities: CapabilitySet) -> Self {
+        Self { capabilities }
+    }
 
     pub const fn require(self, required: CapabilitySet) -> Result<(), RuntimeError> {
         if self.capabilities.contains(required) {

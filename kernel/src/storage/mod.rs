@@ -16,7 +16,9 @@ pub enum StorageError {
 }
 
 pub trait BlockDevice {
-    fn block_size(&self) -> usize { BLOCK_SIZE }
+    fn block_size(&self) -> usize {
+        BLOCK_SIZE
+    }
     fn block_count(&self) -> u64;
     fn read_block(&mut self, block: u64, out: &mut [u8]) -> Result<(), StorageError>;
     fn write_block(&mut self, block: u64, data: &[u8]) -> Result<(), StorageError>;
@@ -32,7 +34,11 @@ pub struct DeviceGeometry {
 
 impl DeviceGeometry {
     pub const fn new(block_size: u32, blocks: u64, read_only: bool) -> Self {
-        Self { block_size, blocks, read_only }
+        Self {
+            block_size,
+            blocks,
+            read_only,
+        }
     }
 
     pub const fn bytes(self) -> Option<u64> {

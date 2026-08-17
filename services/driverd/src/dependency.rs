@@ -206,16 +206,20 @@ mod tests {
             interrupt_count: 2,
         };
         assert!(granted.within(budget));
-        assert!(!ResourceOwnership {
-            driver: DriverId(6),
-            ..granted
-        }
-        .within(budget));
+        assert!(
+            !ResourceOwnership {
+                driver: DriverId(6),
+                ..granted
+            }
+            .within(budget)
+        );
     }
 
     #[test]
     fn health_model_is_restartable_and_bounded() {
-        let health = DriverHealth::new(DriverId(9)).record_failure().record_failure();
+        let health = DriverHealth::new(DriverId(9))
+            .record_failure()
+            .record_failure();
         assert_eq!(health.state, DriverState::Failed);
         assert_eq!(health.consecutive_failures, 2);
         assert!(health.can_restart(3));

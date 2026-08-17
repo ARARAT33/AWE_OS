@@ -1,6 +1,6 @@
 #![no_std]
 
-use super::isr::{is_exception_with_error_code, InterruptFrame};
+use super::isr::{InterruptFrame, is_exception_with_error_code};
 
 /// Common Rust-side interrupt entry point. Assembly stubs are responsible for
 /// constructing the frame; this function validates it before dispatching any

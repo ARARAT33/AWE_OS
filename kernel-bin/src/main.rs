@@ -3,8 +3,8 @@
 
 use core::arch::global_asm;
 
-use awe_boot_protocol::{Architecture, BootInfo, MemoryRegion, AWE_BOOT_MAGIC};
-use aweos_kernel::entry::{kernel_entry, KernelBootStatus};
+use awe_boot_protocol::{AWE_BOOT_MAGIC, Architecture, BootInfo, MemoryRegion};
+use aweos_kernel::entry::{KernelBootStatus, kernel_entry};
 #[cfg(target_arch = "x86_64")]
 use aweos_kernel::memory::activate_bootstrap_identity_map;
 
@@ -15,8 +15,12 @@ const FALLBACK_MEMORY_LENGTH: u64 = 0x0200_0000;
 const MULTIBOOT2_MIN_SIZE: usize = 16;
 const MULTIBOOT2_MAX_SIZE: usize = 1024 * 1024;
 
-static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] =
-    [MemoryRegion { base: 0, length: 0, kind: 2, reserved: 0 }; MAX_MEMORY_REGIONS];
+static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] = [MemoryRegion {
+    base: 0,
+    length: 0,
+    kind: 2,
+    reserved: 0,
+}; MAX_MEMORY_REGIONS];
 
 #[used]
 #[unsafe(link_section = ".multiboot2_header")]
@@ -206,7 +210,9 @@ pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u64) -> ! {
 #[cfg(not(test))]
 fn halt_forever() -> ! {
     loop {
-        unsafe { core::arch::asm!("hlt", options(nomem, nostack, preserves_flags)); }
+        unsafe {
+            core::arch::asm!("hlt", options(nomem, nostack, preserves_flags));
+        }
     }
 }
 
@@ -251,29 +257,25 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
 
         match tag {
             4 if size >= 16 => {
-                basic_mem_upper_kb = unsafe {
-                    core::ptr::read_unaligned((addr + offset + 12) as *const u32)
-                } as u64;
+                basic_mem_upper_kb =
+                    unsafe { core::ptr::read_unaligned((addr + offset + 12) as *const u32) } as u64;
             }
             6 if size >= 16 => {
-                let entry_size = unsafe {
-                    core::ptr::read_unaligned((addr + offset + 8) as *const u32)
-                } as usize;
+                let entry_size =
+                    unsafe { core::ptr::read_unaligned((addr + offset + 8) as *const u32) }
+                        as usize;
                 if entry_size >= 24 {
                     let mut entry = offset + 16;
                     while entry_size <= size.saturating_sub(16)
                         && entry + entry_size <= offset + size
                         && (region_count as usize) < MAX_MEMORY_REGIONS
                     {
-                        let base = unsafe {
-                            core::ptr::read_unaligned((addr + entry) as *const u64)
-                        };
-                        let length = unsafe {
-                            core::ptr::read_unaligned((addr + entry + 8) as *const u64)
-                        };
-                        let kind = unsafe {
-                            core::ptr::read_unaligned((addr + entry + 16) as *const u32)
-                        };
+                        let base =
+                            unsafe { core::ptr::read_unaligned((addr + entry) as *const u64) };
+                        let length =
+                            unsafe { core::ptr::read_unaligned((addr + entry + 8) as *const u64) };
+                        let kind =
+                            unsafe { core::ptr::read_unaligned((addr + entry + 16) as *const u32) };
                         unsafe {
                             core::ptr::write(
                                 regions_ptr.add(region_count as usize),
@@ -291,18 +293,14 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
                 }
             }
             8 if size >= 32 => {
-                framebuffer_address = unsafe {
-                    core::ptr::read_unaligned((addr + offset + 8) as *const u64)
-                };
-                framebuffer_pitch = unsafe {
-                    core::ptr::read_unaligned((addr + offset + 16) as *const u32)
-                };
-                framebuffer_width = unsafe {
-                    core::ptr::read_unaligned((addr + offset + 20) as *const u32)
-                };
-                framebuffer_height = unsafe {
-                    core::ptr::read_unaligned((addr + offset + 24) as *const u32)
-                };
+                framebuffer_address =
+                    unsafe { core::ptr::read_unaligned((addr + offset + 8) as *const u64) };
+                framebuffer_pitch =
+                    unsafe { core::ptr::read_unaligned((addr + offset + 16) as *const u32) };
+                framebuffer_width =
+                    unsafe { core::ptr::read_unaligned((addr + offset + 20) as *const u32) };
+                framebuffer_height =
+                    unsafe { core::ptr::read_unaligned((addr + offset + 24) as *const u32) };
                 framebuffer_size =
                     (framebuffer_pitch as u64).saturating_mul(framebuffer_height as u64);
             }
@@ -334,7 +332,11 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
             core::ptr::write(
                 regions_ptr,
                 MemoryRegion {
-                    base: if length >= 4096 { 0x0010_0000 } else { FALLBACK_MEMORY_BASE },
+                    base: if length >= 4096 {
+                        0x0010_0000
+                    } else {
+                        FALLBACK_MEMORY_BASE
+                    },
                     length: if length >= 4096 {
                         length
                     } else {

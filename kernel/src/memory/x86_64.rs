@@ -19,7 +19,9 @@ const LEAF_FLAGS: u64 = TABLE_FLAGS | HUGE_2M;
 struct Table([u64; ENTRIES]);
 
 impl Table {
-    const fn empty() -> Self { Self([0; ENTRIES]) }
+    const fn empty() -> Self {
+        Self([0; ENTRIES])
+    }
 }
 
 static mut PML4: Table = Table::empty();
@@ -71,6 +73,9 @@ mod tests {
 
     #[test]
     fn entry_address_masks_flags() {
-        assert_eq!(bootstrap_entry_address(0x1234_5000 | LEAF_FLAGS), 0x1234_5000);
+        assert_eq!(
+            bootstrap_entry_address(0x1234_5000 | LEAF_FLAGS),
+            0x1234_5000
+        );
     }
 }

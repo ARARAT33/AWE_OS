@@ -4,8 +4,8 @@ mod access;
 mod binding;
 
 pub use access::{
-    power_transition, AccessKind, DeviceAccessContract, InterruptGrant, IoRegion, IrqMode,
-    PowerState, PowerTransitionError,
+    AccessKind, DeviceAccessContract, InterruptGrant, IoRegion, IrqMode, PowerState,
+    PowerTransitionError, power_transition,
 };
 pub use binding::{BindingDecision, DeviceMatch, MatchKind, ResourceGrant, decide_binding};
 
@@ -47,7 +47,14 @@ pub struct DeviceContract {
 
 impl DeviceContract {
     pub const fn new(id: DeviceId, class: DeviceClass, vendor: u16, product: u16) -> Self {
-        Self { id, class, state: DeviceState::Discovered, vendor, product, irq: None }
+        Self {
+            id,
+            class,
+            state: DeviceState::Discovered,
+            vendor,
+            product,
+            irq: None,
+        }
     }
 
     pub const fn with_irq(mut self, irq: u32) -> Self {
@@ -74,12 +81,23 @@ pub struct DeviceRegistry<const N: usize> {
 }
 
 impl<const N: usize> DeviceRegistry<N> {
-    pub const fn new() -> Self { Self { devices: [None; N], len: 0 } }
-    pub const fn len(&self) -> usize { self.len }
+    pub const fn new() -> Self {
+        Self {
+            devices: [None; N],
+            len: 0,
+        }
+    }
+    pub const fn len(&self) -> usize {
+        self.len
+    }
 
     pub fn register(&mut self, device: DeviceContract) -> Result<(), RegistryError> {
-        if self.find(device.id).is_some() { return Err(RegistryError::Duplicate); }
-        if self.len == N { return Err(RegistryError::Full); }
+        if self.find(device.id).is_some() {
+            return Err(RegistryError::Duplicate);
+        }
+        if self.len == N {
+            return Err(RegistryError::Full);
+        }
         self.devices[self.len] = Some(device);
         self.len += 1;
         Ok(())
@@ -89,7 +107,9 @@ impl<const N: usize> DeviceRegistry<N> {
         let mut i = 0;
         while i < self.len {
             if let Some(device) = &self.devices[i] {
-                if device.id == id { return Some(device); }
+                if device.id == id {
+                    return Some(device);
+                }
             }
             i += 1;
         }
@@ -119,16 +139,29 @@ mod tests {
     fn registry_is_bounded_and_tracks_state() {
         let mut registry: DeviceRegistry<1> = DeviceRegistry::new();
         let id = DeviceId(7);
-        assert!(registry.register(DeviceContract::new(id, DeviceClass::Storage, 1, 2)).is_ok());
-        assert_eq!(registry.register(DeviceContract::new(id, DeviceClass::Storage, 1, 2)), Err(RegistryError::Duplicate));
+        assert!(
+            registry
+                .register(DeviceContract::new(id, DeviceClass::Storage, 1, 2))
+                .is_ok()
+        );
+        assert_eq!(
+            registry.register(DeviceContract::new(id, DeviceClass::Storage, 1, 2)),
+            Err(RegistryError::Duplicate)
+        );
         assert_eq!(registry.set_state(id, DeviceState::Active), Ok(()));
         assert_eq!(registry.find(id).unwrap().state, DeviceState::Active);
-        assert_eq!(registry.register(DeviceContract::new(DeviceId(8), DeviceClass::Network, 3, 4)), Err(RegistryError::Full));
+        assert_eq!(
+            registry.register(DeviceContract::new(DeviceId(8), DeviceClass::Network, 3, 4)),
+            Err(RegistryError::Full)
+        );
     }
 
     #[test]
     fn device_contract_exposes_canonical_exact_match() {
         let device = DeviceContract::new(DeviceId(11), DeviceClass::Display, 0x10de, 0x1cb3);
-        assert_eq!(device.matching(), DeviceMatch::exact(0x10de, 0x1cb3, DeviceClass::Display));
+        assert_eq!(
+            device.matching(),
+            DeviceMatch::exact(0x10de, 0x1cb3, DeviceClass::Display)
+        );
     }
 }

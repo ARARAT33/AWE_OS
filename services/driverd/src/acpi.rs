@@ -37,11 +37,19 @@ pub fn checksum_ok(bytes: &[u8]) -> bool {
 }
 
 pub fn parse_header(bytes: &[u8]) -> Result<SdtHeader, AcpiError> {
-    if bytes.len() < 10 { return Err(AcpiError::TooShort); }
+    if bytes.len() < 10 {
+        return Err(AcpiError::TooShort);
+    }
     let length = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
-    if length < 10 { return Err(AcpiError::InvalidLength); }
-    if length as usize > bytes.len() { return Err(AcpiError::TableOverflow); }
-    if !checksum_ok(&bytes[..length as usize]) { return Err(AcpiError::BadChecksum); }
+    if length < 10 {
+        return Err(AcpiError::InvalidLength);
+    }
+    if length as usize > bytes.len() {
+        return Err(AcpiError::TableOverflow);
+    }
+    if !checksum_ok(&bytes[..length as usize]) {
+        return Err(AcpiError::BadChecksum);
+    }
     Ok(SdtHeader {
         signature: [bytes[0], bytes[1], bytes[2], bytes[3]],
         length,
@@ -75,7 +83,9 @@ pub struct MadtRecord {
 }
 
 pub fn parse_madt(body: &[u8]) -> Result<MadtRecord, AcpiError> {
-    if body.len() < 8 { return Err(AcpiError::TooShort); }
+    if body.len() < 8 {
+        return Err(AcpiError::TooShort);
+    }
     Ok(MadtRecord {
         local_apic_address: u32::from_le_bytes([body[0], body[1], body[2], body[3]]),
         flags: u32::from_le_bytes([body[4], body[5], body[6], body[7]]),
@@ -101,9 +111,21 @@ mod tests {
     #[test]
     fn table_search_is_bounded() {
         let entries = [
-            AcpiTableRef { signature: *b"FACP", address: 1, length: 100 },
-            AcpiTableRef { signature: *b"APIC", address: 2, length: 80 },
-            AcpiTableRef { signature: *b"APIC", address: 3, length: 96 },
+            AcpiTableRef {
+                signature: *b"FACP",
+                address: 1,
+                length: 100,
+            },
+            AcpiTableRef {
+                signature: *b"APIC",
+                address: 2,
+                length: 80,
+            },
+            AcpiTableRef {
+                signature: *b"APIC",
+                address: 3,
+                length: 96,
+            },
         ];
         let mut out = [None; 1];
         assert_eq!(find_table(&entries, *b"APIC", &mut out), 1);

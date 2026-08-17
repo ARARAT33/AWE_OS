@@ -9,9 +9,8 @@
 
 use crate::process::{ProcessId, ResourceBudget};
 use crate::system_contract::{
-    CapabilitySet, ServiceContract, ServiceId, APPD_CONTRACT, ASAPPD_CONTRACT,
-    AWEBUSD_CONTRACT, AWEUPDATED_CONTRACT, AWETERMINALD_CONTRACT, AYUID_CONTRACT,
-    DRIVERD_CONTRACT,
+    APPD_CONTRACT, ASAPPD_CONTRACT, AWEBUSD_CONTRACT, AWETERMINALD_CONTRACT, AWEUPDATED_CONTRACT,
+    AYUID_CONTRACT, CapabilitySet, DRIVERD_CONTRACT, ServiceContract, ServiceId,
 };
 
 #[repr(u8)]

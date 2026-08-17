@@ -24,6 +24,6 @@ pub mod security;
 pub mod service;
 pub mod service_registry;
 pub mod storage;
-pub mod system_contract;
 pub mod syscall;
+pub mod system_contract;
 pub mod time;

@@ -11,7 +11,9 @@ pub struct Frame {
 pub const PAGE_SIZE: u64 = 4096;
 
 pub const fn frame_at(address: u64) -> Frame {
-    Frame { start: address & !(PAGE_SIZE - 1) }
+    Frame {
+        start: address & !(PAGE_SIZE - 1),
+    }
 }
 
 pub const fn frame_end(frame: Frame) -> u64 {
@@ -59,7 +61,9 @@ impl PhysicalFrameAllocator {
         while self.region_index < self.region_count {
             let region = unsafe { core::ptr::read(self.regions.add(self.region_index as usize)) };
             self.region_index += 1;
-            if region.kind != 1 || region.length < PAGE_SIZE { continue; }
+            if region.kind != 1 || region.length < PAGE_SIZE {
+                continue;
+            }
 
             let start = region.base.max(PAGE_SIZE).saturating_add(PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
             let end = region.base.saturating_add(region.length) & !(PAGE_SIZE - 1);
@@ -79,7 +83,9 @@ impl PhysicalFrameAllocator {
         if self.cursor == 0 || self.cursor >= self.end {
             self.select_next_region();
         }
-        if self.cursor == 0 { return None; }
+        if self.cursor == 0 {
+            return None;
+        }
         let frame = Frame { start: self.cursor };
         self.cursor = self.cursor.saturating_add(PAGE_SIZE);
         Some(frame)
@@ -104,9 +110,24 @@ mod tests {
     #[test]
     fn allocator_skips_reserved_memory_and_page_zero() {
         let regions = [
-            MemoryRegion { base: 0, length: 0x2000, kind: 1, reserved: 0 },
-            MemoryRegion { base: 0x2000, length: 0x2000, kind: 2, reserved: 0 },
-            MemoryRegion { base: 0x4000, length: 0x3000, kind: 1, reserved: 0 },
+            MemoryRegion {
+                base: 0,
+                length: 0x2000,
+                kind: 1,
+                reserved: 0,
+            },
+            MemoryRegion {
+                base: 0x2000,
+                length: 0x2000,
+                kind: 2,
+                reserved: 0,
+            },
+            MemoryRegion {
+                base: 0x4000,
+                length: 0x3000,
+                kind: 1,
+                reserved: 0,
+            },
         ];
         let info = BootInfo {
             magic: awe_boot_protocol::AWE_BOOT_MAGIC,

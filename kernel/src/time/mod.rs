@@ -23,14 +23,20 @@ pub struct MonotonicClock {
 }
 
 impl MonotonicClock {
-    pub const fn new() -> Self { Self { ticks: 0 } }
-    pub const fn now(&self) -> Instant { Instant(self.ticks) }
+    pub const fn new() -> Self {
+        Self { ticks: 0 }
+    }
+    pub const fn now(&self) -> Instant {
+        Instant(self.ticks)
+    }
 
     pub fn advance(&mut self, ticks: u64) {
         self.ticks = self.ticks.saturating_add(ticks);
     }
 
-    pub fn reset_for_test(&mut self) { self.ticks = 0; }
+    pub fn reset_for_test(&mut self) {
+        self.ticks = 0;
+    }
 }
 
 #[cfg(test)]

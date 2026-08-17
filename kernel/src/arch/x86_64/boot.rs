@@ -23,5 +23,7 @@ pub unsafe fn enable_interrupts() {
 
 #[inline(always)]
 pub unsafe fn halt() -> ! {
-    loop { core::arch::asm!("hlt", options(nomem, nostack, preserves_flags)); }
+    loop {
+        core::arch::asm!("hlt", options(nomem, nostack, preserves_flags));
+    }
 }

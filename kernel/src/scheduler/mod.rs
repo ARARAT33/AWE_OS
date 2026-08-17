@@ -15,45 +15,102 @@ pub struct RunQueue<const N: usize> {
 }
 
 impl<const N: usize> RunQueue<N> {
-    pub const fn new() -> Self { Self { items: [None; N], head: 0, tail: 0, len: 0 } }
-    pub const fn len(&self) -> usize { self.len }
-    pub const fn is_empty(&self) -> bool { self.len == 0 }
+    pub const fn new() -> Self {
+        Self {
+            items: [None; N],
+            head: 0,
+            tail: 0,
+            len: 0,
+        }
+    }
+    pub const fn len(&self) -> usize {
+        self.len
+    }
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
+    }
     pub fn push(&mut self, id: ProcessId) -> bool {
-        if N == 0 || self.len == N || self.contains(id) { return false; }
-        self.items[self.tail] = Some(id); self.tail = (self.tail + 1) % N; self.len += 1; true
+        if N == 0 || self.len == N || self.contains(id) {
+            return false;
+        }
+        self.items[self.tail] = Some(id);
+        self.tail = (self.tail + 1) % N;
+        self.len += 1;
+        true
     }
     pub fn pop(&mut self) -> Option<ProcessId> {
-        if self.len == 0 { return None; }
-        let id = self.items[self.head].take(); self.head = (self.head + 1) % N; self.len -= 1; id
+        if self.len == 0 {
+            return None;
+        }
+        let id = self.items[self.head].take();
+        self.head = (self.head + 1) % N;
+        self.len -= 1;
+        id
     }
     fn contains(&self, id: ProcessId) -> bool {
-        let mut i = 0; while i < self.len { if self.items[(self.head + i) % N] == Some(id) { return true; } i += 1; } false
+        let mut i = 0;
+        while i < self.len {
+            if self.items[(self.head + i) % N] == Some(id) {
+                return true;
+            }
+            i += 1;
+        }
+        false
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum TickAction { Continue, Reschedule }
+pub enum TickAction {
+    Continue,
+    Reschedule,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct SchedulerClock { quantum: u32, remaining: u32 }
+pub struct SchedulerClock {
+    quantum: u32,
+    remaining: u32,
+}
 
 impl SchedulerClock {
-    pub const fn new(quantum: u32) -> Self { Self { quantum, remaining: quantum } }
-    pub const fn quantum(&self) -> u32 { self.quantum }
-    pub const fn remaining(&self) -> u32 { self.remaining }
-    pub fn tick(&mut self) -> TickAction {
-        if self.quantum == 0 { return TickAction::Reschedule; }
-        if self.remaining > 0 { self.remaining -= 1; }
-        if self.remaining == 0 { self.remaining = self.quantum; TickAction::Reschedule } else { TickAction::Continue }
+    pub const fn new(quantum: u32) -> Self {
+        Self {
+            quantum,
+            remaining: quantum,
+        }
     }
-    pub fn reset(&mut self) { self.remaining = self.quantum; }
+    pub const fn quantum(&self) -> u32 {
+        self.quantum
+    }
+    pub const fn remaining(&self) -> u32 {
+        self.remaining
+    }
+    pub fn tick(&mut self) -> TickAction {
+        if self.quantum == 0 {
+            return TickAction::Reschedule;
+        }
+        if self.remaining > 0 {
+            self.remaining -= 1;
+        }
+        if self.remaining == 0 {
+            self.remaining = self.quantum;
+            TickAction::Reschedule
+        } else {
+            TickAction::Continue
+        }
+    }
+    pub fn reset(&mut self) {
+        self.remaining = self.quantum;
+    }
 }
 
 /// Small deterministic bridge between an interrupt-side reschedule request and
 /// the scheduler dispatcher. The interrupt path only sets a flag; the safe
 /// scheduling boundary consumes it and selects the next runnable process.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum DispatchAction { KeepCurrent, SwitchTo(ProcessId) }
+pub enum DispatchAction {
+    KeepCurrent,
+    SwitchTo(ProcessId),
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Scheduler<const N: usize> {
@@ -63,18 +120,39 @@ pub struct Scheduler<const N: usize> {
 }
 
 impl<const N: usize> Scheduler<N> {
-    pub const fn new() -> Self { Self { queue: RunQueue::new(), current: None, reschedule_pending: false } }
-    pub const fn current(&self) -> Option<ProcessId> { self.current }
-    pub const fn reschedule_pending(&self) -> bool { self.reschedule_pending }
-    pub fn enqueue(&mut self, id: ProcessId) -> bool { self.queue.push(id) }
-    pub fn request_reschedule(&mut self) { self.reschedule_pending = true; }
+    pub const fn new() -> Self {
+        Self {
+            queue: RunQueue::new(),
+            current: None,
+            reschedule_pending: false,
+        }
+    }
+    pub const fn current(&self) -> Option<ProcessId> {
+        self.current
+    }
+    pub const fn reschedule_pending(&self) -> bool {
+        self.reschedule_pending
+    }
+    pub fn enqueue(&mut self, id: ProcessId) -> bool {
+        self.queue.push(id)
+    }
+    pub fn request_reschedule(&mut self) {
+        self.reschedule_pending = true;
+    }
 
     pub fn schedule_boundary(&mut self) -> DispatchAction {
-        if !self.reschedule_pending { return DispatchAction::KeepCurrent; }
+        if !self.reschedule_pending {
+            return DispatchAction::KeepCurrent;
+        }
         self.reschedule_pending = false;
-        if let Some(current) = self.current { let _ = self.queue.push(current); }
+        if let Some(current) = self.current {
+            let _ = self.queue.push(current);
+        }
         match self.queue.pop() {
-            Some(next) => { self.current = Some(next); DispatchAction::SwitchTo(next) }
+            Some(next) => {
+                self.current = Some(next);
+                DispatchAction::SwitchTo(next)
+            }
             None => DispatchAction::KeepCurrent,
         }
     }
@@ -83,28 +161,57 @@ impl<const N: usize> Scheduler<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn fifo_and_capacity_are_deterministic() {
+    #[test]
+    fn fifo_and_capacity_are_deterministic() {
         let mut q: RunQueue<2> = RunQueue::new();
-        assert!(q.push(ProcessId(1))); assert!(q.push(ProcessId(2))); assert!(!q.push(ProcessId(3)));
-        assert_eq!(q.pop(), Some(ProcessId(1))); assert!(q.push(ProcessId(3)));
-        assert_eq!(q.pop(), Some(ProcessId(2))); assert_eq!(q.pop(), Some(ProcessId(3))); assert!(q.pop().is_none());
+        assert!(q.push(ProcessId(1)));
+        assert!(q.push(ProcessId(2)));
+        assert!(!q.push(ProcessId(3)));
+        assert_eq!(q.pop(), Some(ProcessId(1)));
+        assert!(q.push(ProcessId(3)));
+        assert_eq!(q.pop(), Some(ProcessId(2)));
+        assert_eq!(q.pop(), Some(ProcessId(3)));
+        assert!(q.pop().is_none());
     }
-    #[test] fn duplicate_is_rejected() { let mut q: RunQueue<2> = RunQueue::new(); assert!(q.push(ProcessId(1))); assert!(!q.push(ProcessId(1))); }
-    #[test] fn scheduler_clock_requests_reschedule_at_quantum_boundary() {
+    #[test]
+    fn duplicate_is_rejected() {
+        let mut q: RunQueue<2> = RunQueue::new();
+        assert!(q.push(ProcessId(1)));
+        assert!(!q.push(ProcessId(1)));
+    }
+    #[test]
+    fn scheduler_clock_requests_reschedule_at_quantum_boundary() {
         let mut clock = SchedulerClock::new(3);
-        assert_eq!(clock.tick(), TickAction::Continue); assert_eq!(clock.tick(), TickAction::Continue); assert_eq!(clock.tick(), TickAction::Reschedule);
+        assert_eq!(clock.tick(), TickAction::Continue);
+        assert_eq!(clock.tick(), TickAction::Continue);
+        assert_eq!(clock.tick(), TickAction::Reschedule);
         assert_eq!(clock.remaining(), 3);
     }
-    #[test] fn boundary_switches_to_next_runnable_process() {
+    #[test]
+    fn boundary_switches_to_next_runnable_process() {
         let mut scheduler: Scheduler<4> = Scheduler::new();
-        assert!(scheduler.enqueue(ProcessId(1))); assert!(scheduler.enqueue(ProcessId(2)));
-        scheduler.request_reschedule(); assert_eq!(scheduler.schedule_boundary(), DispatchAction::SwitchTo(ProcessId(1)));
-        scheduler.request_reschedule(); assert_eq!(scheduler.schedule_boundary(), DispatchAction::SwitchTo(ProcessId(2)));
+        assert!(scheduler.enqueue(ProcessId(1)));
+        assert!(scheduler.enqueue(ProcessId(2)));
+        scheduler.request_reschedule();
+        assert_eq!(
+            scheduler.schedule_boundary(),
+            DispatchAction::SwitchTo(ProcessId(1))
+        );
+        scheduler.request_reschedule();
+        assert_eq!(
+            scheduler.schedule_boundary(),
+            DispatchAction::SwitchTo(ProcessId(2))
+        );
         assert!(!scheduler.reschedule_pending());
     }
-    #[test] fn no_request_keeps_current() {
+    #[test]
+    fn no_request_keeps_current() {
         let mut scheduler: Scheduler<2> = Scheduler::new();
         assert_eq!(scheduler.schedule_boundary(), DispatchAction::KeepCurrent);
     }
-    #[test] fn zero_quantum_fails_safe() { let mut clock = SchedulerClock::new(0); assert_eq!(clock.tick(), TickAction::Reschedule); }
+    #[test]
+    fn zero_quantum_fails_safe() {
+        let mut clock = SchedulerClock::new(0);
+        assert_eq!(clock.tick(), TickAction::Reschedule);
+    }
 }

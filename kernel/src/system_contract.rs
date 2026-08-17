@@ -25,18 +25,32 @@ pub enum KernelCapability {
     SharedMemory = 9,
 }
 
-impl KernelCapability { pub const fn bit(self) -> u64 { 1u64 << (self as u8) } }
+impl KernelCapability {
+    pub const fn bit(self) -> u64 {
+        1u64 << (self as u8)
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CapabilitySet(u64);
 
 impl CapabilitySet {
     pub const EMPTY: Self = Self(0);
-    pub const fn from_bits(bits: u64) -> Self { Self(bits) }
-    pub const fn bits(self) -> u64 { self.0 }
-    pub const fn contains(self, capability: KernelCapability) -> bool { self.0 & capability.bit() != 0 }
-    pub const fn with(self, capability: KernelCapability) -> Self { Self(self.0 | capability.bit()) }
-    pub const fn without(self, capability: KernelCapability) -> Self { Self(self.0 & !capability.bit()) }
+    pub const fn from_bits(bits: u64) -> Self {
+        Self(bits)
+    }
+    pub const fn bits(self) -> u64 {
+        self.0
+    }
+    pub const fn contains(self, capability: KernelCapability) -> bool {
+        self.0 & capability.bit() != 0
+    }
+    pub const fn with(self, capability: KernelCapability) -> Self {
+        Self(self.0 | capability.bit())
+    }
+    pub const fn without(self, capability: KernelCapability) -> Self {
+        Self(self.0 & !capability.bit())
+    }
 }
 
 pub const REQUIRED_RUNTIME_CAPABILITIES: CapabilitySet = CapabilitySet::EMPTY
@@ -69,19 +83,34 @@ pub struct ServiceContract {
 }
 
 impl ServiceContract {
-    pub const fn new(service: ServiceId, abi_major: u16, abi_minor: u16, required_capabilities: CapabilitySet) -> Self {
-        Self { service, abi_major, abi_minor, required_capabilities }
+    pub const fn new(
+        service: ServiceId,
+        abi_major: u16,
+        abi_minor: u16,
+        required_capabilities: CapabilitySet,
+    ) -> Self {
+        Self {
+            service,
+            abi_major,
+            abi_minor,
+            required_capabilities,
+        }
     }
 
     pub const fn accepts_kernel(self, kernel: KernelContract) -> bool {
         kernel.abi_major == self.abi_major
             && kernel.abi_minor >= self.abi_minor
-            && kernel.capabilities.bits() & self.required_capabilities.bits() == self.required_capabilities.bits()
+            && kernel.capabilities.bits() & self.required_capabilities.bits()
+                == self.required_capabilities.bits()
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ContractError { MajorVersionMismatch, MinorVersionTooOld, MissingCapability }
+pub enum ContractError {
+    MajorVersionMismatch,
+    MinorVersionTooOld,
+    MissingCapability,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct KernelContract {
@@ -91,15 +120,30 @@ pub struct KernelContract {
 }
 
 impl KernelContract {
-    pub const fn current(capabilities: CapabilitySet) -> Self { Self { abi_major: ABI_MAJOR, abi_minor: ABI_MINOR, capabilities } }
-    pub const fn is_compatible_with(self, required_major: u16) -> bool { self.abi_major == required_major }
+    pub const fn current(capabilities: CapabilitySet) -> Self {
+        Self {
+            abi_major: ABI_MAJOR,
+            abi_minor: ABI_MINOR,
+            capabilities,
+        }
+    }
+    pub const fn is_compatible_with(self, required_major: u16) -> bool {
+        self.abi_major == required_major
+    }
     pub const fn has_runtime_baseline(self) -> bool {
-        self.capabilities.bits() & REQUIRED_RUNTIME_CAPABILITIES.bits() == REQUIRED_RUNTIME_CAPABILITIES.bits()
+        self.capabilities.bits() & REQUIRED_RUNTIME_CAPABILITIES.bits()
+            == REQUIRED_RUNTIME_CAPABILITIES.bits()
     }
     pub const fn validate_service(self, service: ServiceContract) -> Result<(), ContractError> {
-        if self.abi_major != service.abi_major { return Err(ContractError::MajorVersionMismatch); }
-        if self.abi_minor < service.abi_minor { return Err(ContractError::MinorVersionTooOld); }
-        if self.capabilities.bits() & service.required_capabilities.bits() != service.required_capabilities.bits() {
+        if self.abi_major != service.abi_major {
+            return Err(ContractError::MajorVersionMismatch);
+        }
+        if self.abi_minor < service.abi_minor {
+            return Err(ContractError::MinorVersionTooOld);
+        }
+        if self.capabilities.bits() & service.required_capabilities.bits()
+            != service.required_capabilities.bits()
+        {
             return Err(ContractError::MissingCapability);
         }
         Ok(())
@@ -111,7 +155,9 @@ const USERSPACE_SERVICE_CAPS: CapabilitySet = CapabilitySet::EMPTY
     .with(KernelCapability::Security);
 
 pub const DRIVERD_CONTRACT: ServiceContract = ServiceContract::new(
-    ServiceId::Driverd, ABI_MAJOR, ABI_MINOR,
+    ServiceId::Driverd,
+    ABI_MAJOR,
+    ABI_MINOR,
     USERSPACE_SERVICE_CAPS
         .with(KernelCapability::DeviceGrant)
         .with(KernelCapability::Dma)
@@ -119,29 +165,44 @@ pub const DRIVERD_CONTRACT: ServiceContract = ServiceContract::new(
 );
 
 pub const APPD_CONTRACT: ServiceContract = ServiceContract::new(
-    ServiceId::Appd, ABI_MAJOR, ABI_MINOR,
+    ServiceId::Appd,
+    ABI_MAJOR,
+    ABI_MINOR,
     USERSPACE_SERVICE_CAPS.with(KernelCapability::SharedMemory),
 );
 
 pub const ASAPPD_CONTRACT: ServiceContract = ServiceContract::new(
-    ServiceId::Asappd, ABI_MAJOR, ABI_MINOR, USERSPACE_SERVICE_CAPS,
+    ServiceId::Asappd,
+    ABI_MAJOR,
+    ABI_MINOR,
+    USERSPACE_SERVICE_CAPS,
 );
 
 pub const AYUID_CONTRACT: ServiceContract = ServiceContract::new(
-    ServiceId::Ayuid, ABI_MAJOR, ABI_MINOR,
+    ServiceId::Ayuid,
+    ABI_MAJOR,
+    ABI_MINOR,
     USERSPACE_SERVICE_CAPS.with(KernelCapability::SharedMemory),
 );
 
 pub const AWETERMINALD_CONTRACT: ServiceContract = ServiceContract::new(
-    ServiceId::Aweterminald, ABI_MAJOR, ABI_MINOR, USERSPACE_SERVICE_CAPS,
+    ServiceId::Aweterminald,
+    ABI_MAJOR,
+    ABI_MINOR,
+    USERSPACE_SERVICE_CAPS,
 );
 
 pub const AWEBUSD_CONTRACT: ServiceContract = ServiceContract::new(
-    ServiceId::Awebusd, ABI_MAJOR, ABI_MINOR, USERSPACE_SERVICE_CAPS,
+    ServiceId::Awebusd,
+    ABI_MAJOR,
+    ABI_MINOR,
+    USERSPACE_SERVICE_CAPS,
 );
 
 pub const AWEUPDATED_CONTRACT: ServiceContract = ServiceContract::new(
-    ServiceId::Aweupdated, ABI_MAJOR, ABI_MINOR,
+    ServiceId::Aweupdated,
+    ABI_MAJOR,
+    ABI_MINOR,
     USERSPACE_SERVICE_CAPS.with(KernelCapability::SharedMemory),
 );
 
@@ -151,11 +212,16 @@ mod tests {
 
     #[test]
     fn capability_operations_are_deterministic() {
-        let set = CapabilitySet::EMPTY.with(KernelCapability::Memory).with(KernelCapability::Ipc);
+        let set = CapabilitySet::EMPTY
+            .with(KernelCapability::Memory)
+            .with(KernelCapability::Ipc);
         assert!(set.contains(KernelCapability::Memory));
         assert!(set.contains(KernelCapability::Ipc));
         assert!(!set.contains(KernelCapability::Dma));
-        assert!(!set.without(KernelCapability::Memory).contains(KernelCapability::Memory));
+        assert!(
+            !set.without(KernelCapability::Memory)
+                .contains(KernelCapability::Memory)
+        );
     }
 
     #[test]
@@ -192,13 +258,21 @@ mod tests {
         );
         assert_eq!(kernel.validate_service(DRIVERD_CONTRACT), Ok(()));
         let weak = KernelContract::current(REQUIRED_RUNTIME_CAPABILITIES);
-        assert_eq!(weak.validate_service(DRIVERD_CONTRACT), Err(ContractError::MissingCapability));
+        assert_eq!(
+            weak.validate_service(DRIVERD_CONTRACT),
+            Err(ContractError::MissingCapability)
+        );
     }
 
     #[test]
     fn minor_versions_are_forward_compatible() {
         let kernel = KernelContract::current(REQUIRED_RUNTIME_CAPABILITIES);
-        let older = ServiceContract::new(ServiceId::Appd, ABI_MAJOR, 0, CapabilitySet::EMPTY.with(KernelCapability::Ipc));
+        let older = ServiceContract::new(
+            ServiceId::Appd,
+            ABI_MAJOR,
+            0,
+            CapabilitySet::EMPTY.with(KernelCapability::Ipc),
+        );
         assert_eq!(kernel.validate_service(older), Ok(()));
     }
 }

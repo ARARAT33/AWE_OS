@@ -13,11 +13,16 @@ impl Pit {
     pub const PIT_BASE_HZ: u32 = 1_193_182;
 
     pub const fn new(frequency_hz: u32) -> Option<Self> {
-        if frequency_hz == 0 || frequency_hz > Self::PIT_BASE_HZ { None }
-        else { Some(Self { frequency_hz }) }
+        if frequency_hz == 0 || frequency_hz > Self::PIT_BASE_HZ {
+            None
+        } else {
+            Some(Self { frequency_hz })
+        }
     }
 
-    pub const fn frequency_hz(&self) -> u32 { self.frequency_hz }
+    pub const fn frequency_hz(&self) -> u32 {
+        self.frequency_hz
+    }
 
     /// Program channel 0, mode 2 (rate generator), squarely suitable for a
     /// periodic scheduler tick. This only performs hardware I/O on x86_64.

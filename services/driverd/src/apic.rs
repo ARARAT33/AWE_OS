@@ -33,8 +33,15 @@ pub struct IrqRoute {
 
 impl IrqRoute {
     pub const fn new(gsi: u32, vector: u8, destination_apic: u8) -> Result<Self, ApicError> {
-        if vector < 32 { return Err(ApicError::InvalidVector); }
-        Ok(Self { gsi, vector, destination_apic, masked: true })
+        if vector < 32 {
+            return Err(ApicError::InvalidVector);
+        }
+        Ok(Self {
+            gsi,
+            vector,
+            destination_apic,
+            masked: true,
+        })
     }
 
     pub const fn unmask(mut self) -> Self {
@@ -52,7 +59,9 @@ impl IoApic {
     }
 
     pub const fn route(self, gsi: u32, vector: u8, destination: u8) -> Result<IrqRoute, ApicError> {
-        if !self.owns_gsi(gsi) { return Err(ApicError::InvalidGsi); }
+        if !self.owns_gsi(gsi) {
+            return Err(ApicError::InvalidGsi);
+        }
         IrqRoute::new(gsi, vector, destination)
     }
 }
@@ -63,7 +72,12 @@ mod tests {
 
     #[test]
     fn ioapic_gsi_range_is_bounded() {
-        let io = IoApic { id: 1, base: 0xFEC0_0000, gsi_base: 32, redirection_entries: 24 };
+        let io = IoApic {
+            id: 1,
+            base: 0xFEC0_0000,
+            gsi_base: 32,
+            redirection_entries: 24,
+        };
         assert!(io.owns_gsi(32));
         assert!(io.owns_gsi(55));
         assert!(!io.owns_gsi(56));

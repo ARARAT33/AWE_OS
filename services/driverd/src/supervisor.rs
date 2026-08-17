@@ -15,12 +15,28 @@ pub struct DriverSupervisor {
 }
 
 impl DriverSupervisor {
-    pub const fn new() -> Self { Self { registry: DriverRegistry::new() } }
-    pub const fn registry(&self) -> &DriverRegistry { &self.registry }
-    pub fn registry_mut(&mut self) -> &mut DriverRegistry { &mut self.registry }
+    pub const fn new() -> Self {
+        Self {
+            registry: DriverRegistry::new(),
+        }
+    }
+    pub const fn registry(&self) -> &DriverRegistry {
+        &self.registry
+    }
+    pub fn registry_mut(&mut self) -> &mut DriverRegistry {
+        &mut self.registry
+    }
 
-    pub fn command(&mut self, id: DriverId, command: DriverCommand) -> Result<DriverState, SupervisorError> {
-        let current = self.registry.find(id).ok_or(SupervisorError::UnknownDriver)?.state;
+    pub fn command(
+        &mut self,
+        id: DriverId,
+        command: DriverCommand,
+    ) -> Result<DriverState, SupervisorError> {
+        let current = self
+            .registry
+            .find(id)
+            .ok_or(SupervisorError::UnknownDriver)?
+            .state;
         let next = match (current, command) {
             (DriverState::Discovered, DriverCommand::Probe) => DriverState::Starting,
             (DriverState::Starting, DriverCommand::Start) => DriverState::Running,
@@ -32,11 +48,15 @@ impl DriverSupervisor {
             (DriverState::Failed, DriverCommand::Reset) => DriverState::Starting,
             _ => return Err(SupervisorError::InvalidTransition),
         };
-        self.registry.set_state(id, next).map_err(|_| SupervisorError::Registry)?;
+        self.registry
+            .set_state(id, next)
+            .map_err(|_| SupervisorError::Registry)?;
         Ok(next)
     }
 
     pub fn fault(&mut self, id: DriverId) -> Result<(), SupervisorError> {
-        self.registry.set_state(id, DriverState::Failed).map_err(|_| SupervisorError::UnknownDriver)
+        self.registry
+            .set_state(id, DriverState::Failed)
+            .map_err(|_| SupervisorError::UnknownDriver)
     }
 }

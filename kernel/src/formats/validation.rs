@@ -4,14 +4,23 @@
 #![allow(dead_code)]
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Error { Empty, Misaligned, TooLarge, NonCanonical }
+pub enum Error {
+    Empty,
+    Misaligned,
+    TooLarge,
+    NonCanonical,
+}
 
 pub const MAX_CONTAINER: usize = 16 * 1024 * 1024;
 
 pub fn checked_range(total: usize, start: usize, len: usize) -> Result<(usize, usize), Error> {
-    if total == 0 { return Err(Error::Empty); }
+    if total == 0 {
+        return Err(Error::Empty);
+    }
     let end = start.checked_add(len).ok_or(Error::TooLarge)?;
-    if end > total { return Err(Error::TooLarge); }
+    if end > total {
+        return Err(Error::TooLarge);
+    }
     Ok((start, end))
 }
 
