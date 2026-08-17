@@ -1,8 +1,12 @@
 #![no_std]
 
-//! AWE application service. Native applications are user-space objects; this
-//! service owns package admission, lifecycle and sandbox policy rather than
-//! embedding application logic in CellKernel.
+//! AWE native application admission service. Package policy remains outside
+//! CellKernel and every untrusted field is validated before admission.
+
+pub const AWE_APP_ABI_MAJOR: u16 = 1;
+pub const AWE_APP_ABI_MINOR: u16 = 2;
+pub const MAX_DEPS: usize = 32;
+pub const MAX_RESOURCES: usize = 64;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AppId(pub u64);
@@ -17,21 +21,58 @@ pub struct AppManifest {
     pub abi_minor: u16,
     pub memory_limit_pages: u32,
     pub capability_mask: u64,
+    pub dependency_count: u16,
+    pub resource_count: u16,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AppError { InvalidManifest, AlreadyRunning, NotFound, CapabilityDenied }
-
-/// Native application service ABI frozen by the AWE_OS 60.2 contract.
-pub const AWE_APP_ABI_MAJOR: u16 = 1;
-pub const AWE_APP_ABI_MINOR: u16 = 2;
+pub enum AppError { InvalidManifest, AlreadyRunning, NotFound, CapabilityDenied, TooManyDependencies, TooManyResources }
 
 pub fn validate_manifest(manifest: AppManifest) -> Result<(), AppError> {
     if manifest.abi_major != AWE_APP_ABI_MAJOR
         || manifest.abi_minor > AWE_APP_ABI_MINOR
         || manifest.memory_limit_pages == 0
-    {
-        return Err(AppError::InvalidManifest);
-    }
+    { return Err(AppError::InvalidManifest); }
+    if manifest.dependency_count as usize > MAX_DEPS { return Err(AppError::TooManyDependencies); }
+    if manifest.resource_count as usize > MAX_RESOURCES { return Err(AppError::TooManyResources); }
     Ok(())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PackageHeader {
+    pub version: u16,
+    pub manifest_len: u32,
+    pub payload_len: u32,
+    pub signature_len: u16,
+}
+
+pub const PACKAGE_HEADER_SIZE: usize = 14;
+pub const MAX_MANIFEST: usize = 64 * 1024;
+pub const MAX_PAYLOAD: usize = 64 * 1024 * 1024;
+
+pub fn validate_package(header: PackageHeader, total_len: usize) -> Result<(), AppError> {
+    if header.version == 0 || header.manifest_len as usize > MAX_MANIFEST
+        || header.payload_len as usize > MAX_PAYLOAD || header.signature_len == 0 { return Err(AppError::InvalidManifest); }
+    let expected = PACKAGE_HEADER_SIZE
+        .checked_add(header.manifest_len as usize)
+        .and_then(|v| v.checked_add(header.payload_len as usize))
+        .and_then(|v| v.checked_add(header.signature_len as usize))
+        .ok_or(AppError::InvalidManifest)?;
+    if expected != total_len { return Err(AppError::InvalidManifest); }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn rejects_oversized_package() {
+        let h = PackageHeader { version: 1, manifest_len: 1, payload_len: (MAX_PAYLOAD + 1) as u32, signature_len: 64 };
+        assert_eq!(validate_package(h, 0), Err(AppError::InvalidManifest));
+    }
+    #[test]
+    fn validates_bounded_manifest() {
+        let m = AppManifest { id: AppId(1), abi_major: 1, abi_minor: 2, memory_limit_pages: 4, capability_mask: 1, dependency_count: 1, resource_count: 1 };
+        assert!(validate_manifest(m).is_ok());
+    }
 }
