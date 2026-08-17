@@ -6,10 +6,11 @@
 //! capability-aware ABI rules that can be exercised independently.
 
 pub const AWOSA_ABI_MAJOR: u16 = 1;
-pub const AWOSA_ABI_MINOR: u16 = 1;
+pub const AWOSA_ABI_MINOR: u16 = 2;
 pub const MAX_PATH: usize = 256;
 pub const MAX_MESSAGE: usize = 4096;
 pub const MAX_IO: usize = 64 * 1024;
+pub const MAX_HANDLES: usize = 64;
 
 pub const CAP_FS_READ: u64 = 1 << 0;
 pub const CAP_FS_WRITE: u64 = 1 << 1;
@@ -31,6 +32,7 @@ pub enum RuntimeError {
     CapabilityDenied,
     ResourceExhausted,
     NotFound,
+    AlreadyExists,
 }
 
 pub const fn negotiate(requested: AbiVersion) -> Result<AbiVersion, RuntimeError> {
@@ -64,13 +66,48 @@ pub const fn validate_io(kind: IoKind, size: usize, capabilities: u64) -> Result
     Ok(())
 }
 
+/// A bounded native handle table. Handles are indices into a fixed table;
+/// stale/invalid indices are rejected before any operation is attempted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HandleTable { used: [bool; MAX_HANDLES] }
+
+impl HandleTable {
+    pub const fn new() -> Self { Self { used: [false; MAX_HANDLES] } }
+
+    pub fn allocate(&mut self) -> Result<u16, RuntimeError> {
+        let mut i = 0;
+        while i < MAX_HANDLES {
+            if !self.used[i] {
+                self.used[i] = true;
+                return Ok(i as u16);
+            }
+            i += 1;
+        }
+        Err(RuntimeError::ResourceExhausted)
+    }
+
+    pub fn release(&mut self, handle: u16) -> Result<(), RuntimeError> {
+        let index = handle as usize;
+        if index >= MAX_HANDLES || !self.used[index] { return Err(RuntimeError::NotFound); }
+        self.used[index] = false;
+        Ok(())
+    }
+
+    pub const fn contains(&self, handle: u16) -> bool {
+        let index = handle as usize;
+        index < MAX_HANDLES && self.used[index]
+    }
+}
+
+impl Default for HandleTable { fn default() -> Self { Self::new() } }
+
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
     fn rejects_future_major_abi() { assert!(negotiate(AbiVersion { major: 2, minor: 0 }).is_err()); }
     #[test]
-    fn accepts_compatible_minor() { assert_eq!(negotiate(AbiVersion { major: 1, minor: 1 }).unwrap().major, 1); }
+    fn accepts_compatible_minor() { assert_eq!(negotiate(AbiVersion { major: 1, minor: 2 }).unwrap().major, 1); }
     #[test]
     fn rejects_write_without_capability() {
         assert_eq!(validate_io(IoKind::Write, 128, CAP_FS_READ), Err(RuntimeError::CapabilityDenied));
@@ -80,5 +117,14 @@ mod tests {
     #[test]
     fn rejects_zero_sized_io() {
         assert_eq!(validate_io(IoKind::Message, 0, CAP_IPC), Err(RuntimeError::ResourceExhausted));
+    }
+    #[test]
+    fn handle_table_is_bounded_and_reusable() {
+        let mut table = HandleTable::new();
+        let h = table.allocate().unwrap();
+        assert!(table.contains(h));
+        assert_eq!(table.release(h), Ok(()));
+        assert!(!table.contains(h));
+        assert_eq!(table.release(h), Err(RuntimeError::NotFound));
     }
 }
