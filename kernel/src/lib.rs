@@ -1,10 +1,14 @@
 #![no_std]
 
+// CellKernel is intentionally hardware-driver free.
+// All hardware discovery, driver lifecycle, compatibility adapters and
+// VirtIO/Linux/Windows/Android driver execution live in services/driverd.
+// The kernel owns only the minimal IPC/capability boundary needed to talk to
+// that isolated service.
 pub mod arch;
 pub mod boot_phase;
 pub mod boot_state;
 pub mod device;
-pub mod drivers;
 pub mod entry;
 pub mod formats;
 pub mod interrupts;
