@@ -1,6 +1,6 @@
 # AWE_OS
 
-AWE_OS is a Rust-first operating-system project focused on a small privileged kernel, a dedicated AWE boot chain, capability-oriented security, and modular user-space services.
+AWE_OS is a Rust-first operating-system project focused on a small privileged CellKernel, a dedicated AWE boot chain, capability-oriented security, and modular user-space services.
 
 ## Product architecture
 
@@ -39,8 +39,21 @@ Experimental research layer:
 - Versioned `BootInfo` protocol with explicit invariants.
 - Kernel module boundaries for architecture, memory, interrupts, process, scheduler, security, synchronization and syscalls.
 - Validated loader-to-kernel entry contract and architecture capability matrix.
+- A typed CellKernel system contract with an explicit ABI version and deterministic capability baseline.
 - Automated formatting, workspace compilation, tests, Clippy and UEFI-loader checks in GitHub Actions.
 - Experimental product specifications for AWE Capsule and AWE XenoSense.
+
+## Engineering documentation
+
+- **[ENGINEERING_GUIDE.md](docs/ENGINEERING_GUIDE.md)** — source-of-truth map, invariants, development loop and release evidence requirements.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — system layers and long-term architecture.
+- **[PRODUCT_READINESS.md](PRODUCT_READINESS.md)** — evidence-based 1.0 gates and current readiness.
+- **[AWE_OS_100_PERCENT_MASTER_PLAN.md](docs/AWE_OS_100_PERCENT_MASTER_PLAN.md)** — complete 1.0 implementation plan.
+- **[ABI.md](docs/ABI.md)** — boot ABI contract.
+- **[BOOT_ARCHITECTURE.md](docs/BOOT_ARCHITECTURE.md)** — loader and boot flow.
+- **[DRIVER_SYSTEM.md](docs/DRIVER_SYSTEM.md)** — driver architecture.
+- **[AWE_CAPSULE.md](docs/AWE_CAPSULE.md)** — native application security model.
+- **[AWE_XENOSENSE.md](docs/AWE_XENOSENSE.md)** — experimental research concepts.
 
 ## New research direction — AWE XenoSense
 
@@ -70,8 +83,6 @@ These are **design proposals, not claims of proven technology or claims that nob
 8. **Desktop** — terminal, compositor, AYUI, file manager, settings and system monitor.
 9. **Compatibility** — optional Linux/POSIX/Windows/Android compatibility layers.
 10. **Production** — signed images, reproducible builds, fuzzing, benchmarks, recovery and hardware matrix.
-
-See **[PRODUCT_READINESS.md](PRODUCT_READINESS.md)** for release gates, **[docs/ABI.md](docs/ABI.md)** for the boot ABI contract, **[docs/AWE_CAPSULE.md](docs/AWE_CAPSULE.md)** for the native application model and **[docs/AWE_XENOSENSE.md](docs/AWE_XENOSENSE.md)** for experimental research concepts.
 
 ## Status
 
