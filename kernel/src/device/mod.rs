@@ -1,7 +1,12 @@
 #![no_std]
 
+mod access;
 mod binding;
 
+pub use access::{
+    power_transition, AccessKind, DeviceAccessContract, InterruptGrant, IoRegion, IrqMode,
+    PowerState, PowerTransitionError,
+};
 pub use binding::{BindingDecision, DeviceMatch, MatchKind, ResourceGrant, decide_binding};
 
 /// Stable device identity used by the AWE driver registry.
