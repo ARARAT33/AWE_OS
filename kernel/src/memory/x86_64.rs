@@ -49,8 +49,6 @@ pub unsafe fn activate_bootstrap_identity_map() {
         index += 1;
     }
 
-    let cr3 = pd as u64 & !0xfff;
-    let _ = cr3;
     asm!("mov cr3, {0}", in(reg) pml4 as u64, options(nostack, preserves_flags));
 }
 
