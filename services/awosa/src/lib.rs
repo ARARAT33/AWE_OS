@@ -20,10 +20,17 @@ pub const CAP_DEVICE: u64 = 1 << 4;
 pub const CAP_UI: u64 = 1 << 5;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AbiVersion { pub major: u16, pub minor: u16 }
+pub struct AbiVersion {
+    pub major: u16,
+    pub minor: u16,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum IoKind { Read, Write, Message }
+pub enum IoKind {
+    Read,
+    Write,
+    Message,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RuntimeError {
@@ -39,16 +46,27 @@ pub const fn negotiate(requested: AbiVersion) -> Result<AbiVersion, RuntimeError
     if requested.major != AWOSA_ABI_MAJOR || requested.minor > AWOSA_ABI_MINOR {
         Err(RuntimeError::IncompatibleAbi)
     } else {
-        Ok(AbiVersion { major: AWOSA_ABI_MAJOR, minor: requested.minor })
+        Ok(AbiVersion {
+            major: AWOSA_ABI_MAJOR,
+            minor: requested.minor,
+        })
     }
 }
 
 pub const fn validate_path(path_len: usize) -> Result<(), RuntimeError> {
-    if path_len == 0 || path_len > MAX_PATH { Err(RuntimeError::InvalidArgument) } else { Ok(()) }
+    if path_len == 0 || path_len > MAX_PATH {
+        Err(RuntimeError::InvalidArgument)
+    } else {
+        Ok(())
+    }
 }
 
 pub const fn validate_message(size: usize) -> Result<(), RuntimeError> {
-    if size == 0 || size > MAX_MESSAGE { Err(RuntimeError::ResourceExhausted) } else { Ok(()) }
+    if size == 0 || size > MAX_MESSAGE {
+        Err(RuntimeError::ResourceExhausted)
+    } else {
+        Ok(())
+    }
 }
 
 pub const fn required_capability(kind: IoKind) -> u64 {
@@ -59,20 +77,37 @@ pub const fn required_capability(kind: IoKind) -> u64 {
     }
 }
 
-pub const fn validate_io(kind: IoKind, size: usize, capabilities: u64) -> Result<(), RuntimeError> {
-    let limit = match kind { IoKind::Read | IoKind::Write => MAX_IO, IoKind::Message => MAX_MESSAGE };
-    if size == 0 || size > limit { return Err(RuntimeError::ResourceExhausted); }
-    if capabilities & required_capability(kind) == 0 { return Err(RuntimeError::CapabilityDenied); }
+pub const fn validate_io(
+    kind: IoKind,
+    size: usize,
+    capabilities: u64,
+) -> Result<(), RuntimeError> {
+    let limit = match kind {
+        IoKind::Read | IoKind::Write => MAX_IO,
+        IoKind::Message => MAX_MESSAGE,
+    };
+    if size == 0 || size > limit {
+        return Err(RuntimeError::ResourceExhausted);
+    }
+    if capabilities & required_capability(kind) == 0 {
+        return Err(RuntimeError::CapabilityDenied);
+    }
     Ok(())
 }
 
 /// A bounded native handle table. Handles are indices into a fixed table;
 /// stale/invalid indices are rejected before any operation is attempted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct HandleTable { used: [bool; MAX_HANDLES] }
+pub struct HandleTable {
+    used: [bool; MAX_HANDLES],
+}
 
 impl HandleTable {
-    pub const fn new() -> Self { Self { used: [false; MAX_HANDLES] } }
+    pub const fn new() -> Self {
+        Self {
+            used: [false; MAX_HANDLES],
+        }
+    }
 
     pub fn allocate(&mut self) -> Result<u16, RuntimeError> {
         let mut i = 0;
@@ -88,7 +123,9 @@ impl HandleTable {
 
     pub fn release(&mut self, handle: u16) -> Result<(), RuntimeError> {
         let index = handle as usize;
-        if index >= MAX_HANDLES || !self.used[index] { return Err(RuntimeError::NotFound); }
+        if index >= MAX_HANDLES || !self.used[index] {
+            return Err(RuntimeError::NotFound);
+        }
         self.used[index] = false;
         Ok(())
     }
@@ -99,25 +136,50 @@ impl HandleTable {
     }
 }
 
-impl Default for HandleTable { fn default() -> Self { Self::new() } }
+impl Default for HandleTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn rejects_future_major_abi() { assert!(negotiate(AbiVersion { major: 2, minor: 0 }).is_err()); }
+    fn rejects_future_major_abi() {
+        assert!(negotiate(AbiVersion { major: 2, minor: 0 }).is_err());
+    }
+
     #[test]
-    fn accepts_compatible_minor() { assert_eq!(negotiate(AbiVersion { major: 1, minor: 2 }).unwrap().major, 1); }
+    fn accepts_compatible_minor() {
+        assert_eq!(
+            negotiate(AbiVersion { major: 1, minor: 2 }).unwrap().major,
+            1
+        );
+    }
+
     #[test]
     fn rejects_write_without_capability() {
-        assert_eq!(validate_io(IoKind::Write, 128, CAP_FS_READ), Err(RuntimeError::CapabilityDenied));
+        assert_eq!(
+            validate_io(IoKind::Write, 128, CAP_FS_READ),
+            Err(RuntimeError::CapabilityDenied)
+        );
     }
+
     #[test]
-    fn accepts_bounded_authorized_read() { assert!(validate_io(IoKind::Read, 4096, CAP_FS_READ).is_ok()); }
+    fn accepts_bounded_authorized_read() {
+        assert!(validate_io(IoKind::Read, 4096, CAP_FS_READ).is_ok());
+    }
+
     #[test]
     fn rejects_zero_sized_io() {
-        assert_eq!(validate_io(IoKind::Message, 0, CAP_IPC), Err(RuntimeError::ResourceExhausted));
+        assert_eq!(
+            validate_io(IoKind::Message, 0, CAP_IPC),
+            Err(RuntimeError::ResourceExhausted)
+        );
     }
+
     #[test]
     fn handle_table_is_bounded_and_reusable() {
         let mut table = HandleTable::new();
