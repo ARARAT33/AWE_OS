@@ -22,8 +22,8 @@ pub struct MacAddress(pub [u8; 6]);
 impl MacAddress {
     pub const ZERO: Self = Self([0; 6]);
 
-    pub const fn is_unicast(self) -> bool {
-        (self.0[0] & 1) == 0 && self != Self([0xff; 6])
+    pub fn is_unicast(self) -> bool {
+        (self.0[0] & 1) == 0 && self.0 != [0xff; 6]
     }
 }
 
