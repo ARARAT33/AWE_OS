@@ -106,44 +106,43 @@ impl KernelContract {
     }
 }
 
+const USERSPACE_SERVICE_CAPS: CapabilitySet = CapabilitySet::EMPTY
+    .with(KernelCapability::Ipc)
+    .with(KernelCapability::Security);
+
 pub const DRIVERD_CONTRACT: ServiceContract = ServiceContract::new(
-    ServiceId::Driverd,
-    ABI_MAJOR,
-    ABI_MINOR,
-    CapabilitySet::EMPTY
-        .with(KernelCapability::Ipc)
-        .with(KernelCapability::Security)
+    ServiceId::Driverd, ABI_MAJOR, ABI_MINOR,
+    USERSPACE_SERVICE_CAPS
         .with(KernelCapability::DeviceGrant)
         .with(KernelCapability::Dma)
         .with(KernelCapability::SharedMemory),
 );
 
 pub const APPD_CONTRACT: ServiceContract = ServiceContract::new(
-    ServiceId::Appd,
-    ABI_MAJOR,
-    ABI_MINOR,
-    CapabilitySet::EMPTY
-        .with(KernelCapability::Ipc)
-        .with(KernelCapability::Security)
-        .with(KernelCapability::SharedMemory),
+    ServiceId::Appd, ABI_MAJOR, ABI_MINOR,
+    USERSPACE_SERVICE_CAPS.with(KernelCapability::SharedMemory),
 );
 
 pub const ASAPPD_CONTRACT: ServiceContract = ServiceContract::new(
-    ServiceId::Asappd,
-    ABI_MAJOR,
-    ABI_MINOR,
-    CapabilitySet::EMPTY
-        .with(KernelCapability::Ipc)
-        .with(KernelCapability::Security),
+    ServiceId::Asappd, ABI_MAJOR, ABI_MINOR, USERSPACE_SERVICE_CAPS,
 );
 
 pub const AYUID_CONTRACT: ServiceContract = ServiceContract::new(
-    ServiceId::Ayuid,
-    ABI_MAJOR,
-    ABI_MINOR,
-    CapabilitySet::EMPTY
-        .with(KernelCapability::Ipc)
-        .with(KernelCapability::SharedMemory),
+    ServiceId::Ayuid, ABI_MAJOR, ABI_MINOR,
+    USERSPACE_SERVICE_CAPS.with(KernelCapability::SharedMemory),
+);
+
+pub const AWETERMINALD_CONTRACT: ServiceContract = ServiceContract::new(
+    ServiceId::Aweterminald, ABI_MAJOR, ABI_MINOR, USERSPACE_SERVICE_CAPS,
+);
+
+pub const AWEBUSD_CONTRACT: ServiceContract = ServiceContract::new(
+    ServiceId::Awebusd, ABI_MAJOR, ABI_MINOR, USERSPACE_SERVICE_CAPS,
+);
+
+pub const AWEUPDATED_CONTRACT: ServiceContract = ServiceContract::new(
+    ServiceId::Aweupdated, ABI_MAJOR, ABI_MINOR,
+    USERSPACE_SERVICE_CAPS.with(KernelCapability::SharedMemory),
 );
 
 #[cfg(test)]
@@ -165,6 +164,22 @@ mod tests {
         assert!(contract.is_compatible_with(ABI_MAJOR));
         assert!(contract.has_runtime_baseline());
         assert!(!contract.is_compatible_with(ABI_MAJOR + 1));
+    }
+
+    #[test]
+    fn every_canonical_service_has_a_contract() {
+        let contracts = [
+            DRIVERD_CONTRACT,
+            APPD_CONTRACT,
+            ASAPPD_CONTRACT,
+            AYUID_CONTRACT,
+            AWETERMINALD_CONTRACT,
+            AWEBUSD_CONTRACT,
+            AWEUPDATED_CONTRACT,
+        ];
+        assert_eq!(contracts.len(), 7);
+        assert_eq!(contracts[0].service, ServiceId::Driverd);
+        assert_eq!(contracts[6].service, ServiceId::Aweupdated);
     }
 
     #[test]
