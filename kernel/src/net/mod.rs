@@ -7,18 +7,39 @@
 pub mod ipv4;
 pub mod transport;
 
-pub use transport::{internet_checksum, tcp_header_valid, udp_payload, Endpoint, SocketEntry, SocketTable, Transport};
+pub use transport::{
+    internet_checksum, tcp_header_valid, udp_payload, Endpoint, SocketEntry, SocketTable,
+    Transport,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum NetError { BufferTooSmall, InvalidAddress, WouldBlock, NoRoute, Io, Unsupported }
+pub enum NetError {
+    BufferTooSmall,
+    InvalidAddress,
+    WouldBlock,
+    NoRoute,
+    Io,
+    Unsupported,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MacAddress(pub [u8; 6]);
-impl MacAddress { pub const ZERO: Self = Self([0; 6]); pub fn is_unicast(self) -> bool { (self.0[0] & 1) == 0 && self.0 != [0xff; 6] } }
+
+impl MacAddress {
+    pub const ZERO: Self = Self([0; 6]);
+
+    pub fn is_unicast(self) -> bool {
+        (self.0[0] & 1) == 0 && self.0 != [0xff; 6]
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Ipv4Address(pub [u8; 4]);
-impl Ipv4Address { pub const UNSPECIFIED: Self = Self([0, 0, 0, 0]); pub const LOOPBACK: Self = Self([127, 0, 0, 1]); }
+
+impl Ipv4Address {
+    pub const UNSPECIFIED: Self = Self([0, 0, 0, 0]);
+    pub const LOOPBACK: Self = Self([127, 0, 0, 1]);
+}
 
 pub trait NetworkDevice {
     fn mac(&self) -> MacAddress;
