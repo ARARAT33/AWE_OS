@@ -11,20 +11,38 @@ pub const FLAG_USER_MODE: u16 = 1 << 2;
 pub const KNOWN_FLAGS: u16 = FLAG_SIGNED | FLAG_PRIVILEGED | FLAG_USER_MODE;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Error { TooSmall, BadMagic, BadVersion, InvalidHeader, OutOfBounds }
+pub enum Error {
+    TooSmall,
+    BadMagic,
+    BadVersion,
+    InvalidHeader,
+    OutOfBounds,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Header {
-    pub version: u16, pub flags: u16, pub abi: u32, pub metadata_len: u32,
-    pub payload_len: u32, pub signature_len: u32, pub entry_offset: u32, pub reserved: u32,
+    pub version: u16,
+    pub flags: u16,
+    pub abi: u32,
+    pub metadata_len: u32,
+    pub payload_len: u32,
+    pub signature_len: u32,
+    pub entry_offset: u32,
+    pub reserved: u32,
 }
 
 impl Header {
     pub fn parse(bytes: &[u8]) -> Result<Self, Error> {
-        if bytes.len() < HEADER_LEN { return Err(Error::TooSmall); }
-        if bytes[0..4] != MAGIC { return Err(Error::BadMagic); }
+        if bytes.len() < HEADER_LEN {
+            return Err(Error::TooSmall);
+        }
+        if bytes[0..4] != MAGIC {
+            return Err(Error::BadMagic);
+        }
         let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-        if version != VERSION { return Err(Error::BadVersion); }
+        if version != VERSION {
+            return Err(Error::BadVersion);
+        }
         let h = Self {
             version,
             flags: u16::from_le_bytes([bytes[6], bytes[7]]),
@@ -35,33 +53,51 @@ impl Header {
             entry_offset: u32::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27]]),
             reserved: u32::from_le_bytes([bytes[28], bytes[29], bytes[30], bytes[31]]),
         };
-        if h.reserved != 0 || h.metadata_len as usize > MAX_METADATA || h.flags & !KNOWN_FLAGS != 0 {
+        if h.reserved != 0 || h.metadata_len as usize > MAX_METADATA || h.flags & !KNOWN_FLAGS != 0
+        {
             return Err(Error::InvalidHeader);
         }
-        if h.payload_len == 0 || h.entry_offset >= h.payload_len { return Err(Error::InvalidHeader); }
-        if h.flags & FLAG_SIGNED != 0 && h.signature_len == 0 { return Err(Error::InvalidHeader); }
+        if h.payload_len == 0 || h.entry_offset >= h.payload_len {
+            return Err(Error::InvalidHeader);
+        }
+        if h.flags & FLAG_SIGNED != 0 && h.signature_len == 0 {
+            return Err(Error::InvalidHeader);
+        }
         Ok(h)
     }
 
     pub fn total_len(&self) -> Result<usize, Error> {
-        HEADER_LEN.checked_add(self.metadata_len as usize)
+        HEADER_LEN
+            .checked_add(self.metadata_len as usize)
             .and_then(|v| v.checked_add(self.payload_len as usize))
             .and_then(|v| v.checked_add(self.signature_len as usize))
             .ok_or(Error::OutOfBounds)
     }
 }
 
-pub struct Image<'a> { pub header: Header, pub metadata: &'a [u8], pub payload: &'a [u8], pub signature: &'a [u8] }
+pub struct Image<'a> {
+    pub header: Header,
+    pub metadata: &'a [u8],
+    pub payload: &'a [u8],
+    pub signature: &'a [u8],
+}
 
 impl<'a> Image<'a> {
     pub fn parse(bytes: &'a [u8]) -> Result<Self, Error> {
         let header = Header::parse(bytes)?;
         let total = header.total_len()?;
-        if bytes.len() < total { return Err(Error::OutOfBounds); }
+        if bytes.len() < total {
+            return Err(Error::OutOfBounds);
+        }
         let m0 = HEADER_LEN;
         let m1 = m0 + header.metadata_len as usize;
         let p1 = m1 + header.payload_len as usize;
         let s1 = p1 + header.signature_len as usize;
-        Ok(Self { header, metadata: &bytes[m0..m1], payload: &bytes[m1..p1], signature: &bytes[p1..s1] })
+        Ok(Self {
+            header,
+            metadata: &bytes[m0..m1],
+            payload: &bytes[m1..p1],
+            signature: &bytes[p1..s1],
+        })
     }
 }

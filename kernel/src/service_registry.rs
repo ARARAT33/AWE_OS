@@ -8,7 +8,11 @@ use crate::service::{ServiceDescriptor, ServiceState};
 use crate::system_contract::ServiceId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RegistryError { Full, Duplicate, NotFound }
+pub enum RegistryError {
+    Full,
+    Duplicate,
+    NotFound,
+}
 
 pub struct ServiceRegistry<const N: usize> {
     entries: [Option<ServiceDescriptor>; N],
@@ -16,13 +20,26 @@ pub struct ServiceRegistry<const N: usize> {
 }
 
 impl<const N: usize> ServiceRegistry<N> {
-    pub const fn new() -> Self { Self { entries: [None; N], len: 0 } }
-    pub const fn len(&self) -> usize { self.len }
-    pub const fn is_full(&self) -> bool { self.len == N }
+    pub const fn new() -> Self {
+        Self {
+            entries: [None; N],
+            len: 0,
+        }
+    }
+    pub const fn len(&self) -> usize {
+        self.len
+    }
+    pub const fn is_full(&self) -> bool {
+        self.len == N
+    }
 
     pub fn register(&mut self, descriptor: ServiceDescriptor) -> Result<(), RegistryError> {
-        if self.find(descriptor.service).is_some() { return Err(RegistryError::Duplicate); }
-        if self.is_full() { return Err(RegistryError::Full); }
+        if self.find(descriptor.service).is_some() {
+            return Err(RegistryError::Duplicate);
+        }
+        if self.is_full() {
+            return Err(RegistryError::Full);
+        }
         self.entries[self.len] = Some(descriptor);
         self.len += 1;
         Ok(())
@@ -31,22 +48,28 @@ impl<const N: usize> ServiceRegistry<N> {
     pub fn find(&self, service: ServiceId) -> Option<&ServiceDescriptor> {
         let mut i = 0;
         while i < self.len {
-            if let Some(entry) = &self.entries[i] {
-                if entry.service as u16 == service as u16 { return Some(entry); }
+            if let Some(entry) = &self.entries[i]
+                && entry.service as u16 == service as u16
+            {
+                return Some(entry);
             }
             i += 1;
         }
         None
     }
 
-    pub fn update_state(&mut self, service: ServiceId, state: ServiceState) -> Result<(), RegistryError> {
+    pub fn update_state(
+        &mut self,
+        service: ServiceId,
+        state: ServiceState,
+    ) -> Result<(), RegistryError> {
         let mut i = 0;
         while i < self.len {
-            if let Some(entry) = &mut self.entries[i] {
-                if entry.service as u16 == service as u16 {
-                    entry.state = state;
-                    return Ok(());
-                }
+            if let Some(entry) = &mut self.entries[i]
+                && entry.service as u16 == service as u16
+            {
+                entry.state = state;
+                return Ok(());
             }
             i += 1;
         }
@@ -55,7 +78,9 @@ impl<const N: usize> ServiceRegistry<N> {
 }
 
 impl<const N: usize> Default for ServiceRegistry<N> {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Canonical seven-service namespace defined by the 60.2 contract.
@@ -72,8 +97,13 @@ pub const CANONICAL_SERVICES: [ServiceId; CANONICAL_SERVICE_COUNT] = [
 
 pub const fn is_canonical_service(service: ServiceId) -> bool {
     match service {
-        ServiceId::Driverd | ServiceId::Appd | ServiceId::Asappd | ServiceId::Ayuid
-        | ServiceId::Aweterminald | ServiceId::Awebusd | ServiceId::Aweupdated => true,
+        ServiceId::Driverd
+        | ServiceId::Appd
+        | ServiceId::Asappd
+        | ServiceId::Ayuid
+        | ServiceId::Aweterminald
+        | ServiceId::Awebusd
+        | ServiceId::Aweupdated => true,
     }
 }
 
@@ -90,7 +120,11 @@ mod tests {
             ProcessId(process),
             ServiceClass::System,
             CapabilitySet::EMPTY.with(KernelCapability::Ipc),
-            ResourceBudget { cpu_ticks: 10, memory_bytes: 1024, ipc_messages: 4 },
+            ResourceBudget {
+                cpu_ticks: 10,
+                memory_bytes: 1024,
+                ipc_messages: 4,
+            },
         )
     }
 
@@ -98,9 +132,15 @@ mod tests {
     fn registry_is_bounded_and_deduplicated() {
         let mut registry: ServiceRegistry<2> = ServiceRegistry::new();
         assert_eq!(registry.register(descriptor(ServiceId::Appd, 1)), Ok(()));
-        assert_eq!(registry.register(descriptor(ServiceId::Appd, 2)), Err(RegistryError::Duplicate));
+        assert_eq!(
+            registry.register(descriptor(ServiceId::Appd, 2)),
+            Err(RegistryError::Duplicate)
+        );
         assert_eq!(registry.register(descriptor(ServiceId::Ayuid, 3)), Ok(()));
-        assert_eq!(registry.register(descriptor(ServiceId::Driverd, 4)), Err(RegistryError::Full));
+        assert_eq!(
+            registry.register(descriptor(ServiceId::Driverd, 4)),
+            Err(RegistryError::Full)
+        );
     }
 
     #[test]
@@ -114,7 +154,13 @@ mod tests {
     fn lifecycle_state_can_be_published_through_registry() {
         let mut registry: ServiceRegistry<2> = ServiceRegistry::new();
         registry.register(descriptor(ServiceId::Appd, 1)).unwrap();
-        assert_eq!(registry.update_state(ServiceId::Appd, ServiceState::Running), Ok(()));
-        assert_eq!(registry.find(ServiceId::Appd).unwrap().state, ServiceState::Running);
+        assert_eq!(
+            registry.update_state(ServiceId::Appd, ServiceState::Running),
+            Ok(())
+        );
+        assert_eq!(
+            registry.find(ServiceId::Appd).unwrap().state,
+            ServiceState::Running
+        );
     }
 }

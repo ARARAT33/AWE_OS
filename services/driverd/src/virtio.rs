@@ -29,11 +29,23 @@ pub struct VirtioDevice {
 
 impl VirtioDevice {
     pub const fn new(device_id: u16, vendor_id: u16, device_features: u64) -> Self {
-        Self { device_id, vendor_id, device_features, driver_features: 0, status: 0 }
+        Self {
+            device_id,
+            vendor_id,
+            device_features,
+            driver_features: 0,
+            status: 0,
+        }
     }
 
-    pub const fn acknowledge(mut self) -> Self { self.status |= VIRTIO_STATUS_ACKNOWLEDGE; self }
-    pub const fn driver_present(mut self) -> Self { self.status |= VIRTIO_STATUS_DRIVER; self }
+    pub const fn acknowledge(mut self) -> Self {
+        self.status |= VIRTIO_STATUS_ACKNOWLEDGE;
+        self
+    }
+    pub const fn driver_present(mut self) -> Self {
+        self.status |= VIRTIO_STATUS_DRIVER;
+        self
+    }
 
     pub const fn negotiate(mut self, requested: u64) -> Result<Self, VirtioError> {
         if self.device_features & VIRTIO_F_VERSION_1 == 0 {
@@ -45,7 +57,8 @@ impl VirtioDevice {
     }
 
     pub const fn ready(mut self) -> Result<Self, VirtioError> {
-        if self.status & (VIRTIO_STATUS_ACKNOWLEDGE | VIRTIO_STATUS_DRIVER | VIRTIO_STATUS_FEATURES_OK)
+        if self.status
+            & (VIRTIO_STATUS_ACKNOWLEDGE | VIRTIO_STATUS_DRIVER | VIRTIO_STATUS_FEATURES_OK)
             != (VIRTIO_STATUS_ACKNOWLEDGE | VIRTIO_STATUS_DRIVER | VIRTIO_STATUS_FEATURES_OK)
         {
             return Err(VirtioError::NotReady);
@@ -67,7 +80,11 @@ impl VirtioQueue {
         if size == 0 || size > 1024 || !size.is_power_of_two() {
             return Err(VirtioError::QueueTooLarge);
         }
-        Ok(Self { size, used_index: 0, avail_index: 0 })
+        Ok(Self {
+            size,
+            used_index: 0,
+            avail_index: 0,
+        })
     }
 
     pub const fn pending(self) -> u16 {
@@ -90,7 +107,12 @@ mod tests {
     #[test]
     fn version_1_is_required() {
         let device = VirtioDevice::new(2, 0x1AF4, VIRTIO_F_VERSION_1);
-        let ready = device.acknowledge().driver_present().negotiate(VIRTIO_F_VERSION_1).unwrap().ready();
+        let ready = device
+            .acknowledge()
+            .driver_present()
+            .negotiate(VIRTIO_F_VERSION_1)
+            .unwrap()
+            .ready();
         assert!(ready.is_ok());
     }
 

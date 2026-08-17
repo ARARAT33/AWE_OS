@@ -17,9 +17,14 @@ pub struct Region {
 }
 
 impl Region {
-    pub const fn end(&self) -> Option<u64> { self.base.checked_add(self.length) }
+    pub const fn end(&self) -> Option<u64> {
+        self.base.checked_add(self.length)
+    }
 
     pub const fn contains(&self, address: u64) -> bool {
-        match self.end() { Some(end) => address >= self.base && address < end, None => false }
+        match self.end() {
+            Some(end) => address >= self.base && address < end,
+            None => false,
+        }
     }
 }

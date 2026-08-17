@@ -6,11 +6,18 @@ pub struct VirtualAddress(pub u64);
 
 impl VirtualAddress {
     pub const PAGE_SIZE: u64 = 4096;
-    pub const fn is_aligned(self) -> bool { self.0 & (Self::PAGE_SIZE - 1) == 0 }
-    pub const fn align_down(self) -> Self { Self(self.0 & !(Self::PAGE_SIZE - 1)) }
+    pub const fn is_aligned(self) -> bool {
+        self.0 & (Self::PAGE_SIZE - 1) == 0
+    }
+    pub const fn align_down(self) -> Self {
+        Self(self.0 & !(Self::PAGE_SIZE - 1))
+    }
     pub const fn align_up(self) -> Option<Self> {
         let mask = Self::PAGE_SIZE - 1;
-        match self.0.checked_add(mask) { Some(v) => Some(Self(v & !mask)), None => None }
+        match self.0.checked_add(mask) {
+            Some(v) => Some(Self(v & !mask)),
+            None => None,
+        }
     }
 }
 
@@ -20,11 +27,18 @@ pub struct PhysicalAddress(pub u64);
 
 impl PhysicalAddress {
     pub const PAGE_SIZE: u64 = 4096;
-    pub const fn is_aligned(self) -> bool { self.0 & (Self::PAGE_SIZE - 1) == 0 }
-    pub const fn align_down(self) -> Self { Self(self.0 & !(Self::PAGE_SIZE - 1)) }
+    pub const fn is_aligned(self) -> bool {
+        self.0 & (Self::PAGE_SIZE - 1) == 0
+    }
+    pub const fn align_down(self) -> Self {
+        Self(self.0 & !(Self::PAGE_SIZE - 1))
+    }
     pub const fn align_up(self) -> Option<Self> {
         let mask = Self::PAGE_SIZE - 1;
-        match self.0.checked_add(mask) { Some(v) => Some(Self(v & !mask)), None => None }
+        match self.0.checked_add(mask) {
+            Some(v) => Some(Self(v & !mask)),
+            None => None,
+        }
     }
 }
 

@@ -254,14 +254,7 @@ mod tests {
             interrupt_count: 2,
         };
         assert_eq!(
-            decide_binding(
-                matcher,
-                1,
-                2,
-                DeviceClass::Network,
-                requested,
-                allowed
-            ),
+            decide_binding(matcher, 1, 2, DeviceClass::Network, requested, allowed),
             BindingDecision::Reject
         );
     }

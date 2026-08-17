@@ -13,19 +13,26 @@ impl Pit {
     pub const PIT_BASE_HZ: u32 = 1_193_182;
 
     pub const fn new(frequency_hz: u32) -> Option<Self> {
-        if frequency_hz == 0 || frequency_hz > Self::PIT_BASE_HZ { None }
-        else { Some(Self { frequency_hz }) }
+        if frequency_hz == 0 || frequency_hz > Self::PIT_BASE_HZ {
+            None
+        } else {
+            Some(Self { frequency_hz })
+        }
     }
 
-    pub const fn frequency_hz(&self) -> u32 { self.frequency_hz }
+    pub const fn frequency_hz(&self) -> u32 {
+        self.frequency_hz
+    }
 
     /// Program channel 0, mode 2 (rate generator), squarely suitable for a
     /// periodic scheduler tick. This only performs hardware I/O on x86_64.
     pub unsafe fn program(&self) {
-        let divisor = (Self::PIT_BASE_HZ / self.frequency_hz).clamp(1, u16::MAX as u32) as u16;
-        io_out8(0x43, 0x34);
-        io_out8(0x40, divisor as u8);
-        io_out8(0x40, (divisor >> 8) as u8);
+        unsafe {
+            let divisor = (Self::PIT_BASE_HZ / self.frequency_hz).clamp(1, u16::MAX as u32) as u16;
+            io_out8(0x43, 0x34);
+            io_out8(0x40, divisor as u8);
+            io_out8(0x40, (divisor >> 8) as u8);
+        }
     }
 }
 

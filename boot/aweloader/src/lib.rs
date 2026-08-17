@@ -1,6 +1,6 @@
 #![no_std]
 
-use awe_boot_protocol::{validate, Architecture, BootInfo};
+use awe_boot_protocol::{Architecture, BootInfo, validate};
 
 pub struct LoaderState {
     pub info: BootInfo,
@@ -8,7 +8,9 @@ pub struct LoaderState {
 
 impl LoaderState {
     pub const fn new(architecture: Architecture) -> Self {
-        Self { info: BootInfo::empty(architecture) }
+        Self {
+            info: BootInfo::empty(architecture),
+        }
     }
 
     pub fn ready(&self) -> bool {

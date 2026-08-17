@@ -90,6 +90,12 @@ pub struct SharedRing<const N: usize> {
     len: usize,
 }
 
+impl<const N: usize> Default for SharedRing<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> SharedRing<N> {
     pub const fn new() -> Self {
         Self {
@@ -129,9 +135,7 @@ impl<const N: usize> SharedRing<N> {
         if self.is_empty() {
             return Err(TransportError::Empty);
         }
-        let value = self.slots[self.head]
-            .take()
-            .expect("shared ring invariant");
+        let value = self.slots[self.head].take().expect("shared ring invariant");
         self.head = (self.head + 1) % N;
         self.len -= 1;
         Ok(value)
@@ -149,6 +153,12 @@ pub struct PendingRequest {
 pub struct AsyncRequests<const N: usize> {
     slots: [Option<PendingRequest>; N],
     len: usize,
+}
+
+impl<const N: usize> Default for AsyncRequests<N> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<const N: usize> AsyncRequests<N> {

@@ -15,8 +15,18 @@ pub struct InterruptTable {
     handlers: [Option<Handler>; 256],
 }
 
+impl Default for InterruptTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InterruptTable {
-    pub const fn new() -> Self { Self { handlers: [None; 256] } }
+    pub const fn new() -> Self {
+        Self {
+            handlers: [None; 256],
+        }
+    }
 
     pub fn register(&mut self, vector: u8, handler: Handler) {
         self.handlers[vector as usize] = Some(handler);

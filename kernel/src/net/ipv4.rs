@@ -22,13 +22,19 @@ pub struct Header {
 
 impl Header {
     pub fn parse(packet: &[u8]) -> Result<Self, NetError> {
-        if packet.len() < IPV4_MIN_HEADER { return Err(NetError::BufferTooSmall); }
+        if packet.len() < IPV4_MIN_HEADER {
+            return Err(NetError::BufferTooSmall);
+        }
         let first = packet[0];
         let version = first >> 4;
         let ihl = first & 0x0f;
-        if version != 4 || ihl < 5 { return Err(NetError::InvalidAddress); }
+        if version != 4 || ihl < 5 {
+            return Err(NetError::InvalidAddress);
+        }
         let header_len = (ihl as usize) * 4;
-        if packet.len() < header_len { return Err(NetError::BufferTooSmall); }
+        if packet.len() < header_len {
+            return Err(NetError::BufferTooSmall);
+        }
         let total_len = u16::from_be_bytes([packet[2], packet[3]]);
         if (total_len as usize) < header_len || (total_len as usize) > packet.len() {
             return Err(NetError::BufferTooSmall);
@@ -48,12 +54,16 @@ impl Header {
         })
     }
 
-    pub const fn header_len(self) -> usize { self.ihl as usize * 4 }
+    pub const fn header_len(self) -> usize {
+        self.ihl as usize * 4
+    }
 
-    pub fn payload<'a>(self, packet: &'a [u8]) -> Result<&'a [u8], NetError> {
+    pub fn payload(self, packet: &[u8]) -> Result<&[u8], NetError> {
         let h = self.header_len();
         let end = self.total_len as usize;
-        if end < h || end > packet.len() { return Err(NetError::BufferTooSmall); }
+        if end < h || end > packet.len() {
+            return Err(NetError::BufferTooSmall);
+        }
         Ok(&packet[h..end])
     }
 
@@ -66,7 +76,9 @@ impl Header {
             sum = sum.wrapping_add(u16::from_be_bytes([packet[i], packet[i + 1]]) as u32);
             i += 2;
         }
-        while (sum >> 16) != 0 { sum = (sum & 0xffff) + (sum >> 16); }
+        while (sum >> 16) != 0 {
+            sum = (sum & 0xffff) + (sum >> 16);
+        }
         Ok((sum as u16) == 0xffff)
     }
 }

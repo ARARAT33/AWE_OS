@@ -8,20 +8,30 @@ pub struct GdtDescriptor {
 
 #[inline(always)]
 pub unsafe fn load_gdt(descriptor: &GdtDescriptor) {
-    core::arch::asm!("lgdt [{}]", in(reg) descriptor, options(readonly, nostack, preserves_flags));
+    unsafe {
+        core::arch::asm!("lgdt [{}]", in(reg) descriptor, options(readonly, nostack, preserves_flags));
+    }
 }
 
 #[inline(always)]
 pub unsafe fn disable_interrupts() {
-    core::arch::asm!("cli", options(nomem, nostack, preserves_flags));
+    unsafe {
+        core::arch::asm!("cli", options(nomem, nostack, preserves_flags));
+    }
 }
 
 #[inline(always)]
 pub unsafe fn enable_interrupts() {
-    core::arch::asm!("sti", options(nomem, nostack, preserves_flags));
+    unsafe {
+        core::arch::asm!("sti", options(nomem, nostack, preserves_flags));
+    }
 }
 
 #[inline(always)]
 pub unsafe fn halt() -> ! {
-    loop { core::arch::asm!("hlt", options(nomem, nostack, preserves_flags)); }
+    unsafe {
+        loop {
+            core::arch::asm!("hlt", options(nomem, nostack, preserves_flags));
+        }
+    }
 }

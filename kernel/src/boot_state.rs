@@ -1,6 +1,6 @@
 #![no_std]
 
-use awe_boot_protocol::{validate, BootInfo};
+use awe_boot_protocol::{BootInfo, validate};
 
 pub struct EarlyBoot<'a> {
     info: &'a BootInfo,
@@ -8,8 +8,14 @@ pub struct EarlyBoot<'a> {
 
 impl<'a> EarlyBoot<'a> {
     pub fn new(info: &'a BootInfo) -> Option<Self> {
-        if validate(info) { Some(Self { info }) } else { None }
+        if validate(info) {
+            Some(Self { info })
+        } else {
+            None
+        }
     }
 
-    pub const fn info(&self) -> &BootInfo { self.info }
+    pub const fn info(&self) -> &BootInfo {
+        self.info
+    }
 }

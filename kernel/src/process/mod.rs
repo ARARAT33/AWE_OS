@@ -18,6 +18,12 @@ pub struct ProcessTable {
     next_id: AtomicU64,
 }
 
+impl Default for ProcessTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProcessTable {
     pub const fn new() -> Self {
         Self {

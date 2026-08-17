@@ -35,11 +35,16 @@ jobs:
         shell: bash
         run: |
           set +e
-          timeout 12s qemu-system-x86_64 \
+          timeout 15s qemu-system-x86_64 \
+            -M q35 \
+            -m 512M \
             -cdrom dist/aweos-x86_64.iso \
             -display none \
             -serial stdio \
             -no-reboot \
+            -no-shutdown \
+            -d guest_errors,cpu_reset \
+            -D dist/qemu-debug.log \
             > dist/qemu.log 2>&1
           qemu_status=$?
           grep -q "AWEOS: boot protocol validated" dist/qemu.log
@@ -52,10 +57,13 @@ jobs:
           echo "boot_ok=$boot_ok" >> "$GITHUB_OUTPUT"
           echo "running_ok=$running_ok" >> "$GITHUB_OUTPUT"
           echo "alive_ok=$alive_ok" >> "$GITHUB_OUTPUT"
+          echo "--- serial/qemu output ---"
           cat dist/qemu.log
+          echo "--- qemu debug output ---"
+          cat dist/qemu-debug.log || true
           if [ "$qemu_status" -ne 124 ] && [ "$qemu_status" -ne 0 ]; then exit 1; fi
           if [ "$boot_ok" -ne 0 ] || [ "$running_ok" -ne 0 ] || [ "$alive_ok" -ne 0 ]; then exit 1; fi
-      - name: Upload ISO and boot log
+      - name: Upload ISO and boot diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -63,6 +71,7 @@ jobs:
           path: |
             dist/aweos-x86_64.iso
             dist/qemu.log
+            dist/qemu-debug.log
       - name: Boot diagnostics summary
         if: always()
         run: |

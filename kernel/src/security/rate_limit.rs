@@ -10,7 +10,12 @@ pub struct TokenBucket {
 
 impl TokenBucket {
     pub const fn new(capacity: u64, refill_per_tick: u64) -> Self {
-        Self { capacity, tokens: capacity, refill_per_tick, last_tick: 0 }
+        Self {
+            capacity,
+            tokens: capacity,
+            refill_per_tick,
+            last_tick: 0,
+        }
     }
 
     pub fn allow(&mut self, now: u64, cost: u64) -> bool {
@@ -20,12 +25,16 @@ impl TokenBucket {
             self.tokens = self.tokens.saturating_add(refill).min(self.capacity);
             self.last_tick = now;
         }
-        if cost > self.tokens { return false; }
+        if cost > self.tokens {
+            return false;
+        }
         self.tokens -= cost;
         true
     }
 
-    pub const fn available(&self) -> u64 { self.tokens }
+    pub const fn available(&self) -> u64 {
+        self.tokens
+    }
 }
 
 #[cfg(test)]

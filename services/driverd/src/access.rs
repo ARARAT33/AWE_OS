@@ -120,31 +120,37 @@ mod tests {
         assert!(region.valid());
         assert!(region.contains(0x20, 4));
         assert!(!region.contains(0xff, 2));
-        assert!(!AccessRegion {
-            driver: DriverId(1),
-            base: u64::MAX,
-            length: 2,
-            kind: AccessKind::Mmio,
-        }
-        .valid());
+        assert!(
+            !AccessRegion {
+                driver: DriverId(1),
+                base: u64::MAX,
+                length: 2,
+                kind: AccessKind::Mmio,
+            }
+            .valid()
+        );
     }
 
     #[test]
     fn interrupt_ownership_is_explicit() {
-        assert!(!InterruptOwnership {
-            driver: DriverId(1),
-            vector: 0,
-            mode: InterruptMode::Msi,
-            shared: false,
-        }
-        .valid());
-        assert!(InterruptOwnership {
-            driver: DriverId(1),
-            vector: 32,
-            mode: InterruptMode::MsiX,
-            shared: false,
-        }
-        .valid());
+        assert!(
+            !InterruptOwnership {
+                driver: DriverId(1),
+                vector: 0,
+                mode: InterruptMode::Msi,
+                shared: false,
+            }
+            .valid()
+        );
+        assert!(
+            InterruptOwnership {
+                driver: DriverId(1),
+                vector: 32,
+                mode: InterruptMode::MsiX,
+                shared: false,
+            }
+            .valid()
+        );
     }
 
     #[test]
