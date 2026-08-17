@@ -19,6 +19,25 @@ pub enum StorageError {
     ReadOnly,
     Io,
     Unsupported,
+    InvalidMetadata,
+    TooLarge,
+}
+
+impl From<GptError> for StorageError {
+    fn from(error: GptError) -> Self {
+        match error {
+            GptError::BufferTooSmall => Self::BufferTooSmall,
+            GptError::InvalidHeaderSize
+            | GptError::InvalidLbaRange
+            | GptError::InvalidEntrySize
+            | GptError::TooManyPartitions
+            | GptError::InvalidPartitionRange
+            | GptError::HeaderCrcMismatch
+            | GptError::PartitionArrayCrcMismatch
+            | GptError::BadSignature
+            | GptError::UnsupportedRevision => Self::InvalidMetadata,
+        }
+    }
 }
 
 pub trait BlockDevice {
@@ -70,39 +89,50 @@ pub fn scan_gpt<D: BlockDevice>(device: &mut D) -> Result<GptScanSummary, Storag
         return Err(StorageError::Unsupported);
     }
 
+    let sectors_per_block = device.block_size() / gpt::GPT_SECTOR_SIZE;
     let disk_last_lba = device
         .block_count()
-        .checked_mul((device.block_size() / gpt::GPT_SECTOR_SIZE) as u64)
+        .checked_mul(sectors_per_block as u64)
         .and_then(|sectors| sectors.checked_sub(1))
         .ok_or(StorageError::InvalidBlock)?;
 
     let mut block = [0u8; BLOCK_SIZE];
     device.read_block(0, &mut block)?;
-    let header = gpt::parse_header(
-        &block[..gpt::GPT_SECTOR_SIZE * 2],
-        disk_last_lba,
-    )?;
+    let header = gpt::parse_header(&block[gpt::GPT_SECTOR_SIZE..], disk_last_lba)?;
 
     let entry_bytes = (header.partition_count as usize)
         .checked_mul(header.partition_entry_size as usize)
-        .ok_or(StorageError::InvalidBlock)?;
+        .ok_or(StorageError::TooLarge)?;
     if entry_bytes > 16 * 1024 {
         return Err(StorageError::TooLarge);
     }
 
     let mut entries = [0u8; 16 * 1024];
-    let sectors_per_block = device.block_size() / gpt::GPT_SECTOR_SIZE;
     let first_block = header.partition_entry_lba / sectors_per_block as u64;
-    let block_count = (entry_bytes + device.block_size() - 1) / device.block_size();
+    let first_sector_in_block =
+        (header.partition_entry_lba % sectors_per_block as u64) as usize * gpt::GPT_SECTOR_SIZE;
+    let block_count = (first_sector_in_block + entry_bytes + device.block_size() - 1)
+        / device.block_size();
     for index in 0..block_count {
         device.read_block(first_block + index as u64, &mut block)?;
-        let start = index * device.block_size();
-        let end = core::cmp::min(start + device.block_size(), entry_bytes);
-        entries[start..end].copy_from_slice(&block[..end - start]);
+        let source_start = if index == 0 { first_sector_in_block } else { 0 };
+        let destination_start = if index == 0 {
+            0
+        } else {
+            index * device.block_size() - first_sector_in_block
+        };
+        let copy_len = core::cmp::min(
+            device.block_size() - source_start,
+            entry_bytes.saturating_sub(destination_start),
+        );
+        if copy_len == 0 {
+            break;
+        }
+        entries[destination_start..destination_start + copy_len]
+            .copy_from_slice(&block[source_start..source_start + copy_len]);
     }
 
-    let stored_array_crc = 0u32;
-    let _ = stored_array_crc;
+    gpt::validate_partition_array_crc(&entries[..entry_bytes], header.partition_array_crc32)?;
 
     let mut partitions = 0u16;
     for index in 0..header.partition_count as usize {
