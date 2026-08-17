@@ -43,9 +43,7 @@ pub struct SocketTable<const N: usize = MAX_ENDPOINTS> {
 
 impl<const N: usize> SocketTable<N> {
     pub const fn new() -> Self {
-        Self {
-            entries: [None; N],
-        }
+        Self { entries: [None; N] }
     }
 
     pub fn bind(&mut self, endpoint: Endpoint, transport: Transport) -> Result<usize, NetError> {
