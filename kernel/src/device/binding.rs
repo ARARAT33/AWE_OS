@@ -7,11 +7,16 @@
 //! contract needed to admit an already-discovered device to a driver service.
 
 use super::{DeviceClass, DeviceId};
-use crate::system_contract::{CapabilityHandle, CapabilitySet, KernelCapability, ServiceId};
+use crate::ipc::CapabilityHandle;
+use crate::system_contract::{CapabilitySet, KernelCapability, ServiceId};
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MatchKind { Exact = 0, Class = 1, Fallback = 2 }
+pub enum MatchKind {
+    Exact = 0,
+    Class = 1,
+    Fallback = 2,
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,17 +29,37 @@ pub struct DeviceMatch {
 
 impl DeviceMatch {
     pub const fn exact(vendor: u16, product: u16, class: DeviceClass) -> Self {
-        Self { vendor, product, class, kind: MatchKind::Exact }
+        Self {
+            vendor,
+            product,
+            class,
+            kind: MatchKind::Exact,
+        }
     }
+
     pub const fn class(class: DeviceClass) -> Self {
-        Self { vendor: 0, product: 0, class, kind: MatchKind::Class }
+        Self {
+            vendor: 0,
+            product: 0,
+            class,
+            kind: MatchKind::Class,
+        }
     }
+
     pub const fn fallback() -> Self {
-        Self { vendor: 0, product: 0, class: DeviceClass::Unknown, kind: MatchKind::Fallback }
+        Self {
+            vendor: 0,
+            product: 0,
+            class: DeviceClass::Unknown,
+            kind: MatchKind::Fallback,
+        }
     }
-    pub const fn matches(self, vendor: u16, product: u16, class: DeviceClass) -> bool {
+
+    pub fn matches(self, vendor: u16, product: u16, class: DeviceClass) -> bool {
         match self.kind {
-            MatchKind::Exact => self.vendor == vendor && self.product == product && self.class == class,
+            MatchKind::Exact => {
+                self.vendor == vendor && self.product == product && self.class == class
+            }
             MatchKind::Class => self.class == class,
             MatchKind::Fallback => true,
         }
@@ -53,9 +78,16 @@ pub struct ResourceGrant {
 
 impl ResourceGrant {
     pub const fn empty(device: DeviceId) -> Self {
-        Self { device, mmio_bytes: 0, io_bytes: 0, dma_bytes: 0, interrupt_count: 0 }
+        Self {
+            device,
+            mmio_bytes: 0,
+            io_bytes: 0,
+            dma_bytes: 0,
+            interrupt_count: 0,
+        }
     }
-    pub const fn within(self, budget: ResourceGrant) -> bool {
+
+    pub fn within(self, budget: ResourceGrant) -> bool {
         self.device == budget.device
             && self.mmio_bytes <= budget.mmio_bytes
             && self.io_bytes <= budget.io_bytes
@@ -75,20 +107,39 @@ pub struct DriverGrant {
 }
 
 impl DriverGrant {
-    pub const fn new(service: ServiceId, endpoint: CapabilityHandle, device: DeviceId, resources: ResourceGrant, capabilities: CapabilitySet) -> Self {
-        Self { service, endpoint, device, resources, capabilities }
+    pub const fn new(
+        service: ServiceId,
+        endpoint: CapabilityHandle,
+        device: DeviceId,
+        resources: ResourceGrant,
+        capabilities: CapabilitySet,
+    ) -> Self {
+        Self {
+            service,
+            endpoint,
+            device,
+            resources,
+            capabilities,
+        }
     }
-    pub const fn is_valid_for(self, service: ServiceId, endpoint: CapabilityHandle) -> bool {
+
+    pub fn is_valid_for(self, service: ServiceId, endpoint: CapabilityHandle) -> bool {
         self.service as u16 == service as u16
             && self.endpoint == endpoint
             && self.endpoint.is_valid()
             && self.device == self.resources.device
     }
-    pub const fn permits(self, required: KernelCapability) -> bool { self.capabilities.contains(required) }
+
+    pub fn permits(self, required: KernelCapability) -> bool {
+        self.capabilities.contains(required)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BindingDecision { Reject, Accept }
+pub enum BindingDecision {
+    Reject,
+    Accept,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GrantError {
@@ -99,7 +150,7 @@ pub enum GrantError {
     ResourceExceeded,
 }
 
-pub const fn decide_binding(
+pub fn decide_binding(
     matcher: DeviceMatch,
     vendor: u16,
     product: u16,
@@ -107,21 +158,35 @@ pub const fn decide_binding(
     requested: ResourceGrant,
     allowed: ResourceGrant,
 ) -> BindingDecision {
-    if !matcher.matches(vendor, product, class) || !requested.within(allowed) { BindingDecision::Reject } else { BindingDecision::Accept }
+    if !matcher.matches(vendor, product, class) || !requested.within(allowed) {
+        BindingDecision::Reject
+    } else {
+        BindingDecision::Accept
+    }
 }
 
-pub const fn validate_driver_grant(
+pub fn validate_driver_grant(
     grant: DriverGrant,
     service: ServiceId,
     endpoint: CapabilityHandle,
     required: KernelCapability,
     allowed: ResourceGrant,
 ) -> Result<(), GrantError> {
-    if grant.service as u16 != service as u16 { return Err(GrantError::ServiceMismatch); }
-    if !endpoint.is_valid() || grant.endpoint != endpoint { return Err(GrantError::InvalidEndpoint); }
-    if grant.device != grant.resources.device { return Err(GrantError::DeviceMismatch); }
-    if grant.resources.device != allowed.device || !grant.resources.within(allowed) { return Err(GrantError::ResourceExceeded); }
-    if !grant.permits(required) { return Err(GrantError::MissingCapability); }
+    if grant.service as u16 != service as u16 {
+        return Err(GrantError::ServiceMismatch);
+    }
+    if !endpoint.is_valid() || grant.endpoint != endpoint {
+        return Err(GrantError::InvalidEndpoint);
+    }
+    if grant.device != grant.resources.device {
+        return Err(GrantError::DeviceMismatch);
+    }
+    if grant.resources.device != allowed.device || !grant.resources.within(allowed) {
+        return Err(GrantError::ResourceExceeded);
+    }
+    if !grant.permits(required) {
+        return Err(GrantError::MissingCapability);
+    }
     Ok(())
 }
 
@@ -146,41 +211,149 @@ mod tests {
     #[test]
     fn resource_ownership_is_bounded() {
         let device = DeviceId(7);
-        let budget = ResourceGrant { device, mmio_bytes: 4096, io_bytes: 128, dma_bytes: 8192, interrupt_count: 4 };
-        let requested = ResourceGrant { device, mmio_bytes: 2048, io_bytes: 64, dma_bytes: 4096, interrupt_count: 2 };
+        let budget = ResourceGrant {
+            device,
+            mmio_bytes: 4096,
+            io_bytes: 128,
+            dma_bytes: 8192,
+            interrupt_count: 4,
+        };
+        let requested = ResourceGrant {
+            device,
+            mmio_bytes: 2048,
+            io_bytes: 64,
+            dma_bytes: 4096,
+            interrupt_count: 2,
+        };
         assert!(requested.within(budget));
-        let too_much = ResourceGrant { device, mmio_bytes: 8192, io_bytes: 64, dma_bytes: 4096, interrupt_count: 2 };
+        let too_much = ResourceGrant {
+            device,
+            mmio_bytes: 8192,
+            io_bytes: 64,
+            dma_bytes: 4096,
+            interrupt_count: 2,
+        };
         assert!(!too_much.within(budget));
     }
 
     #[test]
     fn binding_is_fail_closed() {
         let matcher = DeviceMatch::exact(1, 2, DeviceClass::Network);
-        let allowed = ResourceGrant { device: DeviceId(9), mmio_bytes: 4096, io_bytes: 64, dma_bytes: 4096, interrupt_count: 2 };
-        let requested = ResourceGrant { device: DeviceId(9), mmio_bytes: 8192, io_bytes: 64, dma_bytes: 4096, interrupt_count: 2 };
-        assert_eq!(decide_binding(matcher, 1, 2, DeviceClass::Network, requested, allowed), BindingDecision::Reject);
+        let allowed = ResourceGrant {
+            device: DeviceId(9),
+            mmio_bytes: 4096,
+            io_bytes: 64,
+            dma_bytes: 4096,
+            interrupt_count: 2,
+        };
+        let requested = ResourceGrant {
+            device: DeviceId(9),
+            mmio_bytes: 8192,
+            io_bytes: 64,
+            dma_bytes: 4096,
+            interrupt_count: 2,
+        };
+        assert_eq!(
+            decide_binding(
+                matcher,
+                1,
+                2,
+                DeviceClass::Network,
+                requested,
+                allowed
+            ),
+            BindingDecision::Reject
+        );
     }
 
     #[test]
     fn driver_grant_binds_capability_endpoint_and_device() {
         let device = DeviceId(21);
         let endpoint = CapabilityHandle(77);
-        let caps = CapabilitySet::EMPTY.with(KernelCapability::DeviceGrant).with(KernelCapability::Dma);
-        let resources = ResourceGrant { device, mmio_bytes: 1024, io_bytes: 32, dma_bytes: 2048, interrupt_count: 1 };
+        let caps = CapabilitySet::EMPTY
+            .with(KernelCapability::DeviceGrant)
+            .with(KernelCapability::Dma);
+        let resources = ResourceGrant {
+            device,
+            mmio_bytes: 1024,
+            io_bytes: 32,
+            dma_bytes: 2048,
+            interrupt_count: 1,
+        };
         let grant = DriverGrant::new(ServiceId::Driverd, endpoint, device, resources, caps);
-        assert_eq!(validate_driver_grant(grant, ServiceId::Driverd, endpoint, KernelCapability::Dma, resources), Ok(()));
-        assert_eq!(validate_driver_grant(grant, ServiceId::Appd, endpoint, KernelCapability::Dma, resources), Err(GrantError::ServiceMismatch));
+        assert_eq!(
+            validate_driver_grant(
+                grant,
+                ServiceId::Driverd,
+                endpoint,
+                KernelCapability::Dma,
+                resources
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            validate_driver_grant(
+                grant,
+                ServiceId::Appd,
+                endpoint,
+                KernelCapability::Dma,
+                resources
+            ),
+            Err(GrantError::ServiceMismatch)
+        );
     }
 
     #[test]
     fn driver_grant_rejects_missing_capability_and_excess_resources() {
         let device = DeviceId(22);
         let endpoint = CapabilityHandle(88);
-        let allowed = ResourceGrant { device, mmio_bytes: 1024, io_bytes: 32, dma_bytes: 1024, interrupt_count: 1 };
-        let requested = ResourceGrant { device, mmio_bytes: 2048, io_bytes: 32, dma_bytes: 1024, interrupt_count: 1 };
-        let grant = DriverGrant::new(ServiceId::Driverd, endpoint, device, requested, CapabilitySet::EMPTY);
-        assert_eq!(validate_driver_grant(grant, ServiceId::Driverd, endpoint, KernelCapability::Dma, allowed), Err(GrantError::ResourceExceeded));
-        let limited = DriverGrant::new(ServiceId::Driverd, endpoint, device, allowed, CapabilitySet::EMPTY);
-        assert_eq!(validate_driver_grant(limited, ServiceId::Driverd, endpoint, KernelCapability::Dma, allowed), Err(GrantError::MissingCapability));
+        let allowed = ResourceGrant {
+            device,
+            mmio_bytes: 1024,
+            io_bytes: 32,
+            dma_bytes: 1024,
+            interrupt_count: 1,
+        };
+        let requested = ResourceGrant {
+            device,
+            mmio_bytes: 2048,
+            io_bytes: 32,
+            dma_bytes: 1024,
+            interrupt_count: 1,
+        };
+        let grant = DriverGrant::new(
+            ServiceId::Driverd,
+            endpoint,
+            device,
+            requested,
+            CapabilitySet::EMPTY,
+        );
+        assert_eq!(
+            validate_driver_grant(
+                grant,
+                ServiceId::Driverd,
+                endpoint,
+                KernelCapability::Dma,
+                allowed
+            ),
+            Err(GrantError::ResourceExceeded)
+        );
+        let limited = DriverGrant::new(
+            ServiceId::Driverd,
+            endpoint,
+            device,
+            allowed,
+            CapabilitySet::EMPTY,
+        );
+        assert_eq!(
+            validate_driver_grant(
+                limited,
+                ServiceId::Driverd,
+                endpoint,
+                KernelCapability::Dma,
+                allowed
+            ),
+            Err(GrantError::MissingCapability)
+        );
     }
 }
