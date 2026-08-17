@@ -4,9 +4,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**63% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**64% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
-The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 63% gate completes the driver dependency/ownership/health sub-gate inside the 61.6–64.x driver-service preparation block; the 65% hardware execution checkpoint remains separate.
+The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 64% gate closes the remaining hardware-boundary preparation inside the 61.6–64.x block; the 65% hardware execution checkpoint remains separate.
 
 ## Implemented kernel foundations
 
@@ -41,6 +41,7 @@ The percentage follows the AWE_OS 60–100 master plan and advances only when th
 - **62.0 driver capability integration:** driver grants bind a driver service to an authenticated capability endpoint and one canonical device identity while independently enforcing capability and resource budgets.
 - **62.5 native driver manifest/lifecycle freeze:** ABI-aware driver manifests, architecture/capability declarations, verified-trust admission, deterministic lifecycle transitions, and registry-level trust/ABI metadata.
 - **63.0 driver dependency/ownership/health integration:** bounded dependency graph, cycle rejection, per-driver resource ownership, failure counters, bounded restart accounting, and deterministic health recovery state.
+- **64.0 hardware access boundary freeze:** overflow-safe MMIO/PIO regions, bounded sub-range checks, explicit interrupt ownership modes, deterministic power-state transitions, and device-consistent access plans in both CellKernel and driverd.
 
 ## 62.0 milestone — COMPLETE
 
@@ -52,30 +53,33 @@ The 62.5 gate freezes the native driver-service contract required immediately be
 
 ## 63.0 milestone — COMPLETE
 
-The 63.0 gate advances the 61.6–64.x driver-service preparation block with the operational contracts needed to manage driver dependencies, resource ownership and health without putting driver implementations back into CellKernel:
+The 63.0 gate advances the 61.6–64.x driver-service preparation block with the operational contracts needed to manage driver dependencies, resource ownership and health without putting driver implementations back into CellKernel.
 
-- [x] Bounded driver dependency graph.
-- [x] Self-dependency rejection.
-- [x] Simple transitive cycle rejection.
-- [x] Explicit per-driver resource ownership record.
-- [x] MMIO/I/O/DMA/interrupt ownership remains bounded.
-- [x] Driver health state with consecutive-failure tracking.
-- [x] Bounded restart accounting.
-- [x] Deterministic restart transition.
-- [x] Service exports expose the new preparation contracts.
-- [x] Unit coverage for dependency cycles, ownership budgets and restart behavior.
-- [x] Concrete PCI/ACPI/VirtIO execution remains excluded from this gate.
+## 64.0 milestone — COMPLETE
 
-The detailed specification is `docs/MILESTONE_63_0.md`.
+The 64.0 gate freezes the last hardware-neutral access boundary before real device execution:
+
+- [x] Overflow-safe MMIO region contract.
+- [x] Overflow-safe PIO region contract.
+- [x] Bounded sub-range containment for register/window access.
+- [x] Explicit interrupt ownership contract with line/MSI/MSI-X modes.
+- [x] Explicit power-state contract with deterministic bounded transitions.
+- [x] Device-side access contract ties MMIO/PIO/interrupt ownership to one device identity.
+- [x] Driver-side access plan ties hardware resources to one driver identity.
+- [x] Driver service exports the access/power contracts.
+- [x] Unit coverage for overflow, bounds, interrupt validity, power transitions and identity consistency.
+- [x] No concrete PCI/ACPI/APIC/IOAPIC/VirtIO/DMA hardware execution counted early.
+
+The detailed specification is `docs/MILESTONE_64_0.md`.
 
 ## Reserved for 65% checkpoint
 
-The following are deliberately not counted toward 63% and remain the next major validation block:
+The following are deliberately not counted toward 64% and remain the next major validation block:
 
-- PCI/PCIe enumeration;
-- ACPI discovery;
-- APIC/IOAPIC execution;
-- VirtIO transport;
+- PCI/PCIe enumeration and BAR discovery;
+- ACPI discovery and real power-resource execution;
+- APIC/IOAPIC implementation and interrupt routing;
+- VirtIO transport and queue execution;
 - concrete VirtIO block/network/input/display drivers;
 - real DMA/IOMMU hardware enforcement;
 - QEMU hardware certification.
@@ -126,10 +130,10 @@ The following are deliberately not counted toward 63% and remain the next major 
 - [ ] Signed/measured release image verification in the boot path.
 - [ ] Automated QEMU boot certification.
 
-## 63% milestone boundary
+## 64% milestone boundary
 
-The 63% milestone represents completion of the next driver-service preparation layer from the master plan: dependency relationships are bounded and cycle-safe, resource ownership is explicit per driver, and health/restart state is deterministic and bounded. The system is still deliberately hardware-neutral here; the real PCI/ACPI/VirtIO execution checkpoint remains 65%.
+The 64% milestone represents completion of the final hardware-neutral device-access preparation block from the master plan. CellKernel and driverd now have explicit, bounded contracts for MMIO/PIO access, interrupt ownership and power-state intent, all tied to a concrete device/driver identity. Real hardware discovery, interrupt routing, DMA programming and driver execution remain reserved for the 65% checkpoint.
 
 ## Definition of done
 
-AWE_OS is considered product-ready only when the required boot, kernel, driver, security, recovery and release gates are implemented and their automated validation is green. Documentation or architectural placeholders alone do not satisfy a gate.
+AWE_OS is considered product-ready only when the required boot, kernel, driver, security, recovery and release gates are implemented and their automated CI/QEMU validation is green. Documentation or architectural placeholders alone do not satisfy a gate.
