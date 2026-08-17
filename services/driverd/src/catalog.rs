@@ -1,7 +1,7 @@
 //! Built-in driver-service catalog.
 //! The catalog is metadata only: implementations execute outside CellKernel.
 
-use crate::{DriverClass, DriverDescriptor, DriverId};
+use crate::{DriverClass, DriverDescriptor, DriverId, DriverState, DriverTrust};
 
 pub const BUILTIN_DRIVER_COUNT: usize = 10;
 
@@ -31,6 +31,11 @@ pub const fn descriptor(driver: BuiltinDriver) -> DriverDescriptor {
         id: driver.id,
         class: driver.class,
         abi_major: driver.abi_major,
+        abi_minor: 2,
+        vendor: 0,
+        device: 0,
+        state: DriverState::Discovered,
+        trust: DriverTrust::Verified,
     }
 }
 
