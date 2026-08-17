@@ -14,6 +14,50 @@ impl IpcMessage {
     }
 }
 
+#[repr(u16)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ServiceChannel {
+    Driverd = 1,
+    Appd = 2,
+    Asappd = 3,
+    Ayuid = 4,
+    Aweterminald = 5,
+    Awebusd = 6,
+    Aweupdated = 7,
+}
+
+#[repr(u16)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IpcOpcode {
+    Hello = 1,
+    Ping = 2,
+    Start = 3,
+    Stop = 4,
+    Reset = 5,
+    Query = 6,
+    Event = 7,
+    Handoff = 8,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct IpcEnvelope {
+    pub service: ServiceChannel,
+    pub opcode: IpcOpcode,
+    pub request_id: u64,
+    pub message: IpcMessage,
+}
+
+impl IpcEnvelope {
+    pub const fn new(
+        service: ServiceChannel,
+        opcode: IpcOpcode,
+        request_id: u64,
+        message: IpcMessage,
+    ) -> Self {
+        Self { service, opcode, request_id, message }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IpcError {
     Full,
@@ -69,5 +113,21 @@ mod tests {
         assert_eq!(q.recv(), Ok(a));
         assert_eq!(q.recv(), Ok(b));
         assert_eq!(q.recv(), Err(IpcError::Empty));
+    }
+
+    #[test]
+    fn service_channels_and_opcodes_are_stable() {
+        assert_eq!(ServiceChannel::Driverd as u16, 1);
+        assert_eq!(ServiceChannel::Aweupdated as u16, 7);
+        assert_eq!(IpcOpcode::Hello as u16, 1);
+        assert_eq!(IpcOpcode::Handoff as u16, 8);
+        let envelope = IpcEnvelope::new(
+            ServiceChannel::Driverd,
+            IpcOpcode::Hello,
+            42,
+            IpcMessage::new(7, 1, [1, 2, 3, 4]),
+        );
+        assert_eq!(envelope.request_id, 42);
+        assert_eq!(envelope.message.payload[3], 4);
     }
 }
