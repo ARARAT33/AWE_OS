@@ -9,10 +9,10 @@ pub mod ramdisk;
 pub mod vfs;
 
 pub use gpt::{
-    crc32, parse_header, parse_partition, validate_partition_array_crc, GptError, GptHeader,
-    GptPartition,
+    GptError, GptHeader, GptPartition, crc32, parse_header, parse_partition,
+    validate_partition_array_crc,
 };
-pub use ramdisk::{RamBlockDevice, RAMDISK_BLOCKS};
+pub use ramdisk::{RAMDISK_BLOCKS, RamBlockDevice};
 pub use vfs::{FileName, FsError, Inode, JournalRecord, NodeKind, RecoveryAction, Vfs};
 
 pub const BLOCK_SIZE: usize = 4096;
@@ -105,16 +105,12 @@ pub fn scan_gpt<D: BlockDevice>(device: &mut D) -> Result<GptScanSummary, Storag
     }
     let mut entries = [0u8; 16 * 1024];
     let first_block = header.partition_entry_lba / sectors_per_block as u64;
-    let first_sector_in_block = (header.partition_entry_lba % sectors_per_block as u64) as usize
-        * gpt::GPT_SECTOR_SIZE;
+    let first_sector_in_block =
+        (header.partition_entry_lba % sectors_per_block as u64) as usize * gpt::GPT_SECTOR_SIZE;
     let block_count = (first_sector_in_block + entry_bytes).div_ceil(device.block_size());
     for index in 0..block_count {
         device.read_block(first_block + index as u64, &mut block)?;
-        let source_start = if index == 0 {
-            first_sector_in_block
-        } else {
-            0
-        };
+        let source_start = if index == 0 { first_sector_in_block } else { 0 };
         let destination_start = if index == 0 {
             0
         } else {
@@ -173,7 +169,8 @@ mod tests {
         block[header_offset + 88..header_offset + 92].copy_from_slice(&partition_crc.to_le_bytes());
         let mut header_copy = block;
         header_copy[header_offset + 16..header_offset + 20].fill(0);
-        let header_crc = crc32(&header_copy[header_offset..header_offset + gpt::GPT_HEADER_MIN_SIZE]);
+        let header_crc =
+            crc32(&header_copy[header_offset..header_offset + gpt::GPT_HEADER_MIN_SIZE]);
         block[header_offset + 16..header_offset + 20].copy_from_slice(&header_crc.to_le_bytes());
         disk.write_block(0, &block).expect("write GPT");
         let summary = scan_gpt(&mut disk).expect("scan GPT");
