@@ -4,9 +4,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**61.5% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**62% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
-The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 61.5% gate is a hardware-boundary sub-gate between the completed 61.0 Architecture Freeze and the 65% driver execution checkpoint.
+The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 62% gate completes the driver-service resource/capability integration sub-gate after the 61.0 Architecture Freeze and 61.5 device-boundary freeze.
 
 ## Implemented kernel foundations
 
@@ -38,32 +38,35 @@ The percentage follows the AWE_OS 60–100 master plan and advances only when th
 - **60.5 service/process freeze:** explicit service-to-process ownership, service classes, lifecycle states, bounded CPU/memory/IPC budgets, fixed-capacity service registry, canonical seven-service roster, and fail-closed capability admission.
 - **60.6–61.0 transport freeze:** capability handles, service endpoints, versioned HELLO handshake, bounded shared-memory-style rings, async request tracking, event queues, canonical service/channel mapping, and frozen IPC opcode validation.
 - **61.5 device-boundary freeze:** canonical device matching, explicit resource grants, bounded MMIO/I/O/DMA/interrupt ownership accounting, and fail-closed driver binding decisions.
+- **62.0 driver capability integration:** driver grants bind a driver service to an authenticated capability endpoint and one canonical device identity while independently enforcing capability and resource budgets.
 
-## 61.5 milestone — COMPLETE
+## 62.0 milestone — COMPLETE
 
-The 61.5 gate is deliberately hardware-neutral. It completes the common device/driver contract needed before concrete hardware discovery and execution:
+The 62.0 gate prepares the standalone driver service for real hardware execution without counting the 65% PCI/ACPI/VirtIO implementation:
 
-- [x] Stable `DeviceId`, `DeviceClass` and `DeviceState` model.
-- [x] Exact, class and fallback driver matching semantics.
-- [x] Canonical device-to-driver match descriptors.
-- [x] Explicit resource grant contract for MMIO, I/O, DMA and interrupts.
-- [x] Resource ownership is bounded by a device-specific budget.
-- [x] Binding fails closed on identity mismatch or resource over-allocation.
-- [x] Existing bounded device registry remains intact.
-- [x] New primitives are fixed-layout and allocation-free.
-- [x] Unit coverage for strict matching and resource ownership.
+- [x] Driver grants bind to a stable service identity.
+- [x] Driver grants bind to a valid capability endpoint.
+- [x] Driver grants bind to one canonical device identity.
+- [x] MMIO/I/O/DMA/interrupt budgets remain bounded.
+- [x] Capability checks are independent from resource checks.
+- [x] Service, endpoint, device and resource mismatches fail closed.
+- [x] Grant structures are fixed-layout and allocation-free.
+- [x] Deterministic exact/class/fallback matching remains intact.
+- [x] Unit coverage covers service mismatch, endpoint validation, device identity, capability denial and resource exhaustion.
 
-## 61.5 boundary — NOT COUNTED YET
+The detailed specification is `docs/MILESTONE_62_0.md`.
 
-The following remain intentionally reserved for the 65% checkpoint and later production gates:
+## Reserved for 65% checkpoint
+
+The following are deliberately not counted toward 62% and remain the next major validation block:
 
 - PCI/PCIe enumeration;
 - ACPI discovery;
-- APIC/IOAPIC implementation;
-- VirtIO transport and concrete drivers;
-- real hardware driver execution;
-- hardware DMA/IOMMU enforcement;
-- QEMU device certification.
+- APIC/IOAPIC execution;
+- VirtIO transport;
+- concrete VirtIO block/network/input/display drivers;
+- real DMA/IOMMU hardware enforcement;
+- QEMU hardware certification.
 
 ## Driver roadmap
 
@@ -111,9 +114,9 @@ The following remain intentionally reserved for the 65% checkpoint and later pro
 - [ ] Signed/measured release image verification in the boot path.
 - [ ] Automated QEMU boot certification.
 
-## 61.5 milestone boundary
+## 62% milestone boundary
 
-The 61.5 milestone represents completion of the hardware-neutral device boundary required by the master execution order: the kernel can describe devices, define canonical driver matching and account for bounded resource ownership, while concrete PCI/ACPI/VirtIO discovery and driver execution remain outside this gate. No 65% checkpoint work is counted early.
+The 62% milestone represents completion of the driver-service preparation block following the 61.5 device boundary: a driver grant can now be admitted only for the intended service, endpoint and device, with separately enforced capability and resource budgets. Concrete PCI/ACPI/VirtIO discovery and execution remain reserved for the 65% checkpoint.
 
 ## Definition of done
 
