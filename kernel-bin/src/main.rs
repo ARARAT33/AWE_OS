@@ -1,7 +1,10 @@
 #![no_std]
 #![cfg_attr(not(test), no_main)]
 
-use awe_boot_protocol::MemoryRegion;
+use awe_boot_protocol::{Architecture, BootInfo, MemoryRegion, AWE_BOOT_MAGIC};
+use aweos_kernel::entry::{kernel_entry, KernelBootStatus};
+#[cfg(target_arch = "x86_64")]
+use aweos_kernel::memory::activate_bootstrap_identity_map;
 
 const MULTIBOOT2_BOOTLOADER_MAGIC: u32 = 0x36D7_6289;
 const MAX_MEMORY_REGIONS: usize = 128;
