@@ -4,9 +4,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**58% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**60% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
-The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes.
+The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes. The new 60% milestone is earned by a real x86_64 bootstrap paging path, not by documentation alone.
 
 ## Implemented kernel foundations
 
@@ -22,6 +22,9 @@ The percentage is based on implemented product gates, not documentation or archi
 - Typed physical/virtual addresses with overflow-safe alignment.
 - Deterministic early page mapper with duplicate-map rejection and fail-closed validation.
 - Bounded early boot identity mapper with overflow and capacity rejection.
+- x86_64 four-level page-table representation and mapping validation.
+- x86_64 bootstrap identity mapping of the first 1 GiB using 2 MiB pages.
+- Real x86_64 CR3 activation from the CellKernel bootstrap path after boot-protocol validation.
 - x86_64 IDT gate encoding and safe early timer-vector installation primitive.
 - x86_64 CR3/RFLAGS/I/O primitives.
 - Monotonic boot phases and terminal failure state.
@@ -79,15 +82,16 @@ Implemented foundations include cross-OS provenance manifests, verified-only bin
 - [x] AWE image identity and architecture validation contract.
 - [x] Loader-owned memory validation contract.
 - [x] Monotonic boot phases and terminal failure state.
+- [x] Kernel-side x86_64 bootstrap page-table construction and CR3 activation.
 - [ ] Complete x86_64 UEFI boot implementation.
-- [ ] Page-table handoff and CR3 activation from the loader.
+- [ ] Loader-owned page-table handoff and CR3 activation.
 - [ ] Signed/measured release image verification in the boot path.
 - [ ] Automated QEMU boot certification.
+
+## 60% milestone boundary
+
+The 60% milestone now represents a genuine boot execution foundation: Multiboot2 handoff is parsed, the AWE boot contract is validated, usable memory is normalized, CellKernel is entered, and x86_64 bootstrap paging can be constructed and activated before the kernel enters its running halt loop. The remaining work is intentionally larger and includes a kernel heap, interrupt/timer runtime, scheduler execution, syscall trap entry, process/address-space isolation, IPC runtime, PCI/VirtIO transports, storage/network drivers, DMA/IOMMU isolation and automated QEMU certification.
 
 ## Definition of done
 
 AWE_OS is considered product-ready only when the required boot, kernel, driver, security, recovery and release gates are implemented and their automated CI/QEMU validation is green. Documentation or architectural placeholders alone do not satisfy a gate.
-
-## Next 60% gate
-
-The next milestone is a real booted CellKernel execution path: architecture paging activation, kernel heap, IDT/timer integration, scheduler execution, syscall trap entry, process isolation, IPC, and DMA/IOMMU foundations. Documentation alone never advances this percentage.
