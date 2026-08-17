@@ -14,8 +14,9 @@ pub use protocol::{DriverClass, DriverCommand, DriverEvent, DriverId, DriverRepl
 pub use registry::{DriverDescriptor, DriverRegistry, RegistryError};
 pub use supervisor::{DriverSupervisor, SupervisorError};
 
+/// Driver service ABI frozen by the AWE_OS 60.2 contract.
 pub const DRIVERD_ABI_MAJOR: u16 = 1;
-pub const DRIVERD_ABI_MINOR: u16 = 0;
+pub const DRIVERD_ABI_MINOR: u16 = 2;
 pub const MAX_REGISTERED_DRIVERS: usize = 256;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
