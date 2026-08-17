@@ -8,8 +8,7 @@ pub mod ipv4;
 pub mod transport;
 
 pub use transport::{
-    internet_checksum, tcp_header_valid, udp_payload, Endpoint, SocketEntry, SocketTable,
-    Transport,
+    Endpoint, SocketEntry, SocketTable, Transport, internet_checksum, tcp_header_valid, udp_payload,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
