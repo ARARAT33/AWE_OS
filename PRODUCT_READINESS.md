@@ -4,9 +4,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**62% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**62.5% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
-The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 62% gate completes the driver-service resource/capability integration sub-gate after the 61.0 Architecture Freeze and 61.5 device-boundary freeze.
+The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 62.5% gate completes the native driver manifest/lifecycle sub-gate after the 62.0 driver capability/resource boundary and before the 65% hardware execution checkpoint.
 
 ## Implemented kernel foundations
 
@@ -39,10 +39,11 @@ The percentage follows the AWE_OS 60–100 master plan and advances only when th
 - **60.6–61.0 transport freeze:** capability handles, service endpoints, versioned HELLO handshake, bounded shared-memory-style rings, async request tracking, event queues, canonical service/channel mapping, and frozen IPC opcode validation.
 - **61.5 device-boundary freeze:** canonical device matching, explicit resource grants, bounded MMIO/I/O/DMA/interrupt ownership accounting, and fail-closed driver binding decisions.
 - **62.0 driver capability integration:** driver grants bind a driver service to an authenticated capability endpoint and one canonical device identity while independently enforcing capability and resource budgets.
+- **62.5 native driver manifest/lifecycle freeze:** ABI-aware driver manifests, architecture/capability declarations, verified-trust admission, deterministic lifecycle transitions, and registry-level trust/ABI metadata.
 
 ## 62.0 milestone — COMPLETE
 
-The 62.0 gate prepares the standalone driver service for real hardware execution without counting the 65% PCI/ACPI/VirtIO implementation:
+The 62.0 gate prepares the standalone driver service for real hardware execution without counting the 65% PCI/ACPI/VirtIO implementation.
 
 - [x] Driver grants bind to a stable service identity.
 - [x] Driver grants bind to a valid capability endpoint.
@@ -56,9 +57,28 @@ The 62.0 gate prepares the standalone driver service for real hardware execution
 
 The detailed specification is `docs/MILESTONE_62_0.md`.
 
+## 62.5 milestone — COMPLETE
+
+The 62.5 gate freezes the native driver-service contract required immediately before concrete hardware execution:
+
+- [x] Versioned `DriverManifest` with stable identity, class and ABI major/minor.
+- [x] Architecture target mask.
+- [x] Explicit declared capability mask.
+- [x] Verified/unverified/revoked trust state.
+- [x] Fail-closed lifecycle admission for untrusted drivers.
+- [x] Deterministic lifecycle: discover → identify → probe → bind → initialize → run → suspend/resume → stop → remove/recover.
+- [x] Invalid lifecycle transitions rejected.
+- [x] Driver registry stores ABI minor and trust metadata.
+- [x] Unverified driver descriptors rejected at registration.
+- [x] Built-in driver catalog migrated to the native metadata contract.
+- [x] Manifest export from registry descriptors.
+- [x] Unit coverage for lifecycle, trust, manifest and registry invariants.
+
+The detailed specification is `docs/MILESTONE_62_5.md`.
+
 ## Reserved for 65% checkpoint
 
-The following are deliberately not counted toward 62% and remain the next major validation block:
+The following are deliberately not counted toward 62.5% and remain the next major validation block:
 
 - PCI/PCIe enumeration;
 - ACPI discovery;
@@ -114,9 +134,9 @@ The following are deliberately not counted toward 62% and remain the next major 
 - [ ] Signed/measured release image verification in the boot path.
 - [ ] Automated QEMU boot certification.
 
-## 62% milestone boundary
+## 62.5% milestone boundary
 
-The 62% milestone represents completion of the driver-service preparation block following the 61.5 device boundary: a driver grant can now be admitted only for the intended service, endpoint and device, with separately enforced capability and resource budgets. Concrete PCI/ACPI/VirtIO discovery and execution remain reserved for the 65% checkpoint.
+The 62.5% milestone represents completion of the native driver-service contract block after the 62.0 capability/resource boundary: each driver can now be described by versioned ABI, architecture and capability metadata; execution trust is explicit; lifecycle transitions are deterministic; and the bounded driver registry carries the same contract. Concrete hardware discovery and driver execution remain reserved for the 65% checkpoint.
 
 ## Definition of done
 
