@@ -1,32 +1,34 @@
-# AWE_OS 60.5 — System Service / Process Model Freeze
+# AWE_OS 60.5 — Architecture Freeze: Process + Service Ownership
 
 ## Status
 
 **Code milestone: COMPLETE.**
 
-60.5 freezes the process-level contract used by AWE_OS system services. It does not place service implementations back into CellKernel.
+60.5 is the exact midpoint gate inside the **60–61% Architecture Freeze** block from the AWE_OS master plan. It freezes the process/service ownership model without moving driver, application, UI, terminal, compatibility, or update implementations into CellKernel.
 
-## Scope
+## What 60.5 freezes
 
-The kernel now exposes a small, deterministic service-process model:
+- Every system service has a stable `ServiceId`.
+- Every service is owned by exactly one `ProcessId` at runtime.
+- Service class is explicit: Hardware, Application, Interface, Compatibility, System, or Update.
+- Service lifecycle is explicit and deterministic.
+- Service capabilities are explicit and fail closed.
+- CPU, memory and IPC budgets are explicit and bounded.
+- Kernel service metadata is fixed-capacity and allocation-free during bootstrap.
+- Driver/application implementations remain outside CellKernel.
+- A canonical seven-service roster is defined for the platform boundary.
 
-- explicit `ServiceId` ownership;
-- explicit `ProcessId` association;
-- service class classification;
-- explicit lifecycle state;
-- bounded CPU/memory/IPC resource budget;
-- capability set attached to the service process;
-- fail-closed capability admission;
-- no driver/application implementation inside the kernel.
+## Canonical service roster
 
-## Service classes
-
-- `System` — core OS services;
-- `Hardware` — `driverd` and hardware-facing services;
-- `Application` — `appd` and native application services;
-- `Interface` — AYUI and terminal-facing services;
-- `Compatibility` — Linux/Windows/Android/macOS compatibility services;
-- `Update` — AWEUpdate and recovery services.
+| Service | Class | Role |
+|---|---|---|
+| `driverd` | Hardware | isolated driver plane |
+| `appd` | Application | native application/package plane |
+| `asappd` | Application | ASAPP build/development service |
+| `ayuid` | Interface | AYUI UI service |
+| `aweterminald` | Interface | AWETerminal service |
+| `awebusd` | System | system bus/service coordination |
+| `aweupdated` | Update | update/recovery service |
 
 ## Lifecycle
 
@@ -36,20 +38,37 @@ DECLARED → STARTING → RUNNING → STOPPING
                    └────────────→ QUARANTINED
 ```
 
-Only the process/scheduler primitives belong to CellKernel. Service supervisors remain in userspace.
+Only process/scheduler primitives and the minimal service metadata model belong to CellKernel. Service supervisors and implementations remain in user space.
+
+## Resource model
+
+Every service process carries:
+
+- CPU budget;
+- memory budget;
+- IPC message budget;
+- capability set;
+- process owner identity.
+
+The bootstrap model uses bounded quotas; later runtime negotiation may adjust quotas without changing the service ABI.
 
 ## Acceptance criteria
 
-- [x] Service descriptors are fixed-layout and allocation-free.
-- [x] Every service has an explicit process owner.
-- [x] Every service carries a capability set.
-- [x] Every service carries CPU/memory/IPC budgets.
-- [x] Lifecycle transitions are explicit and deterministic.
+- [x] `ServiceDescriptor` is fixed-layout and allocation-free.
+- [x] `ServiceRegistry<N>` is bounded and duplicate-safe.
+- [x] Canonical service IDs/classes are frozen.
+- [x] Service/process ownership is explicit.
+- [x] Lifecycle states are explicit and deterministic.
 - [x] Capability admission fails closed.
+- [x] CPU/memory/IPC quotas are carried with the service descriptor.
 - [x] Driver code remains outside CellKernel.
-- [x] App code remains outside CellKernel.
-- [x] Unit tests cover lifecycle and capability rejection.
+- [x] Application code remains outside CellKernel.
+- [x] Tests cover lifecycle, registry bounds/duplicates, roster stability and capability rejection.
 
-## Next gate: 60.6–60.8
+## Validation rule
 
-The next block implements the execution-side IPC/service boundary: capability handles, service registration/handshake, shared-memory channels and deterministic asynchronous request/event transport.
+This milestone is complete as an engineering/code gate. The headline product percentage remains **60%** until the next substantive product gate in the master plan is implemented and validated.
+
+## Next planned gate
+
+**60.6–60.8:** execution-side IPC/service boundary: capability handles, service registration/handshake, shared-memory channels, deterministic asynchronous request/event transport.
