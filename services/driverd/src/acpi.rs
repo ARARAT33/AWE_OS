@@ -88,12 +88,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn zero_checksum_is_detected() {
+    fn checksum_fixture_is_validated() {
         let mut bytes = [0u8; 12];
         bytes[0..4].copy_from_slice(b"TEST");
         bytes[4..8].copy_from_slice(&(12u32).to_le_bytes());
+        bytes[11] = 180;
         assert!(checksum_ok(&bytes));
-        bytes[11] = 1;
+        bytes[11] = bytes[11].wrapping_add(1);
         assert!(!checksum_ok(&bytes));
     }
 
