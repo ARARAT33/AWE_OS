@@ -145,3 +145,46 @@ pub fn scan_gpt<D: BlockDevice>(device: &mut D) -> Result<GptScanSummary, Storag
 
     Ok(GptScanSummary { header, partitions })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scans_real_gpt_metadata_through_block_device() {
+        let mut disk = RamBlockDevice::default();
+        let mut block = [0u8; BLOCK_SIZE];
+        let entry_offset = 1024usize;
+
+        block[entry_offset] = 1;
+        block[entry_offset + 16] = 2;
+        block[entry_offset + 32..entry_offset + 40].copy_from_slice(&34u64.to_le_bytes());
+        block[entry_offset + 40..entry_offset + 48].copy_from_slice(&100u64.to_le_bytes());
+        let partition_crc = crc32(&block[entry_offset..entry_offset + 128]);
+
+        let header_offset = 512usize;
+        block[header_offset..header_offset + 8].copy_from_slice(&gpt::GPT_SIGNATURE);
+        block[header_offset + 8..header_offset + 12]
+            .copy_from_slice(&gpt::GPT_REVISION_1_0.to_le_bytes());
+        block[header_offset + 12..header_offset + 16]
+            .copy_from_slice(&(gpt::GPT_HEADER_MIN_SIZE as u32).to_le_bytes());
+        block[header_offset + 24..header_offset + 32].copy_from_slice(&1u64.to_le_bytes());
+        block[header_offset + 32..header_offset + 40].copy_from_slice(&511u64.to_le_bytes());
+        block[header_offset + 40..header_offset + 48].copy_from_slice(&34u64.to_le_bytes());
+        block[header_offset + 48..header_offset + 56].copy_from_slice(&480u64.to_le_bytes());
+        block[header_offset + 72..header_offset + 80].copy_from_slice(&2u64.to_le_bytes());
+        block[header_offset + 80..header_offset + 84].copy_from_slice(&1u32.to_le_bytes());
+        block[header_offset + 84..header_offset + 88]
+            .copy_from_slice(&(gpt::GPT_PARTITION_ENTRY_MIN_SIZE as u32).to_le_bytes());
+        block[header_offset + 88..header_offset + 92].copy_from_slice(&partition_crc.to_le_bytes());
+        let mut header_copy = block;
+        header_copy[header_offset + 16..header_offset + 20].fill(0);
+        let header_crc = crc32(&header_copy[header_offset..header_offset + gpt::GPT_HEADER_MIN_SIZE]);
+        block[header_offset + 16..header_offset + 20].copy_from_slice(&header_crc.to_le_bytes());
+
+        disk.write_block(0, &block).expect("write GPT");
+        let summary = scan_gpt(&mut disk).expect("scan GPT");
+        assert_eq!(summary.partitions, 1);
+        assert_eq!(summary.header.partition_count, 1);
+    }
+}
