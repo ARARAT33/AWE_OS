@@ -83,6 +83,12 @@ pub struct Mailbox<const N: usize> {
     head: usize,
     len: usize,
 }
+impl<const N: usize> Default for Mailbox<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> Mailbox<N> {
     pub const fn new() -> Self {
         Self {

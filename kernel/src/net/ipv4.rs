@@ -58,7 +58,7 @@ impl Header {
         self.ihl as usize * 4
     }
 
-    pub fn payload<'a>(self, packet: &'a [u8]) -> Result<&'a [u8], NetError> {
+    pub fn payload(self, packet: &[u8]) -> Result<&[u8], NetError> {
         let h = self.header_len();
         let end = self.total_len as usize;
         if end < h || end > packet.len() {

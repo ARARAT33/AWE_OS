@@ -8,6 +8,12 @@ pub struct BumpAllocator {
     start: AtomicUsize,
     end: AtomicUsize,
 }
+impl Default for BumpAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BumpAllocator {
     pub const fn new() -> Self {
         Self {

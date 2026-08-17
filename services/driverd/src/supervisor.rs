@@ -14,6 +14,12 @@ pub struct DriverSupervisor {
     registry: DriverRegistry,
 }
 
+impl Default for DriverSupervisor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DriverSupervisor {
     pub const fn new() -> Self {
         Self {

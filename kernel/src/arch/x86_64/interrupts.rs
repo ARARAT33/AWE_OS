@@ -19,7 +19,7 @@ mod tests {
     #[test]
     fn timer_vector_is_installed() {
         let mut idt = Idt::new();
-        install_early_interrupts(&mut idt, 0x08, timer as usize as u64);
+        install_early_interrupts(&mut idt, 0x08, timer as *const () as usize as u64);
         assert!(idt.is_present(TIMER_VECTOR));
         assert!(!idt.is_present(33));
     }

@@ -14,6 +14,12 @@ pub struct RunQueue<const N: usize> {
     len: usize,
 }
 
+impl<const N: usize> Default for RunQueue<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> RunQueue<N> {
     pub const fn new() -> Self {
         Self {
@@ -117,6 +123,12 @@ pub struct Scheduler<const N: usize> {
     queue: RunQueue<N>,
     current: Option<ProcessId>,
     reschedule_pending: bool,
+}
+
+impl<const N: usize> Default for Scheduler<N> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<const N: usize> Scheduler<N> {

@@ -19,6 +19,12 @@ pub struct KernelContext {
     progress: BootProgress,
 }
 
+impl Default for KernelContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl KernelContext {
     pub const fn new() -> Self {
         Self {

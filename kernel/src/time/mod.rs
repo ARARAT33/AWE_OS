@@ -22,6 +22,12 @@ pub struct MonotonicClock {
     ticks: u64,
 }
 
+impl Default for MonotonicClock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MonotonicClock {
     pub const fn new() -> Self {
         Self { ticks: 0 }

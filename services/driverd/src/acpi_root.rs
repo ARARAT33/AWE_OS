@@ -79,7 +79,7 @@ pub fn parse_pointer_table<const N: usize>(
     if entry_size != 4 && entry_size != 8 {
         return Err(RsdpError::BadLength);
     }
-    if bytes.len() % entry_size != 0 {
+    if !bytes.len().is_multiple_of(entry_size) {
         return Err(RsdpError::BadLength);
     }
     let count = core::cmp::min(bytes.len() / entry_size, N);

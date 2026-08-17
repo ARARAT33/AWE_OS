@@ -122,6 +122,12 @@ pub struct ServiceRegistry<const N: usize> {
     len: usize,
 }
 
+impl<const N: usize> Default for ServiceRegistry<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> ServiceRegistry<N> {
     pub const fn new() -> Self {
         Self {
@@ -149,10 +155,10 @@ impl<const N: usize> ServiceRegistry<N> {
     pub fn find(&self, service: ServiceId) -> Option<ServiceDescriptor> {
         let mut i = 0;
         while i < self.len {
-            if let Some(entry) = self.entries[i] {
-                if entry.service == service {
-                    return Some(entry);
-                }
+            if let Some(entry) = self.entries[i]
+                && entry.service == service
+            {
+                return Some(entry);
             }
             i += 1;
         }

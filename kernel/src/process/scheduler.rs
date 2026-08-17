@@ -20,6 +20,12 @@ pub struct Scheduler<const N: usize> {
     len: usize,
     ticks: u64,
 }
+impl<const N: usize> Default for Scheduler<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> Scheduler<N> {
     pub const fn new() -> Self {
         Self {

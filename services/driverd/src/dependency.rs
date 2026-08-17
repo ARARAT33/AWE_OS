@@ -43,6 +43,12 @@ pub struct DependencyGraph<const N: usize> {
     len: usize,
 }
 
+impl<const N: usize> Default for DependencyGraph<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> DependencyGraph<N> {
     pub const fn new() -> Self {
         Self {
@@ -58,10 +64,10 @@ impl<const N: usize> DependencyGraph<N> {
     fn requires(&self, driver: DriverId) -> Option<DriverId> {
         let mut i = 0;
         while i < self.len {
-            if let Some(edge) = self.edges[i] {
-                if edge.driver == driver {
-                    return Some(edge.requires);
-                }
+            if let Some(edge) = self.edges[i]
+                && edge.driver == driver
+            {
+                return Some(edge.requires);
             }
             i += 1;
         }

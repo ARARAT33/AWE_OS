@@ -28,6 +28,12 @@ pub struct ProvenanceLog<const N: usize> {
     sequence: u64,
 }
 
+impl<const N: usize> Default for ProvenanceLog<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> ProvenanceLog<N> {
     pub const fn new() -> Self {
         Self {

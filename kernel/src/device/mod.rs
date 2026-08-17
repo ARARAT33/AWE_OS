@@ -80,6 +80,12 @@ pub struct DeviceRegistry<const N: usize> {
     len: usize,
 }
 
+impl<const N: usize> Default for DeviceRegistry<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> DeviceRegistry<N> {
     pub const fn new() -> Self {
         Self {
@@ -106,10 +112,10 @@ impl<const N: usize> DeviceRegistry<N> {
     pub fn find(&self, id: DeviceId) -> Option<&DeviceContract> {
         let mut i = 0;
         while i < self.len {
-            if let Some(device) = &self.devices[i] {
-                if device.id == id {
-                    return Some(device);
-                }
+            if let Some(device) = &self.devices[i]
+                && device.id == id
+            {
+                return Some(device);
             }
             i += 1;
         }
@@ -119,11 +125,11 @@ impl<const N: usize> DeviceRegistry<N> {
     pub fn set_state(&mut self, id: DeviceId, state: DeviceState) -> Result<(), RegistryError> {
         let mut i = 0;
         while i < self.len {
-            if let Some(device) = &mut self.devices[i] {
-                if device.id == id {
-                    device.state = state;
-                    return Ok(());
-                }
+            if let Some(device) = &mut self.devices[i]
+                && device.id == id
+            {
+                device.state = state;
+                return Ok(());
             }
             i += 1;
         }

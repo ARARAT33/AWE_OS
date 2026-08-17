@@ -7,6 +7,12 @@ pub struct PriorityScheduler<const N: usize> {
     tails: [usize; PRIORITY_LEVELS],
     lengths: [usize; PRIORITY_LEVELS],
 }
+impl<const N: usize> Default for PriorityScheduler<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> PriorityScheduler<N> {
     pub const fn new() -> Self {
         Self {

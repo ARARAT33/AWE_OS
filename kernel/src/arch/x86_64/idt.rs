@@ -44,6 +44,12 @@ pub struct Idt {
     entries: [IdtEntry; 256],
 }
 
+impl Default for Idt {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Idt {
     pub const fn new() -> Self {
         Self {
@@ -74,11 +80,13 @@ impl Idt {
     }
 
     pub unsafe fn load(&'static self) {
-        let descriptor = Idtr {
-            limit: (size_of::<Self>() - 1) as u16,
-            base: self as *const _ as u64,
-        };
-        core::arch::asm!("lidt [{}]", in(reg) &descriptor, options(readonly, nostack, preserves_flags));
+        unsafe {
+            let descriptor = Idtr {
+                limit: (size_of::<Self>() - 1) as u16,
+                base: self as *const _ as u64,
+            };
+            core::arch::asm!("lidt [{}]", in(reg) &descriptor, options(readonly, nostack, preserves_flags));
+        }
     }
 }
 
@@ -94,7 +102,7 @@ mod tests {
     extern "C" fn test_handler() {}
     #[test]
     fn interrupt_gate_encodes_handler_address() {
-        let entry = IdtEntry::new(test_handler as usize as u64, 0x08);
+        let entry = IdtEntry::new(test_handler as *const () as usize as u64, 0x08);
         assert!(entry.is_present());
     }
     #[test]

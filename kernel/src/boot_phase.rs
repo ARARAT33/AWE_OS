@@ -36,6 +36,12 @@ pub struct BootProgress {
     phase: BootPhase,
     failure: Option<BootFailure>,
 }
+impl Default for BootProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BootProgress {
     pub const fn new() -> Self {
         Self {

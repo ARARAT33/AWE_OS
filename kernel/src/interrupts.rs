@@ -15,6 +15,12 @@ pub struct InterruptTable {
     handlers: [Option<Handler>; 256],
 }
 
+impl Default for InterruptTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InterruptTable {
     pub const fn new() -> Self {
         Self {

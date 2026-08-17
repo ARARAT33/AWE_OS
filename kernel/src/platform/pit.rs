@@ -27,10 +27,12 @@ impl Pit {
     /// Program channel 0, mode 2 (rate generator), squarely suitable for a
     /// periodic scheduler tick. This only performs hardware I/O on x86_64.
     pub unsafe fn program(&self) {
-        let divisor = (Self::PIT_BASE_HZ / self.frequency_hz).clamp(1, u16::MAX as u32) as u16;
-        io_out8(0x43, 0x34);
-        io_out8(0x40, divisor as u8);
-        io_out8(0x40, (divisor >> 8) as u8);
+        unsafe {
+            let divisor = (Self::PIT_BASE_HZ / self.frequency_hz).clamp(1, u16::MAX as u32) as u16;
+            io_out8(0x43, 0x34);
+            io_out8(0x40, divisor as u8);
+            io_out8(0x40, (divisor >> 8) as u8);
+        }
     }
 }
 

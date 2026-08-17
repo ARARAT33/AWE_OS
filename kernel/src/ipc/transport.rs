@@ -90,6 +90,12 @@ pub struct SharedRing<const N: usize> {
     len: usize,
 }
 
+impl<const N: usize> Default for SharedRing<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> SharedRing<N> {
     pub const fn new() -> Self {
         Self {
@@ -147,6 +153,12 @@ pub struct PendingRequest {
 pub struct AsyncRequests<const N: usize> {
     slots: [Option<PendingRequest>; N],
     len: usize,
+}
+
+impl<const N: usize> Default for AsyncRequests<N> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<const N: usize> AsyncRequests<N> {

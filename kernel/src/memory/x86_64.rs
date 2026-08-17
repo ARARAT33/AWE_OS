@@ -35,23 +35,25 @@ static mut PD: Table = Table::empty();
 /// of physical memory must remain identity-addressable during bootstrap.
 #[inline(never)]
 pub unsafe fn activate_bootstrap_identity_map() {
-    let pml4 = core::ptr::addr_of_mut!(PML4);
-    let pdpt = core::ptr::addr_of_mut!(PDPT);
-    let pd = core::ptr::addr_of_mut!(PD);
+    unsafe {
+        let pml4 = core::ptr::addr_of_mut!(PML4);
+        let pdpt = core::ptr::addr_of_mut!(PDPT);
+        let pd = core::ptr::addr_of_mut!(PD);
 
-    // Non-leaf entries must not carry PS/HUGE; only the PD leafs do.
-    (*pml4).0[0] = (pdpt as u64) | TABLE_FLAGS;
-    (*pdpt).0[0] = (pd as u64) | TABLE_FLAGS;
+        // Non-leaf entries must not carry PS/HUGE; only the PD leafs do.
+        (*pml4).0[0] = (pdpt as u64) | TABLE_FLAGS;
+        (*pdpt).0[0] = (pd as u64) | TABLE_FLAGS;
 
-    // Identity-map 0..1 GiB with 2 MiB leaf entries.
-    let mut index = 0usize;
-    while index < ENTRIES {
-        let physical = (index as u64) * 0x20_0000;
-        (*pd).0[index] = physical | LEAF_FLAGS;
-        index += 1;
+        // Identity-map 0..1 GiB with 2 MiB leaf entries.
+        let mut index = 0usize;
+        while index < ENTRIES {
+            let physical = (index as u64) * 0x20_0000;
+            (*pd).0[index] = physical | LEAF_FLAGS;
+            index += 1;
+        }
+
+        asm!("mov cr3, {0}", in(reg) pml4 as u64, options(nostack, preserves_flags));
     }
-
-    asm!("mov cr3, {0}", in(reg) pml4 as u64, options(nostack, preserves_flags));
 }
 
 /// Return the physical address encoded in a page-table entry.

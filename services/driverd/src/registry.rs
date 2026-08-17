@@ -41,6 +41,12 @@ pub struct DriverRegistry {
     len: usize,
 }
 
+impl Default for DriverRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DriverRegistry {
     pub const fn new() -> Self {
         Self {
@@ -70,10 +76,10 @@ impl DriverRegistry {
     pub fn find(&self, id: DriverId) -> Option<&DriverDescriptor> {
         let mut i = 0;
         while i < self.len {
-            if let Some(entry) = &self.entries[i] {
-                if entry.id == id {
-                    return Some(entry);
-                }
+            if let Some(entry) = &self.entries[i]
+                && entry.id == id
+            {
+                return Some(entry);
             }
             i += 1;
         }
@@ -83,11 +89,11 @@ impl DriverRegistry {
     pub fn set_state(&mut self, id: DriverId, state: DriverState) -> Result<(), RegistryError> {
         let mut i = 0;
         while i < self.len {
-            if let Some(entry) = &mut self.entries[i] {
-                if entry.id == id {
-                    entry.state = state;
-                    return Ok(());
-                }
+            if let Some(entry) = &mut self.entries[i]
+                && entry.id == id
+            {
+                entry.state = state;
+                return Ok(());
             }
             i += 1;
         }

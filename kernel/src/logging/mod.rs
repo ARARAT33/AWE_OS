@@ -27,6 +27,12 @@ pub struct LogRing<const N: usize> {
     dropped: u64,
 }
 
+impl<const N: usize> Default for LogRing<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> LogRing<N> {
     pub const fn new() -> Self {
         Self {

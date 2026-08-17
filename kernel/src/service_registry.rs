@@ -48,10 +48,10 @@ impl<const N: usize> ServiceRegistry<N> {
     pub fn find(&self, service: ServiceId) -> Option<&ServiceDescriptor> {
         let mut i = 0;
         while i < self.len {
-            if let Some(entry) = &self.entries[i] {
-                if entry.service as u16 == service as u16 {
-                    return Some(entry);
-                }
+            if let Some(entry) = &self.entries[i]
+                && entry.service as u16 == service as u16
+            {
+                return Some(entry);
             }
             i += 1;
         }
@@ -65,11 +65,11 @@ impl<const N: usize> ServiceRegistry<N> {
     ) -> Result<(), RegistryError> {
         let mut i = 0;
         while i < self.len {
-            if let Some(entry) = &mut self.entries[i] {
-                if entry.service as u16 == service as u16 {
-                    entry.state = state;
-                    return Ok(());
-                }
+            if let Some(entry) = &mut self.entries[i]
+                && entry.service as u16 == service as u16
+            {
+                entry.state = state;
+                return Ok(());
             }
             i += 1;
         }

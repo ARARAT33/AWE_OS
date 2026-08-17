@@ -10,6 +10,12 @@ pub struct Dispatcher<const N: usize> {
     current: Option<ProcessId>,
 }
 
+impl<const N: usize> Default for Dispatcher<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> Dispatcher<N> {
     pub const fn new() -> Self {
         Self {
@@ -32,10 +38,8 @@ impl<const N: usize> Dispatcher<N> {
     /// process is requeued only when the caller explicitly requests it; this
     /// makes context-switch policy visible rather than implicit.
     pub fn schedule(&mut self, requeue_current: bool) -> Option<ProcessId> {
-        if requeue_current {
-            if let Some(id) = self.current {
-                let _ = self.queue.push(id);
-            }
+        if requeue_current && let Some(id) = self.current {
+            let _ = self.queue.push(id);
         }
         self.current = self.queue.pop();
         self.current
