@@ -54,7 +54,7 @@ pub const MIN_SIGNATURE: usize = 32;
 pub fn validate_package(header: PackageHeader, total_len: usize) -> Result<(), AppError> {
     if header.version == 0 || header.manifest_len as usize > MAX_MANIFEST
         || header.payload_len as usize > MAX_PAYLOAD
-        || header.signature_len as usize < MIN_SIGNATURE { return Err(AppError::InvalidManifest); }
+        || (header.signature_len as usize) < MIN_SIGNATURE { return Err(AppError::InvalidManifest); }
     let expected = PACKAGE_HEADER_SIZE
         .checked_add(header.manifest_len as usize)
         .and_then(|v| v.checked_add(header.payload_len as usize))
