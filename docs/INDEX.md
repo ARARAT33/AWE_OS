@@ -8,6 +8,7 @@ This directory is the engineering documentation surface for AWE_OS. Code is auth
 2. [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) — implementation status snapshot.
 3. [PRODUCT_READINESS.md](../PRODUCT_READINESS.md) — product gates and evidence standard.
 4. [AWE_OS_100_PERCENT_MASTER_PLAN.md](AWE_OS_100_PERCENT_MASTER_PLAN.md) — complete roadmap to 1.0.
+5. [MILESTONE_60_2.md](MILESTONE_60_2.md) — implemented 60.2 CellKernel/service contract freeze.
 
 ## Boot and kernel
 
