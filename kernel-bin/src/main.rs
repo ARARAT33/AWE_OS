@@ -84,23 +84,27 @@ _start:
 
     # Enable PAE and long mode.
     mov eax, cr4
-    or eax, 1 << 5
+    or eax, 0x20
     mov cr4, eax
 
     mov ecx, 0xC0000080
     rdmsr
-    or eax, 1 << 8
+    or eax, 0x100
     wrmsr
 
     mov eax, cr0
-    or eax, 1 << 31
+    or eax, 0x80000000
     mov cr0, eax
 
     # Temporary 64-bit GDT: null, 64-bit code, data.
     lgdt [gdt64_descriptor]
-    push 0x08
-    push long_mode_entry
-    retf
+
+    # Encode an absolute far jump directly. This is a 32-bit-mode
+    # far jump to the 64-bit code descriptor and avoids assembler
+    # syntax differences for ljmp/far jumps.
+    .byte 0xEA
+    .long long_mode_entry
+    .word 0x08
 
 .code64
 long_mode_entry:
