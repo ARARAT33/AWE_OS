@@ -24,20 +24,23 @@ static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] =
 #[unsafe(no_mangle)]
 static MULTIBOOT2_HEADER: [u32; 4] = [0xE852_50D6, 0, 16, 0x17AD_AF1A];
 
-#[cfg(not(test))]
-#[unsafe(link_section = ".bss.boot")]
-#[unsafe(no_mangle)]
-static mut BOOT_PML4: [u64; 512] = [0; 512];
+#[repr(C, align(4096))]
+struct BootPageTable([u64; 512]);
 
 #[cfg(not(test))]
 #[unsafe(link_section = ".bss.boot")]
 #[unsafe(no_mangle)]
-static mut BOOT_PDPT: [u64; 512] = [0; 512];
+static mut BOOT_PML4: BootPageTable = BootPageTable([0; 512]);
 
 #[cfg(not(test))]
 #[unsafe(link_section = ".bss.boot")]
 #[unsafe(no_mangle)]
-static mut BOOT_PD: [u64; 512] = [0; 512];
+static mut BOOT_PDPT: BootPageTable = BootPageTable([0; 512]);
+
+#[cfg(not(test))]
+#[unsafe(link_section = ".bss.boot")]
+#[unsafe(no_mangle)]
+static mut BOOT_PD: BootPageTable = BootPageTable([0; 512]);
 
 #[cfg(not(test))]
 #[unsafe(link_section = ".bss.stack")]
@@ -101,7 +104,7 @@ _start:
 
     # Temporary 64-bit GDT: null, 64-bit code, data.
     lgdt [gdt64_descriptor]
-    jmp 0x08:long_mode_entry
+    ljmp 0x08, long_mode_entry
 
 .code64
 long_mode_entry:
