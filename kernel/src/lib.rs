@@ -21,6 +21,7 @@ pub mod process;
 pub mod runtime;
 pub mod scheduler;
 pub mod security;
+pub mod service;
 pub mod storage;
 pub mod system_contract;
 pub mod syscall;
