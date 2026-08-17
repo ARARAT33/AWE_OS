@@ -3,7 +3,7 @@
 //! Capability-oriented identity primitives for userspace services.
 
 pub const IDENTITY_ABI_MAJOR: u16 = 1;
-pub const IDENTITY_ABI_MINOR: u16 = 1;
+pub const IDENTITY_ABI_MINOR: u16 = 2;
 pub const MAX_GROUPS: usize = 16;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,7 +25,13 @@ pub const fn validate_group(group: GroupId) -> Result<(), IdentityError> {
     if group.0 == u32::MAX { Err(IdentityError::InvalidGroup) } else { Ok(()) }
 }
 
+pub const fn validate_credential(credential: Credential) -> Result<(), IdentityError> {
+    validate_user(credential.user)?;
+    validate_group(credential.primary_group)
+}
+
 pub const fn authorize(credential: Credential, required: u64) -> Result<(), IdentityError> {
+    validate_credential(credential)?;
     if credential.capability_mask & required == required { Ok(()) } else { Err(IdentityError::CapabilityDenied) }
 }
 
@@ -41,6 +47,21 @@ impl GroupSet {
         if self.len == MAX_GROUPS { return Err(IdentityError::TooManyGroups); }
         self.groups[self.len] = group;
         self.len += 1;
+        Ok(())
+    }
+    pub fn remove(&mut self, group: GroupId) -> Result<(), IdentityError> {
+        validate_group(group)?;
+        let mut i = 0;
+        while i < self.len {
+            if self.groups[i] == group {
+                let last = self.len - 1;
+                self.groups[i] = self.groups[last];
+                self.groups[last] = GroupId(0);
+                self.len -= 1;
+                return Ok(());
+            }
+            i += 1;
+        }
         Ok(())
     }
     pub const fn contains(&self, group: GroupId) -> bool {
@@ -64,11 +85,18 @@ mod tests {
         assert!(authorize(c, 0b010).is_err());
     }
     #[test]
+    fn invalid_credential_is_rejected_before_authorization() {
+        let c = Credential { user: UserId(u32::MAX), primary_group: GroupId(1), capability_mask: u64::MAX };
+        assert_eq!(authorize(c, 1), Err(IdentityError::InvalidUser));
+    }
+    #[test]
     fn group_membership_is_bounded_and_deduplicated() {
         let mut groups = GroupSet::new();
         assert!(groups.add(GroupId(7)).is_ok());
         assert!(groups.add(GroupId(7)).is_ok());
         assert_eq!(groups.len(), 1);
         assert!(groups.contains(GroupId(7)));
+        assert!(groups.remove(GroupId(7)).is_ok());
+        assert!(groups.is_empty());
     }
 }
