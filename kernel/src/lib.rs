@@ -18,5 +18,6 @@ pub mod runtime;
 pub mod scheduler;
 pub mod security;
 pub mod storage;
+pub mod system_contract;
 pub mod syscall;
 pub mod time;
