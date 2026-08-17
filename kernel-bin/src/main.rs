@@ -1,8 +1,8 @@
 #![no_std]
 #![cfg_attr(not(test), no_main)]
 
-use awe_boot_protocol::{Architecture, BootInfo, MemoryRegion, AWE_BOOT_MAGIC};
-use aweos_kernel::entry::{kernel_entry, KernelBootStatus};
+use awe_boot_protocol::{AWE_BOOT_MAGIC, Architecture, BootInfo, MemoryRegion};
+use aweos_kernel::entry::{KernelBootStatus, kernel_entry};
 #[cfg(target_arch = "x86_64")]
 use aweos_kernel::memory::activate_bootstrap_identity_map;
 
