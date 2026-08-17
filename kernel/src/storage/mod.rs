@@ -114,8 +114,7 @@ pub fn scan_gpt<D: BlockDevice>(device: &mut D) -> Result<GptScanSummary, Storag
     let first_block = header.partition_entry_lba / sectors_per_block as u64;
     let first_sector_in_block =
         (header.partition_entry_lba % sectors_per_block as u64) as usize * gpt::GPT_SECTOR_SIZE;
-    let block_count =
-        (first_sector_in_block + entry_bytes + device.block_size() - 1) / device.block_size();
+    let block_count = (first_sector_in_block + entry_bytes).div_ceil(device.block_size());
     for index in 0..block_count {
         device.read_block(first_block + index as u64, &mut block)?;
         let source_start = if index == 0 { first_sector_in_block } else { 0 };
