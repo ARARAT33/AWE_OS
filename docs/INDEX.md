@@ -9,6 +9,7 @@ This directory is the engineering documentation surface for AWE_OS. Code is auth
 3. [PRODUCT_READINESS.md](../PRODUCT_READINESS.md) — product gates and evidence standard.
 4. [AWE_OS_100_PERCENT_MASTER_PLAN.md](AWE_OS_100_PERCENT_MASTER_PLAN.md) — complete roadmap to 1.0.
 5. [MILESTONE_60_2.md](MILESTONE_60_2.md) — implemented 60.2 CellKernel/service contract freeze.
+6. [MILESTONE_60_5.md](MILESTONE_60_5.md) — implemented 60.5 system service/process model freeze.
 
 ## Boot and kernel
 
