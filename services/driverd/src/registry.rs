@@ -4,6 +4,7 @@ use crate::{DriverClass, DriverId, DriverState, MAX_REGISTERED_DRIVERS};
 pub struct DriverDescriptor {
     pub id: DriverId,
     pub class: DriverClass,
+    pub abi_major: u16,
     pub vendor: u16,
     pub device: u16,
     pub state: DriverState,
@@ -22,10 +23,7 @@ pub struct DriverRegistry {
 }
 
 impl DriverRegistry {
-    pub const fn new() -> Self {
-        Self { entries: [None; MAX_REGISTERED_DRIVERS], len: 0 }
-    }
-
+    pub const fn new() -> Self { Self { entries: [None; MAX_REGISTERED_DRIVERS], len: 0 } }
     pub const fn len(&self) -> usize { self.len }
 
     pub fn register(&mut self, descriptor: DriverDescriptor) -> Result<(), RegistryError> {
@@ -39,9 +37,7 @@ impl DriverRegistry {
     pub fn find(&self, id: DriverId) -> Option<&DriverDescriptor> {
         let mut i = 0;
         while i < self.len {
-            if let Some(entry) = &self.entries[i] {
-                if entry.id == id { return Some(entry); }
-            }
+            if let Some(entry) = &self.entries[i] { if entry.id == id { return Some(entry); } }
             i += 1;
         }
         None
@@ -51,10 +47,7 @@ impl DriverRegistry {
         let mut i = 0;
         while i < self.len {
             if let Some(entry) = &mut self.entries[i] {
-                if entry.id == id {
-                    entry.state = state;
-                    return Ok(());
-                }
+                if entry.id == id { entry.state = state; return Ok(()); }
             }
             i += 1;
         }
@@ -65,18 +58,11 @@ impl DriverRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn registry_is_bounded() {
         let mut r = DriverRegistry::new();
         let id = DriverId(1);
-        assert!(r.register(DriverDescriptor {
-            id,
-            class: DriverClass::Virtio,
-            vendor: 0x1af4,
-            device: 0x1001,
-            state: DriverState::Discovered,
-        }).is_ok());
+        assert!(r.register(DriverDescriptor { id, class: DriverClass::Virtio, abi_major: 1, vendor: 0x1af4, device: 0x1001, state: DriverState::Discovered }).is_ok());
         assert_eq!(r.set_state(id, DriverState::Running), Ok(()));
         assert_eq!(r.find(id).unwrap().state, DriverState::Running);
     }
