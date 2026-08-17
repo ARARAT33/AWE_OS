@@ -1,0 +1,9 @@
+[package]
+name = "awe-appd"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "awe_appd"
+path = "src/lib.rs"
