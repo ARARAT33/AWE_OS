@@ -6,7 +6,7 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 **60% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
-The percentage is based on implemented product gates, not documentation or architectural stubs. The 60% milestone is earned by a real x86_64 bootstrap paging path. Sub-milestones such as 60.2 describe completed engineering gates inside that 60% band and do not inflate the headline percentage by themselves.
+The percentage is based on implemented product gates, not documentation or architectural stubs. The 60% milestone is earned by a real x86_64 bootstrap paging path. Sub-milestones such as 60.2 and 60.5 describe completed engineering gates inside that 60% band and do not inflate the headline percentage by themselves.
 
 ## Implemented kernel foundations
 
@@ -35,6 +35,7 @@ The percentage is based on implemented product gates, not documentation or archi
 - AWE Capsule and XenoSense security foundations.
 - Cloud CI security/release gates.
 - **60.2 service-contract freeze:** CellKernel ABI 1.2, typed service IDs, explicit capability admission, and typed IPC channels/opcodes.
+- **60.5 service/process freeze:** explicit service-to-process ownership, service classes, lifecycle states, bounded CPU/memory/IPC budgets, and fail-closed capability admission.
 
 ## 60.2 milestone — COMPLETE
 
@@ -52,6 +53,22 @@ The 60.2 gate freezes the minimal kernel-to-service boundary:
 - [x] Unit coverage for capability, version and IPC invariants.
 
 The detailed specification is `docs/MILESTONE_60_2.md`.
+
+## 60.5 milestone — COMPLETE (engineering gate)
+
+The 60.5 gate freezes the process-level model for all system services without moving service implementations into CellKernel:
+
+- [x] `ServiceDescriptor` with stable `ServiceId` and owning `ProcessId`.
+- [x] Explicit service classes: system, hardware, application, interface, compatibility and update.
+- [x] Explicit lifecycle: declared, starting, running, stopping, failed, quarantined.
+- [x] Per-service CPU, memory and IPC budgets.
+- [x] Capability set attached to each service process.
+- [x] Fail-closed capability admission before startup.
+- [x] Allocation-free fixed-layout service descriptors.
+- [x] Unit tests for lifecycle and capability rejection.
+- [x] CellKernel remains driver/application implementation free.
+
+The detailed specification is `docs/MILESTONE_60_5.md`.
 
 ## Hardware and driver intelligence
 
