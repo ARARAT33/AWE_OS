@@ -1,5 +1,3 @@
-#![no_std]
-
 //! Driver-service hardware access contract.
 //!
 //! This is the execution-facing metadata layer for 64.0. It does not touch
@@ -25,13 +23,18 @@ pub struct AccessRegion {
 }
 
 impl AccessRegion {
-    pub const fn valid(self) -> bool {
+    pub fn valid(self) -> bool {
         self.length != 0 && self.base.checked_add(self.length).is_some()
     }
 
-    pub const fn contains(self, offset: u64, width: u64) -> bool {
-        if width == 0 || offset > self.length { return false; }
-        offset.checked_add(width).map_or(false, |end| end <= self.length)
+    pub fn contains(self, offset: u64, width: u64) -> bool {
+        if width == 0 || offset > self.length {
+            return false;
+        }
+        match offset.checked_add(width) {
+            Some(end) => end <= self.length,
+            None => false,
+        }
     }
 }
 
@@ -53,7 +56,9 @@ pub struct InterruptOwnership {
 }
 
 impl InterruptOwnership {
-    pub const fn valid(self) -> bool { self.vector != 0 }
+    pub fn valid(self) -> bool {
+        self.vector != 0
+    }
 }
 
 #[repr(u8)]
@@ -66,14 +71,18 @@ pub enum PowerState {
 }
 
 pub const fn power_transition_allowed(current: PowerState, next: PowerState) -> bool {
-    if current as u8 == next as u8 { return true; }
-    matches!((current, next),
+    if current as u8 == next as u8 {
+        return true;
+    }
+    matches!(
+        (current, next),
         (PowerState::D0, PowerState::D1)
-        | (PowerState::D1, PowerState::D0)
-        | (PowerState::D1, PowerState::D2)
-        | (PowerState::D2, PowerState::D1)
-        | (PowerState::D2, PowerState::D3)
-        | (PowerState::D3, PowerState::D2))
+            | (PowerState::D1, PowerState::D0)
+            | (PowerState::D1, PowerState::D2)
+            | (PowerState::D2, PowerState::D1)
+            | (PowerState::D2, PowerState::D3)
+            | (PowerState::D3, PowerState::D2)
+    )
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,7 +95,7 @@ pub struct HardwareAccessPlan {
 }
 
 impl HardwareAccessPlan {
-    pub const fn valid(self) -> bool {
+    pub fn valid(self) -> bool {
         self.mmio.driver == self.driver
             && self.pio.driver == self.driver
             && self.interrupt.driver == self.driver
@@ -102,17 +111,40 @@ mod tests {
 
     #[test]
     fn region_bounds_are_overflow_safe() {
-        let region = AccessRegion { driver: DriverId(1), base: 0x1000, length: 0x100, kind: AccessKind::Mmio };
+        let region = AccessRegion {
+            driver: DriverId(1),
+            base: 0x1000,
+            length: 0x100,
+            kind: AccessKind::Mmio,
+        };
         assert!(region.valid());
         assert!(region.contains(0x20, 4));
         assert!(!region.contains(0xff, 2));
-        assert!(!AccessRegion { driver: DriverId(1), base: u64::MAX, length: 2, kind: AccessKind::Mmio }.valid());
+        assert!(!AccessRegion {
+            driver: DriverId(1),
+            base: u64::MAX,
+            length: 2,
+            kind: AccessKind::Mmio,
+        }
+        .valid());
     }
 
     #[test]
     fn interrupt_ownership_is_explicit() {
-        assert!(!InterruptOwnership { driver: DriverId(1), vector: 0, mode: InterruptMode::Msi, shared: false }.valid());
-        assert!(InterruptOwnership { driver: DriverId(1), vector: 32, mode: InterruptMode::MsiX, shared: false }.valid());
+        assert!(!InterruptOwnership {
+            driver: DriverId(1),
+            vector: 0,
+            mode: InterruptMode::Msi,
+            shared: false,
+        }
+        .valid());
+        assert!(InterruptOwnership {
+            driver: DriverId(1),
+            vector: 32,
+            mode: InterruptMode::MsiX,
+            shared: false,
+        }
+        .valid());
     }
 
     #[test]
