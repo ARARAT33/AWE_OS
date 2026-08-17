@@ -8,7 +8,7 @@
 //! kernel.
 
 use crate::process::{ProcessId, ResourceBudget};
-use crate::system_contract::{CapabilitySet, KernelCapability, ServiceId, ServiceContract, APPD_CONTRACT, ASAPPD_CONTRACT, AYUID_CONTRACT, DRIVERD_CONTRACT};
+use crate::system_contract::{CapabilitySet, KernelCapability, ServiceId, ServiceContract, APPD_CONTRACT, ASAPPD_CONTRACT, AWEBUSD_CONTRACT, AWEUPDATED_CONTRACT, AWETERMINALD_CONTRACT, AYUID_CONTRACT, DRIVERD_CONTRACT};
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -148,13 +148,15 @@ pub const SERVICE_CLASSES: [ServiceClass; SERVICE_COUNT] = [
     ServiceClass::Update,
 ];
 
-pub const fn required_contract(service: ServiceId) -> Option<ServiceContract> {
+pub const fn required_contract(service: ServiceId) -> ServiceContract {
     match service {
-        ServiceId::Driverd => Some(DRIVERD_CONTRACT),
-        ServiceId::Appd => Some(APPD_CONTRACT),
-        ServiceId::Asappd => Some(ASAPPD_CONTRACT),
-        ServiceId::Ayuid => Some(AYUID_CONTRACT),
-        _ => None,
+        ServiceId::Driverd => DRIVERD_CONTRACT,
+        ServiceId::Appd => APPD_CONTRACT,
+        ServiceId::Asappd => ASAPPD_CONTRACT,
+        ServiceId::Ayuid => AYUID_CONTRACT,
+        ServiceId::Aweterminald => AWETERMINALD_CONTRACT,
+        ServiceId::Awebusd => AWEBUSD_CONTRACT,
+        ServiceId::Aweupdated => AWEUPDATED_CONTRACT,
     }
 }
 
@@ -207,13 +209,15 @@ mod tests {
     }
 
     #[test]
-    fn canonical_roster_is_stable() {
+    fn canonical_roster_and_contracts_are_stable() {
         assert_eq!(SERVICE_IDS.len(), SERVICE_COUNT);
         assert_eq!(SERVICE_CLASSES.len(), SERVICE_COUNT);
-        assert_eq!(required_contract(ServiceId::Driverd), Some(DRIVERD_CONTRACT));
-        assert_eq!(required_contract(ServiceId::Appd), Some(APPD_CONTRACT));
-        assert_eq!(required_contract(ServiceId::Asappd), Some(ASAPPD_CONTRACT));
-        assert_eq!(required_contract(ServiceId::Ayuid), Some(AYUID_CONTRACT));
-        assert!(required_contract(ServiceId::Aweterminald).is_none());
+        for service in SERVICE_IDS {
+            assert_eq!(required_contract(service).service, service);
+        }
+        assert_eq!(required_contract(ServiceId::Driverd), DRIVERD_CONTRACT);
+        assert_eq!(required_contract(ServiceId::Aweterminald), AWETERMINALD_CONTRACT);
+        assert_eq!(required_contract(ServiceId::Awebusd), AWEBUSD_CONTRACT);
+        assert_eq!(required_contract(ServiceId::Aweupdated), AWEUPDATED_CONTRACT);
     }
 }
