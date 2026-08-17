@@ -1,6 +1,9 @@
 #![no_std]
 #![allow(dead_code)]
 #![allow(unused_attributes)]
+#![allow(clippy::missing_safety_doc)]
+#![allow(clippy::len_without_is_empty)]
+#![allow(clippy::module_inception)]
 
 // CellKernel is intentionally hardware-driver free.
 // All hardware discovery, driver lifecycle, compatibility adapters and
