@@ -1,5 +1,3 @@
-#![no_std]
-
 //! AWE 63.0 driver dependency, ownership and health contract.
 //! Concrete hardware discovery/execution remains outside this contract.
 
@@ -21,7 +19,7 @@ pub struct ResourceOwnership {
 }
 
 impl ResourceOwnership {
-    pub const fn within(self, budget: ResourceOwnership) -> bool {
+    pub fn within(self, budget: ResourceOwnership) -> bool {
         self.driver == budget.driver
             && self.mmio_bytes <= budget.mmio_bytes
             && self.io_bytes <= budget.io_bytes
@@ -31,7 +29,12 @@ impl ResourceOwnership {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DependencyError { SelfDependency, Cycle, MissingDependency, ResourceExceeded }
+pub enum DependencyError {
+    SelfDependency,
+    Cycle,
+    MissingDependency,
+    ResourceExceeded,
+}
 
 /// Bounded dependency table. It intentionally rejects self-dependencies and
 /// simple transitive cycles before a driver is admitted to the service plane.
@@ -41,14 +44,24 @@ pub struct DependencyGraph<const N: usize> {
 }
 
 impl<const N: usize> DependencyGraph<N> {
-    pub const fn new() -> Self { Self { edges: [None; N], len: 0 } }
-    pub const fn len(&self) -> usize { self.len }
+    pub const fn new() -> Self {
+        Self {
+            edges: [None; N],
+            len: 0,
+        }
+    }
+
+    pub const fn len(&self) -> usize {
+        self.len
+    }
 
     fn requires(&self, driver: DriverId) -> Option<DriverId> {
         let mut i = 0;
         while i < self.len {
             if let Some(edge) = self.edges[i] {
-                if edge.driver == driver { return Some(edge.requires); }
+                if edge.driver == driver {
+                    return Some(edge.requires);
+                }
             }
             i += 1;
         }
@@ -56,22 +69,34 @@ impl<const N: usize> DependencyGraph<N> {
     }
 
     pub fn add(&mut self, dependency: DriverDependency) -> Result<(), DependencyError> {
-        if dependency.driver == dependency.requires { return Err(DependencyError::SelfDependency); }
+        if dependency.driver == dependency.requires {
+            return Err(DependencyError::SelfDependency);
+        }
+
         let mut cursor = dependency.requires;
         let mut steps = 0;
         while let Some(next) = self.requires(cursor) {
-            if next == dependency.driver { return Err(DependencyError::Cycle); }
+            if next == dependency.driver {
+                return Err(DependencyError::Cycle);
+            }
             cursor = next;
             steps += 1;
-            if steps >= N { return Err(DependencyError::Cycle); }
+            if steps >= N {
+                return Err(DependencyError::Cycle);
+            }
         }
-        if self.len == N { return Err(DependencyError::MissingDependency); }
+
+        if self.len == N {
+            return Err(DependencyError::MissingDependency);
+        }
         self.edges[self.len] = Some(dependency);
         self.len += 1;
         Ok(())
     }
 
-    pub fn dependency_of(&self, driver: DriverId) -> Option<DriverId> { self.requires(driver) }
+    pub fn dependency_of(&self, driver: DriverId) -> Option<DriverId> {
+        self.requires(driver)
+    }
 }
 
 #[repr(C)]
@@ -86,11 +111,22 @@ pub struct DriverHealth {
 
 impl DriverHealth {
     pub const fn new(driver: DriverId) -> Self {
-        Self { driver, state: DriverState::Discovered, consecutive_failures: 0, restart_count: 0, heartbeat_budget: 0 }
+        Self {
+            driver,
+            state: DriverState::Discovered,
+            consecutive_failures: 0,
+            restart_count: 0,
+            heartbeat_budget: 0,
+        }
     }
 
     pub const fn record_success(self) -> Self {
-        Self { state: DriverState::Running, consecutive_failures: 0, heartbeat_budget: self.heartbeat_budget, ..self }
+        Self {
+            state: DriverState::Running,
+            consecutive_failures: 0,
+            heartbeat_budget: self.heartbeat_budget,
+            ..self
+        }
     }
 
     pub const fn record_failure(self) -> Self {
@@ -123,18 +159,58 @@ mod tests {
     #[test]
     fn dependency_graph_rejects_self_and_cycles() {
         let mut graph: DependencyGraph<4> = DependencyGraph::new();
-        assert_eq!(graph.add(DriverDependency { driver: DriverId(1), requires: DriverId(1) }), Err(DependencyError::SelfDependency));
-        assert_eq!(graph.add(DriverDependency { driver: DriverId(1), requires: DriverId(2) }), Ok(()));
-        assert_eq!(graph.add(DriverDependency { driver: DriverId(2), requires: DriverId(3) }), Ok(()));
-        assert_eq!(graph.add(DriverDependency { driver: DriverId(3), requires: DriverId(1) }), Err(DependencyError::Cycle));
+        assert_eq!(
+            graph.add(DriverDependency {
+                driver: DriverId(1),
+                requires: DriverId(1),
+            }),
+            Err(DependencyError::SelfDependency)
+        );
+        assert_eq!(
+            graph.add(DriverDependency {
+                driver: DriverId(1),
+                requires: DriverId(2),
+            }),
+            Ok(())
+        );
+        assert_eq!(
+            graph.add(DriverDependency {
+                driver: DriverId(2),
+                requires: DriverId(3),
+            }),
+            Ok(())
+        );
+        assert_eq!(
+            graph.add(DriverDependency {
+                driver: DriverId(3),
+                requires: DriverId(1),
+            }),
+            Err(DependencyError::Cycle)
+        );
     }
 
     #[test]
     fn ownership_is_bounded_per_driver() {
-        let budget = ResourceOwnership { driver: DriverId(5), mmio_bytes: 4096, io_bytes: 128, dma_bytes: 8192, interrupt_count: 4 };
-        let granted = ResourceOwnership { driver: DriverId(5), mmio_bytes: 1024, io_bytes: 64, dma_bytes: 4096, interrupt_count: 2 };
+        let budget = ResourceOwnership {
+            driver: DriverId(5),
+            mmio_bytes: 4096,
+            io_bytes: 128,
+            dma_bytes: 8192,
+            interrupt_count: 4,
+        };
+        let granted = ResourceOwnership {
+            driver: DriverId(5),
+            mmio_bytes: 1024,
+            io_bytes: 64,
+            dma_bytes: 4096,
+            interrupt_count: 2,
+        };
         assert!(granted.within(budget));
-        assert!(!ResourceOwnership { driver: DriverId(6), ..granted }.within(budget));
+        assert!(!ResourceOwnership {
+            driver: DriverId(6),
+            ..granted
+        }
+        .within(budget));
     }
 
     #[test]
