@@ -1,4 +1,6 @@
 #![no_std]
+#![allow(dead_code)]
+#![allow(unused_attributes)]
 
 //! AWE Driver Microkernel (driverd): isolated, restartable hardware plane.
 //! CellKernel owns only capabilities/IPC; concrete hardware discovery and
