@@ -5,7 +5,7 @@
 
 use super::{BlockDevice, StorageError, BLOCK_SIZE};
 
-pub const RAMDISK_BLOCKS: usize = 256;
+pub const RAMDISK_BLOCKS: usize = 64;
 
 pub struct RamBlockDevice {
     data: [u8; RAMDISK_BLOCKS * BLOCK_SIZE],
