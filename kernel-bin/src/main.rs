@@ -12,6 +12,8 @@ const MULTIBOOT2_BOOTLOADER_MAGIC: u32 = 0x36D7_6289;
 const MAX_MEMORY_REGIONS: usize = 128;
 const FALLBACK_MEMORY_BASE: u64 = 0x0100_0000;
 const FALLBACK_MEMORY_LENGTH: u64 = 0x0200_0000;
+const MULTIBOOT2_MIN_SIZE: usize = 16;
+const MULTIBOOT2_MAX_SIZE: usize = 1024 * 1024;
 
 static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] =
     [MemoryRegion { base: 0, length: 0, kind: 2, reserved: 0 }; MAX_MEMORY_REGIONS];
@@ -137,10 +139,10 @@ gdt64:
     .quad 0x00AF9A000000FFFF
 gdt64_data:
     .quad 0x00CF92000000FFFF
-gdt64_descriptor:
-    .word gdt64_data - gdt64 - 1
-    .quad gdt64
 gdt64_end:
+gdt64_descriptor:
+    .word gdt64_end - gdt64 - 1
+    .quad gdt64
 
 .size _start, .-_start
 "#
@@ -151,21 +153,23 @@ fn main() {}
 
 #[cfg(not(test))]
 #[unsafe(no_mangle)]
-pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u32) -> ! {
+pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u64) -> ! {
     serial_init();
     serial_write(b"AWEOS CellKernel\r\n");
     serial_write(b"AWEOS boot: x86_64 Multiboot2 entry\r\n");
 
     if boot_magic != MULTIBOOT2_BOOTLOADER_MAGIC {
         serial_write(b"AWEOS: Multiboot2 magic mismatch\r\n");
+        serial_write(b"AWEOS: boot handoff rejected\r\n");
+        halt_forever();
     }
 
-    let info = if boot_magic == MULTIBOOT2_BOOTLOADER_MAGIC && boot_info_addr != 0 {
-        parse_multiboot2(boot_info_addr as usize)
-    } else {
+    if boot_info_addr == 0 {
         serial_write(b"AWEOS: invalid Multiboot2 handoff\r\n");
-        BootInfo::empty(Architecture::X86_64)
-    };
+        halt_forever();
+    }
+
+    let info = parse_multiboot2(boot_info_addr as usize);
 
     match kernel_entry(&info) {
         KernelBootStatus::Ready => {
@@ -177,17 +181,30 @@ pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u32) -> ! {
             serial_write(b"AWEOS: x86_64 bootstrap paging = ACTIVE\r\n");
             serial_write(b"AWEOS: kernel state = RUNNING\r\n");
         }
-        KernelBootStatus::InvalidBootInfo => serial_write(b"AWEOS: invalid boot info\r\n"),
-        KernelBootStatus::UnsupportedArchitecture => {
-            serial_write(b"AWEOS: unsupported architecture\r\n")
+        KernelBootStatus::InvalidBootInfo => {
+            serial_write(b"AWEOS: invalid boot info\r\n");
+            halt_forever();
         }
-        KernelBootStatus::NoCpu => serial_write(b"AWEOS: no CPU reported\r\n"),
+        KernelBootStatus::UnsupportedArchitecture => {
+            serial_write(b"AWEOS: unsupported architecture\r\n");
+            halt_forever();
+        }
+        KernelBootStatus::NoCpu => {
+            serial_write(b"AWEOS: no CPU reported\r\n");
+            halt_forever();
+        }
         KernelBootStatus::NoUsableMemory => {
-            serial_write(b"AWEOS: no usable memory reported\r\n")
+            serial_write(b"AWEOS: no usable memory reported\r\n");
+            halt_forever();
         }
     }
 
     serial_write(b"AWEOS: kernel is alive\r\n");
+    halt_forever();
+}
+
+#[cfg(not(test))]
+fn halt_forever() -> ! {
     loop {
         unsafe { core::arch::asm!("hlt", options(nomem, nostack, preserves_flags)); }
     }
@@ -200,7 +217,7 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
     }
 
     let total_size = unsafe { core::ptr::read_unaligned(addr as *const u32) } as usize;
-    if !(16..=1024 * 1024).contains(&total_size) {
+    if !(MULTIBOOT2_MIN_SIZE..=MULTIBOOT2_MAX_SIZE).contains(&total_size) {
         return BootInfo::empty(Architecture::X86_64);
     }
 
@@ -215,6 +232,7 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
         mut framebuffer_pitch,
         mut acpi_rsdp,
     ) = (0u64, 0u64, 0u32, 0u32, 0u32, 0u64);
+    let mut saw_end_tag = false;
 
     let mut offset = 8usize;
     while offset + 8 <= total_size {
@@ -222,10 +240,13 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
         let size = unsafe { core::ptr::read_unaligned((addr + offset + 4) as *const u32) } as usize;
 
         if tag == 0 {
+            if size == 8 {
+                saw_end_tag = true;
+            }
             break;
         }
         if size < 8 || offset.saturating_add(size) > total_size {
-            break;
+            return BootInfo::empty(Architecture::X86_64);
         }
 
         match tag {
@@ -294,6 +315,10 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
         offset = offset.saturating_add(size + 7) & !7;
     }
 
+    if !saw_end_tag {
+        return BootInfo::empty(Architecture::X86_64);
+    }
+
     let mut has_usable = false;
     for index in 0..region_count as usize {
         let region = unsafe { core::ptr::read(regions_ptr.add(index)) };
@@ -309,11 +334,7 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
             core::ptr::write(
                 regions_ptr,
                 MemoryRegion {
-                    base: if length >= 4096 {
-                        0x0010_0000
-                    } else {
-                        FALLBACK_MEMORY_BASE
-                    },
+                    base: if length >= 4096 { 0x0010_0000 } else { FALLBACK_MEMORY_BASE },
                     length: if length >= 4096 {
                         length
                     } else {
@@ -379,7 +400,5 @@ fn serial_write(bytes: &[u8]) {
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     serial_write(b"AWEOS: KERNEL PANIC\r\n");
-    loop {
-        unsafe { core::arch::asm!("cli; hlt", options(nomem, nostack, preserves_flags)); }
-    }
+    halt_forever();
 }
