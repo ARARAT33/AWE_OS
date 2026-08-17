@@ -29,11 +29,17 @@ global_asm!(
 .type _start, @function
 _start:
     cli
+    // Preserve the full Multiboot2 registers before doing any stack setup.
+    // GRUB documents EAX/EBX for the handoff, while using the full 64-bit
+    // registers here also avoids accidental pointer truncation on a 64-bit
+    // firmware/loader path.
+    mov r12, rax
+    mov r13, rbx
     lea rsp, [rip + stack_top]
     and rsp, -16
     xor rbp, rbp
-    mov edi, eax
-    mov esi, ebx
+    mov rdi, r12
+    mov rsi, r13
     call rust_main
 .Lhalt:
     hlt
@@ -52,21 +58,17 @@ fn main() {}
 
 #[cfg(not(test))]
 #[unsafe(no_mangle)]
-pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u32) -> ! {
+pub extern "C" fn rust_main(boot_magic: u64, boot_info_addr: u64) -> ! {
     serial_init();
     serial_write(b"AWEOS CellKernel\r\n");
     serial_write(b"AWEOS boot: x86_64 Multiboot2 entry\r\n");
 
-    // Some firmware/GRUB combinations preserve the Multiboot2 information
-    // pointer while not preserving the canonical magic value through a
-    // 64-bit handoff. The pointer is the object we can safely bounds-check;
-    // the resulting AWE BootInfo is still strictly validated by kernel_entry.
-    if boot_magic != MULTIBOOT2_BOOTLOADER_MAGIC {
+    if (boot_magic as u32) != MULTIBOOT2_BOOTLOADER_MAGIC {
         serial_write(b"AWEOS: Multiboot2 magic mismatch; validating info pointer\r\n");
     }
 
     let info = if boot_info_addr != 0 {
-        parse_multiboot2(boot_info_addr as usize)
+        parse_multiboot2(boot_info_addr)
     } else {
         serial_write(b"AWEOS: missing Multiboot2 info pointer\r\n");
         BootInfo::empty(Architecture::X86_64)
@@ -99,12 +101,13 @@ pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u32) -> ! {
 }
 
 #[cfg(not(test))]
-fn parse_multiboot2(addr: usize) -> BootInfo {
+fn parse_multiboot2(addr: u64) -> BootInfo {
     if addr == 0 {
         return BootInfo::empty(Architecture::X86_64);
     }
 
-    let total_size = unsafe { core::ptr::read_unaligned(addr as *const u32) } as usize;
+    let base = addr as usize;
+    let total_size = unsafe { core::ptr::read_unaligned(base as *const u32) } as usize;
     if !(16..=1024 * 1024).contains(&total_size) {
         return BootInfo::empty(Architecture::X86_64);
     }
@@ -123,35 +126,52 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
 
     let mut offset = 8usize;
     while offset + 8 <= total_size {
-        let tag = unsafe { core::ptr::read_unaligned((addr + offset) as *const u32) };
-        let size = unsafe { core::ptr::read_unaligned((addr + offset + 4) as *const u32) } as usize;
+        let tag_addr = base.saturating_add(offset);
+        let tag = unsafe { core::ptr::read_unaligned(tag_addr as *const u32) };
+        let size = unsafe { core::ptr::read_unaligned(tag_addr.saturating_add(4) as *const u32) } as usize;
 
-        if tag == 0 { break; }
-        if size < 8 || offset.saturating_add(size) > total_size { break; }
+        if tag == 0 {
+            break;
+        }
+        if size < 8 || offset.saturating_add(size) > total_size {
+            break;
+        }
 
         match tag {
             4 if size >= 16 => {
                 basic_mem_upper_kb = unsafe {
-                    core::ptr::read_unaligned((addr + offset + 12) as *const u32)
+                    core::ptr::read_unaligned(tag_addr.saturating_add(12) as *const u32)
                 } as u64;
             }
             6 if size >= 16 => {
                 let entry_size = unsafe {
-                    core::ptr::read_unaligned((addr + offset + 8) as *const u32)
+                    core::ptr::read_unaligned(tag_addr.saturating_add(8) as *const u32)
                 } as usize;
                 if entry_size >= 24 {
                     let mut entry = offset + 16;
                     while entry_size <= size.saturating_sub(16)
-                        && entry + entry_size <= offset + size
+                        && entry.saturating_add(entry_size) <= offset.saturating_add(size)
                         && (region_count as usize) < MAX_MEMORY_REGIONS
                     {
-                        let base = unsafe { core::ptr::read_unaligned((addr + entry) as *const u64) };
-                        let length = unsafe { core::ptr::read_unaligned((addr + entry + 8) as *const u64) };
-                        let kind = unsafe { core::ptr::read_unaligned((addr + entry + 16) as *const u32) };
+                        let entry_addr = base.saturating_add(entry);
+                        let base_addr = unsafe {
+                            core::ptr::read_unaligned(entry_addr as *const u64)
+                        };
+                        let length = unsafe {
+                            core::ptr::read_unaligned(entry_addr.saturating_add(8) as *const u64)
+                        };
+                        let kind = unsafe {
+                            core::ptr::read_unaligned(entry_addr.saturating_add(16) as *const u32)
+                        };
                         unsafe {
                             core::ptr::write(
                                 regions_ptr.add(region_count as usize),
-                                MemoryRegion { base, length, kind, reserved: 0 },
+                                MemoryRegion {
+                                    base: base_addr,
+                                    length,
+                                    kind,
+                                    reserved: 0,
+                                },
                             );
                         }
                         region_count += 1;
@@ -160,13 +180,23 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
                 }
             }
             8 if size >= 32 => {
-                framebuffer_address = unsafe { core::ptr::read_unaligned((addr + offset + 8) as *const u64) };
-                framebuffer_pitch = unsafe { core::ptr::read_unaligned((addr + offset + 16) as *const u32) };
-                framebuffer_width = unsafe { core::ptr::read_unaligned((addr + offset + 20) as *const u32) };
-                framebuffer_height = unsafe { core::ptr::read_unaligned((addr + offset + 24) as *const u32) };
+                framebuffer_address = unsafe {
+                    core::ptr::read_unaligned(tag_addr.saturating_add(8) as *const u64)
+                };
+                framebuffer_pitch = unsafe {
+                    core::ptr::read_unaligned(tag_addr.saturating_add(16) as *const u32)
+                };
+                framebuffer_width = unsafe {
+                    core::ptr::read_unaligned(tag_addr.saturating_add(20) as *const u32)
+                };
+                framebuffer_height = unsafe {
+                    core::ptr::read_unaligned(tag_addr.saturating_add(24) as *const u32)
+                };
                 framebuffer_size = (framebuffer_pitch as u64).saturating_mul(framebuffer_height as u64);
             }
-            14 | 15 if size >= 16 => acpi_rsdp = (addr + offset + 8) as u64,
+            14 | 15 if size >= 16 => {
+                acpi_rsdp = tag_addr.saturating_add(8) as u64;
+            }
             _ => {}
         }
 
@@ -176,7 +206,10 @@ fn parse_multiboot2(addr: usize) -> BootInfo {
     let mut has_usable = false;
     for index in 0..region_count as usize {
         let region = unsafe { core::ptr::read(regions_ptr.add(index)) };
-        if region.kind == 1 && region.length >= 4096 { has_usable = true; break; }
+        if region.kind == 1 && region.length >= 4096 {
+            has_usable = true;
+            break;
+        }
     }
 
     if !has_usable {
