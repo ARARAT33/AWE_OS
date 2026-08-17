@@ -4,6 +4,12 @@
 
 #![allow(dead_code)]
 
+pub mod gpt;
+pub mod ramdisk;
+
+pub use gpt::{crc32, parse_header, parse_partition, validate_partition_array_crc, GptError, GptHeader, GptPartition};
+pub use ramdisk::{RamBlockDevice, RAMDISK_BLOCKS};
+
 pub const BLOCK_SIZE: usize = 4096;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
