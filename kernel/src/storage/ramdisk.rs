@@ -99,10 +99,7 @@ mod tests {
     fn enforces_bounds_and_read_only_mode() {
         let mut disk = RamBlockDevice::new(true);
         let block = [0u8; BLOCK_SIZE];
-        assert_eq!(
-            disk.write_block(0, &block),
-            Err(StorageError::ReadOnly)
-        );
+        assert_eq!(disk.write_block(0, &block), Err(StorageError::ReadOnly));
         assert_eq!(
             disk.read_block(RAMDISK_BLOCKS as u64, &mut [0; BLOCK_SIZE]),
             Err(StorageError::InvalidBlock)
