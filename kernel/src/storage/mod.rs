@@ -7,8 +7,11 @@
 pub mod gpt;
 pub mod ramdisk;
 
-pub use gpt::{crc32, parse_header, parse_partition, validate_partition_array_crc, GptError, GptHeader, GptPartition};
-pub use ramdisk::{RamBlockDevice, RAMDISK_BLOCKS};
+pub use gpt::{
+    GptError, GptHeader, GptPartition, crc32, parse_header, parse_partition,
+    validate_partition_array_crc,
+};
+pub use ramdisk::{RAMDISK_BLOCKS, RamBlockDevice};
 
 pub const BLOCK_SIZE: usize = 4096;
 
@@ -111,8 +114,8 @@ pub fn scan_gpt<D: BlockDevice>(device: &mut D) -> Result<GptScanSummary, Storag
     let first_block = header.partition_entry_lba / sectors_per_block as u64;
     let first_sector_in_block =
         (header.partition_entry_lba % sectors_per_block as u64) as usize * gpt::GPT_SECTOR_SIZE;
-    let block_count = (first_sector_in_block + entry_bytes + device.block_size() - 1)
-        / device.block_size();
+    let block_count =
+        (first_sector_in_block + entry_bytes + device.block_size() - 1) / device.block_size();
     for index in 0..block_count {
         device.read_block(first_block + index as u64, &mut block)?;
         let source_start = if index == 0 { first_sector_in_block } else { 0 };
@@ -138,7 +141,9 @@ pub fn scan_gpt<D: BlockDevice>(device: &mut D) -> Result<GptScanSummary, Storag
     for index in 0..header.partition_count as usize {
         let start = index * header.partition_entry_size as usize;
         let end = start + header.partition_entry_size as usize;
-        if let Some(_partition) = gpt::parse_partition(&entries[start..end], &header, disk_last_lba)? {
+        if let Some(_partition) =
+            gpt::parse_partition(&entries[start..end], &header, disk_last_lba)?
+        {
             partitions = partitions.saturating_add(1);
         }
     }
@@ -176,10 +181,12 @@ mod tests {
         block[header_offset + 80..header_offset + 84].copy_from_slice(&1u32.to_le_bytes());
         block[header_offset + 84..header_offset + 88]
             .copy_from_slice(&(gpt::GPT_PARTITION_ENTRY_MIN_SIZE as u32).to_le_bytes());
-        block[header_offset + 88..header_offset + 92].copy_from_slice(&partition_crc.to_le_bytes());
+        block[header_offset + 88..header_offset + 92]
+            .copy_from_slice(&partition_crc.to_le_bytes());
         let mut header_copy = block;
         header_copy[header_offset + 16..header_offset + 20].fill(0);
-        let header_crc = crc32(&header_copy[header_offset..header_offset + gpt::GPT_HEADER_MIN_SIZE]);
+        let header_crc =
+            crc32(&header_copy[header_offset..header_offset + gpt::GPT_HEADER_MIN_SIZE]);
         block[header_offset + 16..header_offset + 20].copy_from_slice(&header_crc.to_le_bytes());
 
         disk.write_block(0, &block).expect("write GPT");
