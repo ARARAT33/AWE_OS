@@ -43,8 +43,9 @@ static mut BOOT_PD: [u64; 512] = [0; 512];
 static mut BOOT_STACK: [u8; 65536] = [0; 65536];
 
 #[cfg(not(test))]
-global_asm!(
+core::arch::global_asm!(
     r#"
+.intel_syntax noprefix
 .code32
 .section .text.boot
 .global _start
@@ -100,9 +101,8 @@ _start:
     # Temporary 64-bit GDT: null, 64-bit code, data.
     lgdt [gdt64_descriptor]
 
-    # Encode an absolute far jump directly. This is a 32-bit-mode
-    # far jump to the 64-bit code descriptor and avoids assembler
-    # syntax differences for ljmp/far jumps.
+    # Encode a 32-bit protected-mode far jump directly. The destination
+    # is below 4 GiB because the linker places the image at 1 MiB.
     .byte 0xEA
     .long long_mode_entry
     .word 0x08
@@ -144,6 +144,7 @@ gdt64_descriptor:
     .quad gdt64
 
 .size _start, .-_start
+.att_syntax prefix
 "#
 );
 
