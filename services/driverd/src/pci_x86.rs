@@ -1,5 +1,3 @@
-#![no_std]
-
 //! x86_64 PCI Configuration Mechanism #1 backend.
 //! This backend is intentionally isolated from the kernel and can be replaced
 //! by ECAM/firmware-mediated access on platforms that do not expose CF8/CFC.
@@ -14,13 +12,27 @@ pub struct X86CfgIo;
 impl X86CfgIo {
     #[inline(always)]
     unsafe fn out32(port: u16, value: u32) {
-        core::arch::asm!("out dx, eax", in("dx") port, in("eax") value, options(nostack, preserves_flags));
+        unsafe {
+            core::arch::asm!(
+                "out dx, eax",
+                in("dx") port,
+                in("eax") value,
+                options(nostack, preserves_flags)
+            );
+        }
     }
 
     #[inline(always)]
     unsafe fn in32(port: u16) -> u32 {
         let value: u32;
-        core::arch::asm!("in eax, dx", in("dx") port, out("eax") value, options(nostack, preserves_flags));
+        unsafe {
+            core::arch::asm!(
+                "in eax, dx",
+                in("dx") port,
+                out("eax") value,
+                options(nostack, preserves_flags)
+            );
+        }
         value
     }
 }
