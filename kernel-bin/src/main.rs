@@ -12,6 +12,9 @@ const MULTIBOOT2_BOOTLOADER_MAGIC: u32 = 0x36D7_6289;
 const MAX_MEMORY_REGIONS: usize = 128;
 const FALLBACK_MEMORY_BASE: u64 = 0x0100_0000;
 const FALLBACK_MEMORY_LENGTH: u64 = 0x0200_0000;
+const PAGE_PRESENT: u32 = 1;
+const PAGE_WRITABLE: u32 = 2;
+const PAGE_HUGE: u32 = 1 << 7;
 
 static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] =
     [MemoryRegion { base: 0, length: 0, kind: 2, reserved: 0 }; MAX_MEMORY_REGIONS];
@@ -22,34 +25,120 @@ static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] =
 static MULTIBOOT2_HEADER: [u32; 4] = [0xE852_50D6, 0, 16, 0x17AD_AF1A];
 
 #[cfg(not(test))]
+#[unsafe(link_section = ".bss.boot")]
+#[unsafe(no_mangle)]
+static mut BOOT_PML4: [u64; 512] = [0; 512];
+
+#[cfg(not(test))]
+#[unsafe(link_section = ".bss.boot")]
+#[unsafe(no_mangle)]
+static mut BOOT_PDPT: [u64; 512] = [0; 512];
+
+#[cfg(not(test))]
+#[unsafe(link_section = ".bss.boot")]
+#[unsafe(no_mangle)]
+static mut BOOT_PD: [u64; 512] = [0; 512];
+
+#[cfg(not(test))]
+#[unsafe(link_section = ".bss.stack")]
+#[unsafe(no_mangle)]
+static mut BOOT_STACK: [u8; 65536] = [0; 65536];
+
+#[cfg(not(test))]
 global_asm!(
     r#"
+.code32
 .section .text.boot
 .global _start
 .type _start, @function
 _start:
     cli
-    // Preserve the full Multiboot2 registers before doing any stack setup.
-    // GRUB documents EAX/EBX for the handoff, while using the full 64-bit
-    // registers here also avoids accidental pointer truncation on a 64-bit
-    // firmware/loader path.
-    mov r12, rax
-    mov r13, rbx
-    lea rsp, [rip + stack_top]
+
+    # Multiboot2 enters the kernel in 32-bit protected mode with
+    # EAX = boot magic and EBX = Multiboot2 information pointer.
+    mov dword ptr [boot_magic_saved], eax
+    mov dword ptr [boot_info_saved], ebx
+
+    # Build a minimal identity map for the first 1 GiB using 2 MiB pages.
+    # PML4[0] -> PDPT[0] -> PD[0..511], each PD entry maps 2 MiB.
+    mov eax, offset BOOT_PDPT
+    or eax, PAGE_PRESENT | PAGE_WRITABLE
+    mov dword ptr [BOOT_PML4], eax
+    mov dword ptr [BOOT_PML4 + 4], 0
+
+    mov eax, offset BOOT_PD
+    or eax, PAGE_PRESENT | PAGE_WRITABLE
+    mov dword ptr [BOOT_PDPT], eax
+    mov dword ptr [BOOT_PDPT + 4], 0
+
+    xor ecx, ecx
+1:
+    mov eax, ecx
+    shl eax, 21
+    or eax, PAGE_PRESENT | PAGE_WRITABLE | PAGE_HUGE
+    mov dword ptr [BOOT_PD + ecx * 8], eax
+    mov dword ptr [BOOT_PD + ecx * 8 + 4], 0
+    inc ecx
+    cmp ecx, 512
+    jb 1b
+
+    mov eax, offset BOOT_PML4
+    mov cr3, eax
+
+    # Enable PAE and long mode.
+    mov eax, cr4
+    or eax, 1 << 5
+    mov cr4, eax
+
+    mov ecx, 0xC0000080
+    rdmsr
+    or eax, 1 << 8
+    wrmsr
+
+    mov eax, cr0
+    or eax, 1 << 31
+    mov cr0, eax
+
+    # Temporary 64-bit GDT: null, 64-bit code, data.
+    lgdt [gdt64_descriptor]
+    jmp 0x08:long_mode_entry
+
+.code64
+long_mode_entry:
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+
+    lea rsp, [rip + BOOT_STACK + 65536]
     and rsp, -16
     xor rbp, rbp
-    mov rdi, r12
-    mov rsi, r13
+
+    mov edi, dword ptr [rip + boot_magic_saved]
+    mov esi, dword ptr [rip + boot_info_saved]
     call rust_main
+
 .Lhalt:
     hlt
     jmp .Lhalt
+
+.align 8
+boot_magic_saved:
+    .long 0
+boot_info_saved:
+    .long 0
+
+.align 8
+gdt64:
+    .quad 0
+    .quad 0x00AF9A000000FFFF
+    .quad 0x00CF92000000FFFF
+gdt64_descriptor:
+    .word gdt64_end - gdt64 - 1
+    .quad gdt64
+gdt64_end:
+
 .size _start, .-_start
-.section .bss.stack,"aw",@nobits
-.align 16
-stack_bottom:
-.skip 65536
-stack_top:
 "#
 );
 
@@ -58,19 +147,19 @@ fn main() {}
 
 #[cfg(not(test))]
 #[unsafe(no_mangle)]
-pub extern "C" fn rust_main(boot_magic: u64, boot_info_addr: u64) -> ! {
+pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u32) -> ! {
     serial_init();
     serial_write(b"AWEOS CellKernel\r\n");
     serial_write(b"AWEOS boot: x86_64 Multiboot2 entry\r\n");
 
-    if (boot_magic as u32) != MULTIBOOT2_BOOTLOADER_MAGIC {
-        serial_write(b"AWEOS: Multiboot2 magic mismatch; validating info pointer\r\n");
+    if boot_magic != MULTIBOOT2_BOOTLOADER_MAGIC {
+        serial_write(b"AWEOS: Multiboot2 magic mismatch\r\n");
     }
 
-    let info = if boot_info_addr != 0 {
-        parse_multiboot2(boot_info_addr)
+    let info = if boot_magic == MULTIBOOT2_BOOTLOADER_MAGIC && boot_info_addr != 0 {
+        parse_multiboot2(boot_info_addr as usize)
     } else {
-        serial_write(b"AWEOS: missing Multiboot2 info pointer\r\n");
+        serial_write(b"AWEOS: invalid Multiboot2 handoff\r\n");
         BootInfo::empty(Architecture::X86_64)
     };
 
@@ -101,13 +190,12 @@ pub extern "C" fn rust_main(boot_magic: u64, boot_info_addr: u64) -> ! {
 }
 
 #[cfg(not(test))]
-fn parse_multiboot2(addr: u64) -> BootInfo {
+fn parse_multiboot2(addr: usize) -> BootInfo {
     if addr == 0 {
         return BootInfo::empty(Architecture::X86_64);
     }
 
-    let base = addr as usize;
-    let total_size = unsafe { core::ptr::read_unaligned(base as *const u32) } as usize;
+    let total_size = unsafe { core::ptr::read_unaligned(addr as *const u32) } as usize;
     if !(16..=1024 * 1024).contains(&total_size) {
         return BootInfo::empty(Architecture::X86_64);
     }
@@ -126,9 +214,8 @@ fn parse_multiboot2(addr: u64) -> BootInfo {
 
     let mut offset = 8usize;
     while offset + 8 <= total_size {
-        let tag_addr = base.saturating_add(offset);
-        let tag = unsafe { core::ptr::read_unaligned(tag_addr as *const u32) };
-        let size = unsafe { core::ptr::read_unaligned(tag_addr.saturating_add(4) as *const u32) } as usize;
+        let tag = unsafe { core::ptr::read_unaligned((addr + offset) as *const u32) };
+        let size = unsafe { core::ptr::read_unaligned((addr + offset + 4) as *const u32) } as usize;
 
         if tag == 0 {
             break;
@@ -140,34 +227,33 @@ fn parse_multiboot2(addr: u64) -> BootInfo {
         match tag {
             4 if size >= 16 => {
                 basic_mem_upper_kb = unsafe {
-                    core::ptr::read_unaligned(tag_addr.saturating_add(12) as *const u32)
+                    core::ptr::read_unaligned((addr + offset + 12) as *const u32)
                 } as u64;
             }
             6 if size >= 16 => {
                 let entry_size = unsafe {
-                    core::ptr::read_unaligned(tag_addr.saturating_add(8) as *const u32)
+                    core::ptr::read_unaligned((addr + offset + 8) as *const u32)
                 } as usize;
                 if entry_size >= 24 {
                     let mut entry = offset + 16;
                     while entry_size <= size.saturating_sub(16)
-                        && entry.saturating_add(entry_size) <= offset.saturating_add(size)
+                        && entry + entry_size <= offset + size
                         && (region_count as usize) < MAX_MEMORY_REGIONS
                     {
-                        let entry_addr = base.saturating_add(entry);
-                        let base_addr = unsafe {
-                            core::ptr::read_unaligned(entry_addr as *const u64)
+                        let base = unsafe {
+                            core::ptr::read_unaligned((addr + entry) as *const u64)
                         };
                         let length = unsafe {
-                            core::ptr::read_unaligned(entry_addr.saturating_add(8) as *const u64)
+                            core::ptr::read_unaligned((addr + entry + 8) as *const u64)
                         };
                         let kind = unsafe {
-                            core::ptr::read_unaligned(entry_addr.saturating_add(16) as *const u32)
+                            core::ptr::read_unaligned((addr + entry + 16) as *const u32)
                         };
                         unsafe {
                             core::ptr::write(
                                 regions_ptr.add(region_count as usize),
                                 MemoryRegion {
-                                    base: base_addr,
+                                    base,
                                     length,
                                     kind,
                                     reserved: 0,
@@ -181,21 +267,22 @@ fn parse_multiboot2(addr: u64) -> BootInfo {
             }
             8 if size >= 32 => {
                 framebuffer_address = unsafe {
-                    core::ptr::read_unaligned(tag_addr.saturating_add(8) as *const u64)
+                    core::ptr::read_unaligned((addr + offset + 8) as *const u64)
                 };
                 framebuffer_pitch = unsafe {
-                    core::ptr::read_unaligned(tag_addr.saturating_add(16) as *const u32)
+                    core::ptr::read_unaligned((addr + offset + 16) as *const u32)
                 };
                 framebuffer_width = unsafe {
-                    core::ptr::read_unaligned(tag_addr.saturating_add(20) as *const u32)
+                    core::ptr::read_unaligned((addr + offset + 20) as *const u32)
                 };
                 framebuffer_height = unsafe {
-                    core::ptr::read_unaligned(tag_addr.saturating_add(24) as *const u32)
+                    core::ptr::read_unaligned((addr + offset + 24) as *const u32)
                 };
-                framebuffer_size = (framebuffer_pitch as u64).saturating_mul(framebuffer_height as u64);
+                framebuffer_size =
+                    (framebuffer_pitch as u64).saturating_mul(framebuffer_height as u64);
             }
             14 | 15 if size >= 16 => {
-                acpi_rsdp = tag_addr.saturating_add(8) as u64;
+                acpi_rsdp = (addr + offset + 8) as u64;
             }
             _ => {}
         }
@@ -218,8 +305,16 @@ fn parse_multiboot2(addr: u64) -> BootInfo {
             core::ptr::write(
                 regions_ptr,
                 MemoryRegion {
-                    base: if length >= 4096 { 0x0010_0000 } else { FALLBACK_MEMORY_BASE },
-                    length: if length >= 4096 { length } else { FALLBACK_MEMORY_LENGTH },
+                    base: if length >= 4096 {
+                        0x0010_0000
+                    } else {
+                        FALLBACK_MEMORY_BASE
+                    },
+                    length: if length >= 4096 {
+                        length
+                    } else {
+                        FALLBACK_MEMORY_LENGTH
+                    },
                     kind: 1,
                     reserved: 0,
                 },
