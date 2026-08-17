@@ -3,7 +3,7 @@
 //! This is intentionally deterministic and allocation-free so filesystem and
 //! partition logic can be exercised without depending on a host filesystem.
 
-use super::{BlockDevice, StorageError, BLOCK_SIZE};
+use super::{BLOCK_SIZE, BlockDevice, StorageError};
 
 pub const RAMDISK_BLOCKS: usize = 64;
 
@@ -99,8 +99,17 @@ mod tests {
     fn enforces_bounds_and_read_only_mode() {
         let mut disk = RamBlockDevice::new(true);
         let block = [0u8; BLOCK_SIZE];
-        assert_eq!(disk.write_block(0, &block), Err(StorageError::ReadOnly));
-        assert_eq!(disk.read_block(RAMDISK_BLOCKS as u64, &mut [0; BLOCK_SIZE]), Err(StorageError::InvalidBlock));
-        assert_eq!(disk.read_block(0, &mut [0; BLOCK_SIZE - 1]), Err(StorageError::BufferTooSmall));
+        assert_eq!(
+            disk.write_block(0, &block),
+            Err(StorageError::ReadOnly)
+        );
+        assert_eq!(
+            disk.read_block(RAMDISK_BLOCKS as u64, &mut [0; BLOCK_SIZE]),
+            Err(StorageError::InvalidBlock)
+        );
+        assert_eq!(
+            disk.read_block(0, &mut [0; BLOCK_SIZE - 1]),
+            Err(StorageError::BufferTooSmall)
+        );
     }
 }
