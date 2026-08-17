@@ -57,10 +57,18 @@ pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u32) -> ! {
     serial_write(b"AWEOS CellKernel\r\n");
     serial_write(b"AWEOS boot: x86_64 Multiboot2 entry\r\n");
 
-    let info = if boot_magic == MULTIBOOT2_BOOTLOADER_MAGIC && boot_info_addr != 0 {
+    // Some firmware/GRUB combinations preserve the Multiboot2 information
+    // pointer while not preserving the canonical magic value through a
+    // 64-bit handoff. The pointer is the object we can safely bounds-check;
+    // the resulting AWE BootInfo is still strictly validated by kernel_entry.
+    if boot_magic != MULTIBOOT2_BOOTLOADER_MAGIC {
+        serial_write(b"AWEOS: Multiboot2 magic mismatch; validating info pointer\r\n");
+    }
+
+    let info = if boot_info_addr != 0 {
         parse_multiboot2(boot_info_addr as usize)
     } else {
-        serial_write(b"AWEOS: invalid Multiboot2 handoff\r\n");
+        serial_write(b"AWEOS: missing Multiboot2 info pointer\r\n");
         BootInfo::empty(Architecture::X86_64)
     };
 
