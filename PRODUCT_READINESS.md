@@ -4,9 +4,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**62.5% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**63% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
-The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 62.5% gate completes the native driver manifest/lifecycle sub-gate after the 62.0 driver capability/resource boundary and before the 65% hardware execution checkpoint.
+The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 63% gate completes the driver dependency/ownership/health sub-gate inside the 61.6–64.x driver-service preparation block; the 65% hardware execution checkpoint remains separate.
 
 ## Implemented kernel foundations
 
@@ -40,45 +40,37 @@ The percentage follows the AWE_OS 60–100 master plan and advances only when th
 - **61.5 device-boundary freeze:** canonical device matching, explicit resource grants, bounded MMIO/I/O/DMA/interrupt ownership accounting, and fail-closed driver binding decisions.
 - **62.0 driver capability integration:** driver grants bind a driver service to an authenticated capability endpoint and one canonical device identity while independently enforcing capability and resource budgets.
 - **62.5 native driver manifest/lifecycle freeze:** ABI-aware driver manifests, architecture/capability declarations, verified-trust admission, deterministic lifecycle transitions, and registry-level trust/ABI metadata.
+- **63.0 driver dependency/ownership/health integration:** bounded dependency graph, cycle rejection, per-driver resource ownership, failure counters, bounded restart accounting, and deterministic health recovery state.
 
 ## 62.0 milestone — COMPLETE
 
 The 62.0 gate prepares the standalone driver service for real hardware execution without counting the 65% PCI/ACPI/VirtIO implementation.
 
-- [x] Driver grants bind to a stable service identity.
-- [x] Driver grants bind to a valid capability endpoint.
-- [x] Driver grants bind to one canonical device identity.
-- [x] MMIO/I/O/DMA/interrupt budgets remain bounded.
-- [x] Capability checks are independent from resource checks.
-- [x] Service, endpoint, device and resource mismatches fail closed.
-- [x] Grant structures are fixed-layout and allocation-free.
-- [x] Deterministic exact/class/fallback matching remains intact.
-- [x] Unit coverage covers service mismatch, endpoint validation, device identity, capability denial and resource exhaustion.
-
-The detailed specification is `docs/MILESTONE_62_0.md`.
-
 ## 62.5 milestone — COMPLETE
 
-The 62.5 gate freezes the native driver-service contract required immediately before concrete hardware execution:
+The 62.5 gate freezes the native driver-service contract required immediately before concrete hardware execution.
 
-- [x] Versioned `DriverManifest` with stable identity, class and ABI major/minor.
-- [x] Architecture target mask.
-- [x] Explicit declared capability mask.
-- [x] Verified/unverified/revoked trust state.
-- [x] Fail-closed lifecycle admission for untrusted drivers.
-- [x] Deterministic lifecycle: discover → identify → probe → bind → initialize → run → suspend/resume → stop → remove/recover.
-- [x] Invalid lifecycle transitions rejected.
-- [x] Driver registry stores ABI minor and trust metadata.
-- [x] Unverified driver descriptors rejected at registration.
-- [x] Built-in driver catalog migrated to the native metadata contract.
-- [x] Manifest export from registry descriptors.
-- [x] Unit coverage for lifecycle, trust, manifest and registry invariants.
+## 63.0 milestone — COMPLETE
 
-The detailed specification is `docs/MILESTONE_62_5.md`.
+The 63.0 gate advances the 61.6–64.x driver-service preparation block with the operational contracts needed to manage driver dependencies, resource ownership and health without putting driver implementations back into CellKernel:
+
+- [x] Bounded driver dependency graph.
+- [x] Self-dependency rejection.
+- [x] Simple transitive cycle rejection.
+- [x] Explicit per-driver resource ownership record.
+- [x] MMIO/I/O/DMA/interrupt ownership remains bounded.
+- [x] Driver health state with consecutive-failure tracking.
+- [x] Bounded restart accounting.
+- [x] Deterministic restart transition.
+- [x] Service exports expose the new preparation contracts.
+- [x] Unit coverage for dependency cycles, ownership budgets and restart behavior.
+- [x] Concrete PCI/ACPI/VirtIO execution remains excluded from this gate.
+
+The detailed specification is `docs/MILESTONE_63_0.md`.
 
 ## Reserved for 65% checkpoint
 
-The following are deliberately not counted toward 62.5% and remain the next major validation block:
+The following are deliberately not counted toward 63% and remain the next major validation block:
 
 - PCI/PCIe enumeration;
 - ACPI discovery;
@@ -134,9 +126,9 @@ The following are deliberately not counted toward 62.5% and remain the next majo
 - [ ] Signed/measured release image verification in the boot path.
 - [ ] Automated QEMU boot certification.
 
-## 62.5% milestone boundary
+## 63% milestone boundary
 
-The 62.5% milestone represents completion of the native driver-service contract block after the 62.0 capability/resource boundary: each driver can now be described by versioned ABI, architecture and capability metadata; execution trust is explicit; lifecycle transitions are deterministic; and the bounded driver registry carries the same contract. Concrete hardware discovery and driver execution remain reserved for the 65% checkpoint.
+The 63% milestone represents completion of the next driver-service preparation layer from the master plan: dependency relationships are bounded and cycle-safe, resource ownership is explicit per driver, and health/restart state is deterministic and bounded. The system is still deliberately hardware-neutral here; the real PCI/ACPI/VirtIO execution checkpoint remains 65%.
 
 ## Definition of done
 
