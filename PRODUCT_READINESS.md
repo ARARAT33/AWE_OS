@@ -6,7 +6,7 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 **60% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
-The percentage is based on implemented product gates, not documentation or architectural stubs. It is recalculated after substantive repository changes. The new 60% milestone is earned by a real x86_64 bootstrap paging path, not by documentation alone.
+The percentage is based on implemented product gates, not documentation or architectural stubs. The 60% milestone is earned by a real x86_64 bootstrap paging path. Sub-milestones such as 60.2 describe completed engineering gates inside that 60% band and do not inflate the headline percentage by themselves.
 
 ## Implemented kernel foundations
 
@@ -34,6 +34,24 @@ The percentage is based on implemented product gates, not documentation or archi
 - Validated syscall dispatch gate with argument/error validation and resource-budget enforcement.
 - AWE Capsule and XenoSense security foundations.
 - Cloud CI security/release gates.
+- **60.2 service-contract freeze:** CellKernel ABI 1.2, typed service IDs, explicit capability admission, and typed IPC channels/opcodes.
+
+## 60.2 milestone — COMPLETE
+
+The 60.2 gate freezes the minimal kernel-to-service boundary:
+
+- [x] CellKernel ABI 1.2.
+- [x] Stable service identifiers for driverd/appd/ASAPP/AYUI/terminal/bus/update services.
+- [x] Explicit capability requirements for service admission.
+- [x] Fail-closed major/minor ABI validation.
+- [x] Forward-compatible minor-version validation.
+- [x] Typed IPC service channels.
+- [x] Stable IPC opcodes for hello/ping/start/stop/reset/query/event/handoff.
+- [x] driverd ABI 1.2 alignment.
+- [x] appd ABI 1.2 alignment.
+- [x] Unit coverage for capability, version and IPC invariants.
+
+The detailed specification is `docs/MILESTONE_60_2.md`.
 
 ## Hardware and driver intelligence
 
@@ -90,7 +108,7 @@ Implemented foundations include cross-OS provenance manifests, verified-only bin
 
 ## 60% milestone boundary
 
-The 60% milestone now represents a genuine boot execution foundation: Multiboot2 handoff is parsed, the AWE boot contract is validated, usable memory is normalized, CellKernel is entered, and x86_64 bootstrap paging can be constructed and activated before the kernel enters its running halt loop. The remaining work is intentionally larger and includes a kernel heap, interrupt/timer runtime, scheduler execution, syscall trap entry, process/address-space isolation, IPC runtime, PCI/VirtIO transports, storage/network drivers, DMA/IOMMU isolation and automated QEMU certification.
+The 60% milestone represents a genuine boot execution foundation: Multiboot2 handoff is parsed, the AWE boot contract is validated, usable memory is normalized, CellKernel is entered, and x86_64 bootstrap paging can be constructed and activated before the kernel enters its running halt loop. The remaining work is intentionally larger and includes a kernel heap, interrupt/timer runtime, scheduler execution, syscall trap entry, process/address-space isolation, IPC runtime, PCI/VirtIO transports, storage/network drivers, DMA/IOMMU isolation and automated QEMU certification.
 
 ## Definition of done
 
