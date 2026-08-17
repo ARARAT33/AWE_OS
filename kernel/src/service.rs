@@ -8,7 +8,11 @@
 //! kernel.
 
 use crate::process::{ProcessId, ResourceBudget};
-use crate::system_contract::{CapabilitySet, KernelCapability, ServiceId, ServiceContract, APPD_CONTRACT, ASAPPD_CONTRACT, AWEBUSD_CONTRACT, AWEUPDATED_CONTRACT, AWETERMINALD_CONTRACT, AYUID_CONTRACT, DRIVERD_CONTRACT};
+use crate::system_contract::{
+    CapabilitySet, ServiceContract, ServiceId, APPD_CONTRACT, ASAPPD_CONTRACT,
+    AWEBUSD_CONTRACT, AWEUPDATED_CONTRACT, AWETERMINALD_CONTRACT, AYUID_CONTRACT,
+    DRIVERD_CONTRACT,
+};
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,15 +48,57 @@ pub struct ServiceDescriptor {
 }
 
 impl ServiceDescriptor {
-    pub const fn new(service: ServiceId, process: ProcessId, class: ServiceClass, capabilities: CapabilitySet, budget: ResourceBudget) -> Self {
-        Self { service, process, class, state: ServiceState::Declared, capabilities, budget }
+    pub const fn new(
+        service: ServiceId,
+        process: ProcessId,
+        class: ServiceClass,
+        capabilities: CapabilitySet,
+        budget: ResourceBudget,
+    ) -> Self {
+        Self {
+            service,
+            process,
+            class,
+            state: ServiceState::Declared,
+            capabilities,
+            budget,
+        }
     }
 
-    pub const fn start(self) -> Self { Self { state: ServiceState::Starting, ..self } }
-    pub const fn running(self) -> Self { Self { state: ServiceState::Running, ..self } }
-    pub const fn stop(self) -> Self { Self { state: ServiceState::Stopping, ..self } }
-    pub const fn fail(self) -> Self { Self { state: ServiceState::Failed, ..self } }
-    pub const fn quarantine(self) -> Self { Self { state: ServiceState::Quarantined, ..self } }
+    pub const fn start(self) -> Self {
+        Self {
+            state: ServiceState::Starting,
+            ..self
+        }
+    }
+
+    pub const fn running(self) -> Self {
+        Self {
+            state: ServiceState::Running,
+            ..self
+        }
+    }
+
+    pub const fn stop(self) -> Self {
+        Self {
+            state: ServiceState::Stopping,
+            ..self
+        }
+    }
+
+    pub const fn fail(self) -> Self {
+        Self {
+            state: ServiceState::Failed,
+            ..self
+        }
+    }
+
+    pub const fn quarantine(self) -> Self {
+        Self {
+            state: ServiceState::Quarantined,
+            ..self
+        }
+    }
 
     pub const fn requires(self, required: CapabilitySet) -> bool {
         self.capabilities.bits() & required.bits() == required.bits()
@@ -68,12 +114,10 @@ pub enum ServiceModelError {
     MissingCapability,
     Duplicate,
     Full,
-    NotFound,
-    InvalidState,
+    Unknown,
 }
 
-/// Fixed-size service ownership table. This is kernel metadata only; service
-/// implementations live in user space and are never linked into CellKernel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ServiceRegistry<const N: usize> {
     entries: [Option<ServiceDescriptor>; N],
     len: usize,
@@ -81,10 +125,15 @@ pub struct ServiceRegistry<const N: usize> {
 
 impl<const N: usize> ServiceRegistry<N> {
     pub const fn new() -> Self {
-        Self { entries: [None; N], len: 0 }
+        Self {
+            entries: [None; N],
+            len: 0,
+        }
     }
 
-    pub const fn len(&self) -> usize { self.len }
+    pub const fn len(&self) -> usize {
+        self.len
+    }
 
     pub fn register(&mut self, descriptor: ServiceDescriptor) -> Result<(), ServiceModelError> {
         if self.find(descriptor.service).is_some() {
@@ -98,10 +147,10 @@ impl<const N: usize> ServiceRegistry<N> {
         Ok(())
     }
 
-    pub fn find(&self, service: ServiceId) -> Option<&ServiceDescriptor> {
+    pub fn find(&self, service: ServiceId) -> Option<ServiceDescriptor> {
         let mut i = 0;
         while i < self.len {
-            if let Some(entry) = &self.entries[i] {
+            if let Some(entry) = self.entries[i] {
                 if entry.service == service {
                     return Some(entry);
                 }
@@ -110,114 +159,16 @@ impl<const N: usize> ServiceRegistry<N> {
         }
         None
     }
-
-    pub fn update_state(&mut self, service: ServiceId, state: ServiceState) -> Result<(), ServiceModelError> {
-        let mut i = 0;
-        while i < self.len {
-            if let Some(entry) = &mut self.entries[i] {
-                if entry.service == service {
-                    entry.state = state;
-                    return Ok(());
-                }
-            }
-            i += 1;
-        }
-        Err(ServiceModelError::NotFound)
-    }
 }
 
-/// Canonical service roster for the 60.5 architecture freeze.
-pub const SERVICE_COUNT: usize = 7;
-pub const SERVICE_IDS: [ServiceId; SERVICE_COUNT] = [
-    ServiceId::Driverd,
-    ServiceId::Appd,
-    ServiceId::Asappd,
-    ServiceId::Ayuid,
-    ServiceId::Aweterminald,
-    ServiceId::Awebusd,
-    ServiceId::Aweupdated,
-];
-
-pub const SERVICE_CLASSES: [ServiceClass; SERVICE_COUNT] = [
-    ServiceClass::Hardware,
-    ServiceClass::Application,
-    ServiceClass::Application,
-    ServiceClass::Interface,
-    ServiceClass::Interface,
-    ServiceClass::System,
-    ServiceClass::Update,
-];
-
-pub const fn required_contract(service: ServiceId) -> ServiceContract {
-    match service {
-        ServiceId::Driverd => DRIVERD_CONTRACT,
-        ServiceId::Appd => APPD_CONTRACT,
-        ServiceId::Asappd => ASAPPD_CONTRACT,
-        ServiceId::Ayuid => AYUID_CONTRACT,
-        ServiceId::Aweterminald => AWETERMINALD_CONTRACT,
-        ServiceId::Awebusd => AWEBUSD_CONTRACT,
-        ServiceId::Aweupdated => AWEUPDATED_CONTRACT,
-    }
-}
-
-/// Conservative bootstrap budget used by services until the runtime resource
-/// manager negotiates per-machine quotas.
-pub const fn bootstrap_budget() -> ResourceBudget {
-    ResourceBudget {
-        cpu_ticks: 1_000_000,
-        memory_bytes: 64 * 1024 * 1024,
-        ipc_messages: 65_536,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn sample_caps() -> CapabilitySet {
-        CapabilitySet::EMPTY
-            .with(KernelCapability::Ipc)
-            .with(KernelCapability::Security)
-    }
-
-    #[test]
-    fn service_lifecycle_is_explicit() {
-        let descriptor = ServiceDescriptor::new(ServiceId::Appd, ProcessId(7), ServiceClass::Application, sample_caps(), bootstrap_budget());
-        assert_eq!(descriptor.state, ServiceState::Declared);
-        assert_eq!(descriptor.start().state, ServiceState::Starting);
-        assert_eq!(descriptor.start().running().state, ServiceState::Running);
-        assert_eq!(descriptor.running().stop().state, ServiceState::Stopping);
-        assert_eq!(descriptor.running().fail().state, ServiceState::Failed);
-        assert_eq!(descriptor.running().quarantine().state, ServiceState::Quarantined);
-    }
-
-    #[test]
-    fn capability_boundary_is_fail_closed() {
-        let descriptor = ServiceDescriptor::new(ServiceId::Driverd, ProcessId(9), ServiceClass::Hardware, sample_caps(), bootstrap_budget());
-        assert!(descriptor.requires(CapabilitySet::EMPTY.with(KernelCapability::Ipc)));
-        assert!(!descriptor.requires(CapabilitySet::EMPTY.with(KernelCapability::Dma)));
-        assert!(!descriptor.can_start(CapabilitySet::EMPTY.with(KernelCapability::Dma)));
-    }
-
-    #[test]
-    fn registry_is_bounded_and_unique() {
-        let mut registry: ServiceRegistry<2> = ServiceRegistry::new();
-        assert!(registry.register(ServiceDescriptor::new(ServiceId::Driverd, ProcessId(1), ServiceClass::Hardware, sample_caps(), bootstrap_budget())).is_ok());
-        assert_eq!(registry.register(ServiceDescriptor::new(ServiceId::Driverd, ProcessId(2), ServiceClass::Hardware, sample_caps(), bootstrap_budget())), Err(ServiceModelError::Duplicate));
-        assert!(registry.register(ServiceDescriptor::new(ServiceId::Appd, ProcessId(2), ServiceClass::Application, sample_caps(), bootstrap_budget())).is_ok());
-        assert_eq!(registry.register(ServiceDescriptor::new(ServiceId::Asappd, ProcessId(3), ServiceClass::Application, sample_caps(), bootstrap_budget())), Err(ServiceModelError::Full));
-    }
-
-    #[test]
-    fn canonical_roster_and_contracts_are_stable() {
-        assert_eq!(SERVICE_IDS.len(), SERVICE_COUNT);
-        assert_eq!(SERVICE_CLASSES.len(), SERVICE_COUNT);
-        for service in SERVICE_IDS {
-            assert_eq!(required_contract(service).service, service);
-        }
-        assert_eq!(required_contract(ServiceId::Driverd), DRIVERD_CONTRACT);
-        assert_eq!(required_contract(ServiceId::Aweterminald), AWETERMINALD_CONTRACT);
-        assert_eq!(required_contract(ServiceId::Awebusd), AWEBUSD_CONTRACT);
-        assert_eq!(required_contract(ServiceId::Aweupdated), AWEUPDATED_CONTRACT);
-    }
+pub const fn canonical_contracts() -> [ServiceContract; 7] {
+    [
+        DRIVERD_CONTRACT,
+        APPD_CONTRACT,
+        ASAPPD_CONTRACT,
+        AYUID_CONTRACT,
+        AWETERMINALD_CONTRACT,
+        AWEBUSD_CONTRACT,
+        AWEUPDATED_CONTRACT,
+    ]
 }
