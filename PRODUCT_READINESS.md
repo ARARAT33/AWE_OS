@@ -4,9 +4,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**80% — AWE_OS 1.0 implementation readiness.**
+**85% — AWE_OS 1.0 implementation readiness.**
 
-The 80% storage/network implementation checkpoint is now implemented as bounded kernel contracts with deterministic tests. Automated CI/QEMU certification is a separate evidence gate and must be green before this percentage is called release-certified.
+The 85% checkpoint advances the roadmap from hardware/storage/network foundations into concrete userspace service lifecycle, identity and AWOSA native-runtime contracts. This is an implementation milestone; release certification remains a separate evidence gate and cannot be claimed until the required CI/QEMU/runtime/recovery evidence is green.
 
 ## Implemented kernel foundations
 
@@ -69,32 +69,47 @@ The 80% storage/network implementation checkpoint is now implemented as bounded 
 
 ## 80.0 implementation checkpoint — COMPLETE
 
-The 80% implementation checkpoint combines the completed hardware foundation with storage/filesystem and networking contracts without moving concrete drivers or policy into CellKernel.
-
-### Storage/filesystem
 - [x] GPT-backed block boundary.
 - [x] VFS metadata and inode lifecycle.
 - [x] bounded names and handles.
-- [x] journal transaction state.
-- [x] crash recovery decision model.
+- [x] journal transaction state and crash recovery decision model.
 - [x] fsck validation.
-
-### Networking
 - [x] IPv4 transport boundary.
 - [x] UDP/TCP endpoint validation.
-- [x] bounded socket registry.
-- [x] checksum primitive.
+- [x] bounded socket registry and checksum primitive.
 
-## 80.0 validation evidence gate — PENDING
+## 85.0 userspace/native checkpoint — IMPLEMENTED
 
-Implementation completion is not the same as release certification. These evidence items remain separate:
+### Userspace services
+- [x] Versioned init/service-manager ABI.
+- [x] Fixed-capacity service registry with duplicate rejection.
+- [x] Explicit service lifecycle transitions and fail-closed invalid transitions.
+- [x] Per-service capability mask and CPU/memory budgets.
+- [x] Bounded user/group identity model.
+- [x] Capability authorization at the identity boundary.
+- [x] Fixed-capacity, deduplicated group membership.
 
-- [ ] GitHub Quality Gate finishes green on the 80% checkpoint tree.
-- [ ] Boot Image workflow finishes green.
-- [ ] QEMU PCI/VirtIO device exercise passes.
-- [ ] Persistent storage/filesystem runtime exercise passes.
-- [ ] Network runtime exercise passes.
-- [ ] No high/critical build or runtime blocker remains.
+### AWOSA
+- [x] Versioned runtime ABI negotiation.
+- [x] Bounded path/message/I/O validation.
+- [x] Explicit process/memory/filesystem/network/UI/device/IPC capability vocabulary.
+- [x] Fail-closed native capability authorization.
+
+### Native app admission
+- [x] Versioned application manifest and bounded dependencies/resources.
+- [x] Bounded package header/manifest/payload/signature-length validation.
+- [x] Fail-closed package admission before execution.
+
+## 85.0 validation evidence gate — PENDING
+
+The implementation has advanced to the 85% checkpoint, but the following evidence is still required before calling 85% release-certified:
+
+- [ ] Quality Gate green on the final 85% checkpoint tree.
+- [ ] Boot Image/QEMU smoke green on the same tree.
+- [ ] Userspace service lifecycle exercised in an emulator/runtime path.
+- [ ] AWOSA ABI exercised through a native-runtime integration test.
+- [ ] Persistent storage and network runtime exercises remain green.
+- [ ] No high/critical release blocker remains.
 
 ## Still ahead toward 100%
 
@@ -102,8 +117,8 @@ Implementation completion is not the same as release certification. These eviden
 - [ ] Full NVMe/AHCI runtime, xHCI/USB, HID, Ethernet/Wi-Fi/Bluetooth, audio and GPU runtime.
 - [ ] Full VFS/native filesystem persistence, journaling replay and fsck tools.
 - [ ] Ethernet/ARP/IPv4/IPv6/ICMP, UDP/TCP/DNS/DHCP, TLS, firewall and network recovery.
-- [ ] User-space loader, init/service manager, identity and core system services.
-- [ ] AWOSA runtime and SDK.
+- [ ] Userspace loader integration, device/filesystem/network managers, update/logging/security services and crash recovery.
+- [ ] Full AWOSA SDK, headers and bindings.
 - [ ] Signed `.asd` driver package ecosystem.
 - [ ] Signed `.awos` application ecosystem.
 - [ ] AYUI desktop and first-party applications.
@@ -113,7 +128,7 @@ Implementation completion is not the same as release certification. These eviden
 - [ ] ARM64/RISC-V64 production validation.
 - [ ] Hardware matrix, fuzz/stress and reproducible release certification.
 
-The remaining 80→100 roadmap continues exactly as defined in `docs/AWE_OS_100_PERCENT_MASTER_PLAN.md`: userspace/services → AWOSA → `.awos` → `.asd` → AYUI → compatibility → App Builder → native ecosystem → security/update/recovery → multi-architecture → release validation.
+The remaining 85→100 roadmap follows `docs/AWE_OS_100_PERCENT_MASTER_PLAN.md`: runtime integration → `.asd` → `.awos` → AYUI → compatibility → App Builder → native ecosystem → security/update/recovery → multi-architecture → release validation.
 
 ## Definition of done
 
