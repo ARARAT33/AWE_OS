@@ -115,10 +115,7 @@ mod tests {
             payload_len: (MAX_PAYLOAD + 1) as u32,
             signature_len: 64,
         };
-        assert_eq!(
-            validate_package(h, 0),
-            Err(AppError::InvalidManifest)
-        );
+        assert_eq!(validate_package(h, 0), Err(AppError::InvalidManifest));
     }
 
     #[test]
