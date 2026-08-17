@@ -1,4 +1,6 @@
 #![no_std]
+#![allow(dead_code)]
+#![allow(unused_attributes)]
 
 // CellKernel is intentionally hardware-driver free.
 // All hardware discovery, driver lifecycle, compatibility adapters and
