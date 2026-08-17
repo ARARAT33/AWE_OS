@@ -12,9 +12,6 @@ const MULTIBOOT2_BOOTLOADER_MAGIC: u32 = 0x36D7_6289;
 const MAX_MEMORY_REGIONS: usize = 128;
 const FALLBACK_MEMORY_BASE: u64 = 0x0100_0000;
 const FALLBACK_MEMORY_LENGTH: u64 = 0x0200_0000;
-const PAGE_PRESENT: u32 = 1;
-const PAGE_WRITABLE: u32 = 2;
-const PAGE_HUGE: u32 = 1 << 7;
 
 static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] =
     [MemoryRegion { base: 0, length: 0, kind: 2, reserved: 0 }; MAX_MEMORY_REGIONS];
@@ -24,23 +21,20 @@ static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] =
 #[unsafe(no_mangle)]
 static MULTIBOOT2_HEADER: [u32; 4] = [0xE852_50D6, 0, 16, 0x17AD_AF1A];
 
-#[repr(C, align(4096))]
-struct BootPageTable([u64; 512]);
+#[cfg(not(test))]
+#[unsafe(link_section = ".bss.boot")]
+#[unsafe(no_mangle)]
+static mut BOOT_PML4: [u64; 512] = [0; 512];
 
 #[cfg(not(test))]
 #[unsafe(link_section = ".bss.boot")]
 #[unsafe(no_mangle)]
-static mut BOOT_PML4: BootPageTable = BootPageTable([0; 512]);
+static mut BOOT_PDPT: [u64; 512] = [0; 512];
 
 #[cfg(not(test))]
 #[unsafe(link_section = ".bss.boot")]
 #[unsafe(no_mangle)]
-static mut BOOT_PDPT: BootPageTable = BootPageTable([0; 512]);
-
-#[cfg(not(test))]
-#[unsafe(link_section = ".bss.boot")]
-#[unsafe(no_mangle)]
-static mut BOOT_PD: BootPageTable = BootPageTable([0; 512]);
+static mut BOOT_PD: [u64; 512] = [0; 512];
 
 #[cfg(not(test))]
 #[unsafe(link_section = ".bss.stack")]
@@ -63,14 +57,14 @@ _start:
     mov dword ptr [boot_info_saved], ebx
 
     # Build a minimal identity map for the first 1 GiB using 2 MiB pages.
-    # PML4[0] -> PDPT[0] -> PD[0..511], each PD entry maps 2 MiB.
+    # PML4[0] -> PDPT[0] -> PD[0..511].
     mov eax, offset BOOT_PDPT
-    or eax, PAGE_PRESENT | PAGE_WRITABLE
+    or eax, 3
     mov dword ptr [BOOT_PML4], eax
     mov dword ptr [BOOT_PML4 + 4], 0
 
     mov eax, offset BOOT_PD
-    or eax, PAGE_PRESENT | PAGE_WRITABLE
+    or eax, 3
     mov dword ptr [BOOT_PDPT], eax
     mov dword ptr [BOOT_PDPT + 4], 0
 
@@ -78,7 +72,7 @@ _start:
 1:
     mov eax, ecx
     shl eax, 21
-    or eax, PAGE_PRESENT | PAGE_WRITABLE | PAGE_HUGE
+    or eax, 0x83
     mov dword ptr [BOOT_PD + ecx * 8], eax
     mov dword ptr [BOOT_PD + ecx * 8 + 4], 0
     inc ecx
@@ -104,7 +98,9 @@ _start:
 
     # Temporary 64-bit GDT: null, 64-bit code, data.
     lgdt [gdt64_descriptor]
-    ljmp 0x08, long_mode_entry
+    push 0x08
+    push long_mode_entry
+    retf
 
 .code64
 long_mode_entry:
@@ -135,9 +131,10 @@ boot_info_saved:
 gdt64:
     .quad 0
     .quad 0x00AF9A000000FFFF
+gdt64_data:
     .quad 0x00CF92000000FFFF
 gdt64_descriptor:
-    .word gdt64_end - gdt64 - 1
+    .word gdt64_data - gdt64 - 1
     .quad gdt64
 gdt64_end:
 
