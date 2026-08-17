@@ -4,9 +4,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**61% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**61.5% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
 
-The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 61% gate closes the complete 60.0–61.0 Architecture Freeze block.
+The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 61.5% gate is a hardware-boundary sub-gate between the completed 61.0 Architecture Freeze and the 65% driver execution checkpoint.
 
 ## Implemented kernel foundations
 
@@ -37,35 +37,33 @@ The percentage follows the AWE_OS 60–100 master plan and advances only when th
 - **60.2 service-contract freeze:** CellKernel ABI 1.2, typed service IDs, explicit capability admission, typed IPC channels/opcodes, and contracts for the full canonical service roster.
 - **60.5 service/process freeze:** explicit service-to-process ownership, service classes, lifecycle states, bounded CPU/memory/IPC budgets, fixed-capacity service registry, canonical seven-service roster, and fail-closed capability admission.
 - **60.6–61.0 transport freeze:** capability handles, service endpoints, versioned HELLO handshake, bounded shared-memory-style rings, async request tracking, event queues, canonical service/channel mapping, and frozen IPC opcode validation.
+- **61.5 device-boundary freeze:** canonical device matching, explicit resource grants, bounded MMIO/I/O/DMA/interrupt ownership accounting, and fail-closed driver binding decisions.
 
-## 60.2 milestone — COMPLETE
+## 61.5 milestone — COMPLETE
 
-The 60.2 gate freezes the minimal kernel-to-service boundary.
+The 61.5 gate is deliberately hardware-neutral. It completes the common device/driver contract needed before concrete hardware discovery and execution:
 
-## 60.5 milestone — COMPLETE
+- [x] Stable `DeviceId`, `DeviceClass` and `DeviceState` model.
+- [x] Exact, class and fallback driver matching semantics.
+- [x] Canonical device-to-driver match descriptors.
+- [x] Explicit resource grant contract for MMIO, I/O, DMA and interrupts.
+- [x] Resource ownership is bounded by a device-specific budget.
+- [x] Binding fails closed on identity mismatch or resource over-allocation.
+- [x] Existing bounded device registry remains intact.
+- [x] New primitives are fixed-layout and allocation-free.
+- [x] Unit coverage for strict matching and resource ownership.
 
-The 60.5 gate freezes the process/service ownership model for the complete platform boundary without moving implementations into CellKernel.
+## 61.5 boundary — NOT COUNTED YET
 
-## 60.6–61.0 milestone — COMPLETE
+The following remain intentionally reserved for the 65% checkpoint and later production gates:
 
-The 60.6–61.0 gate implements the execution-side service boundary required by the master plan:
-
-- [x] Explicit capability handles and endpoint identity.
-- [x] Service registration boundary through a bounded registry.
-- [x] Versioned HELLO handshake with major/minor compatibility checks.
-- [x] Wrong-service and wrong-endpoint rejection.
-- [x] Fixed-capacity shared-memory-style ring transport with deterministic backpressure.
-- [x] Bounded asynchronous request table with completion semantics.
-- [x] Bounded event transport.
-- [x] Stable mapping between all seven `ServiceId` values and IPC channels.
-- [x] Closed validation of the frozen IPC opcode set.
-- [x] CellKernel remains driver/application implementation free.
-
-The detailed specification is `docs/MILESTONE_61_0.md`.
-
-## Hardware and driver intelligence
-
-AWE_OS targets real hardware, virtual machines and cloud/server environments through one capability-controlled Driver HAL. Foreign kernel ABIs are not executed directly inside CellKernel.
+- PCI/PCIe enumeration;
+- ACPI discovery;
+- APIC/IOAPIC implementation;
+- VirtIO transport and concrete drivers;
+- real hardware driver execution;
+- hardware DMA/IOMMU enforcement;
+- QEMU device certification.
 
 ## Driver roadmap
 
@@ -113,9 +111,9 @@ AWE_OS targets real hardware, virtual machines and cloud/server environments thr
 - [ ] Signed/measured release image verification in the boot path.
 - [ ] Automated QEMU boot certification.
 
-## 61% milestone boundary
+## 61.5 milestone boundary
 
-The 61% milestone represents completion of the entire 60.0–61.0 Architecture Freeze from the master plan: kernel/service ABI contracts, process/service ownership, service registry, capability handles, service handshake, bounded shared-memory transport, asynchronous requests/events, and stable service/channel/opcode mappings. No later driver, application, UI, compatibility, update or desktop implementation is counted toward 61%.
+The 61.5 milestone represents completion of the hardware-neutral device boundary required by the master execution order: the kernel can describe devices, define canonical driver matching and account for bounded resource ownership, while concrete PCI/ACPI/VirtIO discovery and driver execution remain outside this gate. No 65% checkpoint work is counted early.
 
 ## Definition of done
 
