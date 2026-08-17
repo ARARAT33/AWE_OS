@@ -10,12 +10,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   cloud-security:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -30,7 +34,7 @@ jobs:
           key: aweos-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: aweos-${{ runner.os }}-
       - name: Format workspace
-        run: cargo fmt --all
+        run: cargo fmt --all -- --check
       - name: Compile every workspace crate
         run: cargo check --workspace
       - name: Execute every workspace test
@@ -44,7 +48,7 @@ jobs:
           exit 0
       - name: Upload workspace test diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: aweos-workspace-test-log
           path: workspace-tests.log
@@ -54,7 +58,7 @@ jobs:
       - name: Security-focused tests
         run: cargo test --workspace --all-targets -- security
       - name: Clippy diagnostics
-        run: cargo clippy --workspace --all-targets
+        run: cargo clippy --workspace --all-targets -- -D warnings -A dead_code -A unused_attributes -A bad_asm_style -A unused_imports
       - name: Dependency audit surface
         run: cargo tree --workspace --locked
 
@@ -62,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: cloud-security
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Verify release contract exists
         run: |
           test -f PRODUCT_READINESS.md
