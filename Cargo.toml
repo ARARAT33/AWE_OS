@@ -4,6 +4,7 @@ members = [
     "boot/aweloader",
     "kernel",
     "kernel-bin",
+    "services/driverd",
     "tools/aweosa-builder",
 ]
 resolver = "2"
@@ -13,6 +14,7 @@ edition = "2024"
 
 [workspace.dependencies]
 awe-boot-protocol = { path = "boot/protocol" }
+awe-driverd = { path = "services/driverd" }
 
 [profile.dev]
 panic = "abort"
