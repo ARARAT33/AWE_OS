@@ -7,7 +7,6 @@
 pub enum ApicError {
     InvalidVector,
     InvalidGsi,
-    InvalidDestination,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,7 +34,6 @@ pub struct IrqRoute {
 impl IrqRoute {
     pub const fn new(gsi: u32, vector: u8, destination_apic: u8) -> Result<Self, ApicError> {
         if vector < 32 { return Err(ApicError::InvalidVector); }
-        if destination_apic > 255 { return Err(ApicError::InvalidDestination); }
         Ok(Self { gsi, vector, destination_apic, masked: true })
     }
 
@@ -47,7 +45,10 @@ impl IrqRoute {
 
 impl IoApic {
     pub const fn owns_gsi(self, gsi: u32) -> bool {
-        gsi >= self.gsi_base && gsi < self.gsi_base + self.redirection_entries as u32
+        match self.gsi_base.checked_add(self.redirection_entries as u32) {
+            Some(end) => gsi >= self.gsi_base && gsi < end,
+            None => false,
+        }
     }
 
     pub const fn route(self, gsi: u32, vector: u8, destination: u8) -> Result<IrqRoute, ApicError> {
