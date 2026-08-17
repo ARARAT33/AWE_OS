@@ -1,5 +1,9 @@
 #![no_std]
 
+mod binding;
+
+pub use binding::{BindingDecision, DeviceMatch, MatchKind, ResourceGrant, decide_binding};
+
 /// Stable device identity used by the AWE driver registry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DeviceId(pub u64);
@@ -44,6 +48,10 @@ impl DeviceContract {
     pub const fn with_irq(mut self, irq: u32) -> Self {
         self.irq = Some(irq);
         self
+    }
+
+    pub const fn matching(self) -> DeviceMatch {
+        DeviceMatch::exact(self.vendor, self.product, self.class)
     }
 }
 
@@ -111,5 +119,11 @@ mod tests {
         assert_eq!(registry.set_state(id, DeviceState::Active), Ok(()));
         assert_eq!(registry.find(id).unwrap().state, DeviceState::Active);
         assert_eq!(registry.register(DeviceContract::new(DeviceId(8), DeviceClass::Network, 3, 4)), Err(RegistryError::Full));
+    }
+
+    #[test]
+    fn device_contract_exposes_canonical_exact_match() {
+        let device = DeviceContract::new(DeviceId(11), DeviceClass::Display, 0x10de, 0x1cb3);
+        assert_eq!(device.matching(), DeviceMatch::exact(0x10de, 0x1cb3, DeviceClass::Display));
     }
 }
