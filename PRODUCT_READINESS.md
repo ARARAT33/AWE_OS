@@ -4,9 +4,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**64% — AWE_OS 1.0 Product Readiness (current engineering estimate).**
+**65% — AWE_OS 1.0 implementation readiness.**
 
-The percentage follows the AWE_OS 60–100 master plan and advances only when the corresponding implementation gate is completed. Documentation alone never advances the percentage. The 64% gate closes the remaining hardware-boundary preparation inside the 61.6–64.x block; the 65% hardware execution checkpoint remains separate.
+The 65% hardware execution checkpoint is now implemented in the standalone driver plane. Automated CI/QEMU certification is a separate evidence gate and must be green before this percentage is called release-certified.
 
 ## Implemented kernel foundations
 
@@ -42,98 +42,89 @@ The percentage follows the AWE_OS 60–100 master plan and advances only when th
 - **62.5 native driver manifest/lifecycle freeze:** ABI-aware driver manifests, architecture/capability declarations, verified-trust admission, deterministic lifecycle transitions, and registry-level trust/ABI metadata.
 - **63.0 driver dependency/ownership/health integration:** bounded dependency graph, cycle rejection, per-driver resource ownership, failure counters, bounded restart accounting, and deterministic health recovery state.
 - **64.0 hardware access boundary freeze:** overflow-safe MMIO/PIO regions, bounded sub-range checks, explicit interrupt ownership modes, deterministic power-state transitions, and device-consistent access plans in both CellKernel and driverd.
+- **65.0 hardware execution checkpoint:** PCI enumeration primitives, x86 PCI config-space backend, ACPI/RSDP/table validation, APIC/IOAPIC routing model, VirtIO 1.x transport/queue state machine, and typed block/network/input/display reference devices.
 
-## 62.0 milestone — COMPLETE
+## 65.0 milestone — IMPLEMENTATION COMPLETE
 
-The 62.0 gate prepares the standalone driver service for real hardware execution without counting the 65% PCI/ACPI/VirtIO implementation.
+The 65% hardware execution checkpoint is implemented in `services/driverd` without moving concrete driver code into CellKernel:
 
-## 62.5 milestone — COMPLETE
+### PCI
+- [x] Bounded bus/device/function enumeration.
+- [x] Multi-function detection.
+- [x] Vendor/device/class/subclass/prog-if/header/interrupt extraction.
+- [x] x86_64 Configuration Mechanism #1 backend (`CF8/CFC`).
+- [x] Fixed-capacity discovery table.
 
-The 62.5 gate freezes the native driver-service contract required immediately before concrete hardware execution.
+### ACPI
+- [x] RSDP legacy/revision-2+ validation.
+- [x] Primary/extended checksum validation.
+- [x] Root table pointer parsing.
+- [x] SDT length/checksum bounds validation.
+- [x] Table lookup.
+- [x] MADT base-address/flags parsing.
 
-## 63.0 milestone — COMPLETE
+### APIC/IOAPIC
+- [x] Local APIC state model.
+- [x] IOAPIC GSI ownership model.
+- [x] IRQ vector validation.
+- [x] Mask/unmask routing model.
+- [x] Overflow-safe GSI range handling.
 
-The 63.0 gate advances the 61.6–64.x driver-service preparation block with the operational contracts needed to manage driver dependencies, resource ownership and health without putting driver implementations back into CellKernel.
+### VirtIO
+- [x] VirtIO 1.x feature requirement.
+- [x] Device status progression.
+- [x] Feature negotiation.
+- [x] Driver-OK readiness gate.
+- [x] Bounded power-of-two queue validation.
 
-## 64.0 milestone — COMPLETE
+### Reference devices
+- [x] VirtIO block request/range validation.
+- [x] Network frame contract.
+- [x] Input event contract.
+- [x] Display rectangle validation.
+- [x] Typed Block/Network/Input/GPU reference device descriptors.
 
-The 64.0 gate freezes the last hardware-neutral access boundary before real device execution:
+### Driver ecosystem
+- [x] Canonical PCI/ACPI/APIC/VirtIO metadata.
+- [x] VirtIO block/network/input/GPU metadata.
+- [x] AHCI/NVMe metadata.
+- [x] Linux/Windows/Android compatibility metadata remains separate from native hardware drivers.
 
-- [x] Overflow-safe MMIO region contract.
-- [x] Overflow-safe PIO region contract.
-- [x] Bounded sub-range containment for register/window access.
-- [x] Explicit interrupt ownership contract with line/MSI/MSI-X modes.
-- [x] Explicit power-state contract with deterministic bounded transitions.
-- [x] Device-side access contract ties MMIO/PIO/interrupt ownership to one device identity.
-- [x] Driver-side access plan ties hardware resources to one driver identity.
-- [x] Driver service exports the access/power contracts.
-- [x] Unit coverage for overflow, bounds, interrupt validity, power transitions and identity consistency.
-- [x] No concrete PCI/ACPI/APIC/IOAPIC/VirtIO/DMA hardware execution counted early.
+## 65.0 validation evidence gate — PENDING
 
-The detailed specification is `docs/MILESTONE_64_0.md`.
+Implementation completion is not the same as release certification. These evidence items are intentionally separate:
 
-## Reserved for 65% checkpoint
+- [ ] GitHub Quality Gate finishes green on the 65% checkpoint tree.
+- [ ] Boot Image workflow finishes green.
+- [ ] QEMU PCI/VirtIO device exercise passes.
+- [ ] Storage/network/input/display runtime exercise passes.
+- [ ] No high/critical build or runtime blocker remains.
 
-The following are deliberately not counted toward 64% and remain the next major validation block:
+The current repository workflows are configured to run automatically on pushes to `main`. The checkpoint is **implemented**, while certification remains evidence-driven.
 
-- PCI/PCIe enumeration and BAR discovery;
-- ACPI discovery and real power-resource execution;
-- APIC/IOAPIC implementation and interrupt routing;
-- VirtIO transport and queue execution;
-- concrete VirtIO block/network/input/display drivers;
-- real DMA/IOMMU hardware enforcement;
-- QEMU hardware certification.
+## Driver roadmap after 65%
 
-## Driver roadmap
+### Completed at the implementation checkpoint
+- [x] PCI discovery contract and x86 backend.
+- [x] ACPI discovery primitives.
+- [x] APIC/IOAPIC routing model.
+- [x] VirtIO transport/queue model.
+- [x] VirtIO block/network/input/display reference protocols.
 
-### Virtualization
-- [x] Driver HAL and device contracts.
-- [x] VirtIO feature negotiation foundation.
-- [ ] VirtIO PCI transport.
-- [ ] VirtIO block driver.
-- [ ] VirtIO network driver.
-- [ ] VirtIO console/entropy/input drivers.
-- [ ] VirtIO GPU driver.
-- [ ] Automated QEMU end-to-end device tests.
-
-### PC/server hardware
-- [ ] PCI enumeration.
-- [ ] ACPI tables and power-management.
-- [ ] APIC/IOAPIC.
-- [ ] NVMe/AHCI.
-- [ ] xHCI/USB.
-- [ ] HID keyboard/mouse.
-- [ ] Ethernet.
-- [ ] Wi-Fi.
-- [ ] Audio.
-- [ ] GPU/display.
-- [ ] IOMMU/SMMU DMA isolation.
-
-### Cross-OS coverage
-- [x] Driver source/provenance model.
-- [x] Offline/online driver database architecture.
-- [x] Deterministic driver experience tracking.
-- [ ] Linux hardware-ID ingestion implementation.
-- [ ] Android vendor compatibility adapters.
-- [ ] Windows documented-device compatibility adapters.
-- [ ] BSD compatibility adapters.
+### Still ahead
+- [ ] Real DMA/IOMMU hardware enforcement.
+- [ ] Full NVMe/AHCI runtime execution.
+- [ ] xHCI/USB runtime.
+- [ ] HID runtime.
+- [ ] Ethernet/Wi-Fi/Bluetooth runtime.
+- [ ] Audio runtime.
+- [ ] GPU acceleration runtime.
 - [ ] Hardware certification matrix.
 
-## Bootloader
+## Later stages
 
-- [x] AWE image identity and architecture validation contract.
-- [x] Loader-owned memory validation contract.
-- [x] Monotonic boot phases and terminal failure state.
-- [x] Kernel-side x86_64 bootstrap page-table construction and CR3 activation.
-- [ ] Complete x86_64 UEFI boot implementation.
-- [ ] Loader-owned page-table handoff and CR3 activation.
-- [ ] Signed/measured release image verification in the boot path.
-- [ ] Automated QEMU boot certification.
-
-## 64% milestone boundary
-
-The 64% milestone represents completion of the final hardware-neutral device-access preparation block from the master plan. CellKernel and driverd now have explicit, bounded contracts for MMIO/PIO access, interrupt ownership and power-state intent, all tied to a concrete device/driver identity. Real hardware discovery, interrupt routing, DMA programming and driver execution remain reserved for the 65% checkpoint.
+The remaining 65→100 roadmap continues exactly as defined in `docs/AWE_OS_100_PERCENT_MASTER_PLAN.md`: storage/filesystem → networking → userspace/services → AWOSA → `.awos` → compatibility → AYUI → App Builder → native ecosystem → security/update/recovery → multi-architecture → release validation.
 
 ## Definition of done
 
-AWE_OS is considered product-ready only when the required boot, kernel, driver, security, recovery and release gates are implemented and their automated CI/QEMU validation is green. Documentation or architectural placeholders alone do not satisfy a gate.
+AWE_OS is considered fully product-ready only when the required boot, kernel, driver, security, recovery and release gates are implemented and their automated CI/QEMU validation is green. Documentation or architectural placeholders alone do not satisfy a gate.
