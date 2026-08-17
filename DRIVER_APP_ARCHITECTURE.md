@@ -12,17 +12,11 @@ AWE_OS is now designed as a **microkernel-first system**:
 
 ## What was found
 
-The repository previously exported a large `kernel::drivers` module containing
-native/compatibility abstractions, VirtIO, Linux lifecycle/recovery machinery,
-Windows and Android adapters, registries, installers and resource/health
-management. The driver tree is therefore substantially larger than a normal
-minimal kernel driver boundary. fileciteturn49file0
+The repository previously exported a large `kernel::drivers` module containing native/compatibility abstractions, VirtIO, Linux lifecycle/recovery machinery, Windows and Android adapters, registries, installers and resource/health management. The driver tree is therefore substantially larger than a normal minimal kernel driver boundary.
 
-`kernel/src/lib.rs` previously exported `pub mod drivers;`; that export has now
-been removed. fileciteturn50file0
+`kernel/src/lib.rs` previously exported `pub mod drivers;`; that export has now been removed.
 
-The old driver source remains in the repository as migration material, but it
-is not part of CellKernel's public module graph anymore. fileciteturn51file0
+The old driver source remains in the repository as migration material, but it is not part of CellKernel's public module graph anymore.
 
 ## Runtime topology
 
@@ -86,5 +80,4 @@ The driver boundary is intentionally small and designed for:
 - fault quarantine and restart;
 - no driver code in the kernel hot path.
 
-This makes the **trusted kernel smaller** while allowing the driver plane to
-be much larger without turning every driver bug into a kernel failure.
+This makes the **trusted kernel smaller** while allowing the driver plane to be much larger without turning every driver bug into a kernel failure.
