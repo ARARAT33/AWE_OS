@@ -1,11 +1,12 @@
 #![no_std]
 
-/// Stable identity and capability metadata exposed to kernel integration code.
+/// Stable CellKernel/service contract.
 ///
-/// This is deliberately data-only: architecture code and policy engines remain
-/// responsible for enforcing the individual contracts.
+/// 60.2 freezes the minimal kernel-to-service boundary. The kernel exposes
+/// capabilities and IPC primitives; policy and service implementations stay
+/// outside the kernel.
 pub const ABI_MAJOR: u16 = 1;
-pub const ABI_MINOR: u16 = 0;
+pub const ABI_MINOR: u16 = 2;
 pub const KERNEL_NAME: &[u8] = b"CellKernel";
 pub const OS_NAME: &[u8] = b"AWE_OS";
 
@@ -18,47 +19,26 @@ pub enum KernelCapability {
     Processes = 3,
     Ipc = 4,
     Syscalls = 5,
-    Drivers = 6,
-    Storage = 7,
-    Network = 8,
-    Security = 9,
+    Security = 6,
+    DeviceGrant = 7,
+    Dma = 8,
+    SharedMemory = 9,
 }
 
-impl KernelCapability {
-    pub const fn bit(self) -> u64 {
-        1u64 << (self as u8)
-    }
-}
+impl KernelCapability { pub const fn bit(self) -> u64 { 1u64 << (self as u8) } }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CapabilitySet(u64);
 
 impl CapabilitySet {
     pub const EMPTY: Self = Self(0);
-
-    pub const fn from_bits(bits: u64) -> Self {
-        Self(bits)
-    }
-
-    pub const fn bits(self) -> u64 {
-        self.0
-    }
-
-    pub const fn contains(self, capability: KernelCapability) -> bool {
-        self.0 & capability.bit() != 0
-    }
-
-    pub const fn with(self, capability: KernelCapability) -> Self {
-        Self(self.0 | capability.bit())
-    }
-
-    pub const fn without(self, capability: KernelCapability) -> Self {
-        Self(self.0 & !capability.bit())
-    }
+    pub const fn from_bits(bits: u64) -> Self { Self(bits) }
+    pub const fn bits(self) -> u64 { self.0 }
+    pub const fn contains(self, capability: KernelCapability) -> bool { self.0 & capability.bit() != 0 }
+    pub const fn with(self, capability: KernelCapability) -> Self { Self(self.0 | capability.bit()) }
+    pub const fn without(self, capability: KernelCapability) -> Self { Self(self.0 & !capability.bit()) }
 }
 
-/// Minimum capability set expected before the kernel can report a fully
-/// initialized execution environment.
 pub const REQUIRED_RUNTIME_CAPABILITIES: CapabilitySet = CapabilitySet::EMPTY
     .with(KernelCapability::Memory)
     .with(KernelCapability::Interrupts)
@@ -68,6 +48,41 @@ pub const REQUIRED_RUNTIME_CAPABILITIES: CapabilitySet = CapabilitySet::EMPTY
     .with(KernelCapability::Syscalls)
     .with(KernelCapability::Security);
 
+#[repr(u16)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ServiceId {
+    Driverd = 1,
+    Appd = 2,
+    Asappd = 3,
+    Ayuid = 4,
+    Aweterminald = 5,
+    Awebusd = 6,
+    Aweupdated = 7,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ServiceContract {
+    pub service: ServiceId,
+    pub abi_major: u16,
+    pub abi_minor: u16,
+    pub required_capabilities: CapabilitySet,
+}
+
+impl ServiceContract {
+    pub const fn new(service: ServiceId, abi_major: u16, abi_minor: u16, required_capabilities: CapabilitySet) -> Self {
+        Self { service, abi_major, abi_minor, required_capabilities }
+    }
+
+    pub const fn accepts_kernel(self, kernel: KernelContract) -> bool {
+        kernel.abi_major == self.abi_major
+            && kernel.abi_minor >= self.abi_minor
+            && kernel.capabilities.bits() & self.required_capabilities.bits() == self.required_capabilities.bits()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ContractError { MajorVersionMismatch, MinorVersionTooOld, MissingCapability }
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct KernelContract {
     pub abi_major: u16,
@@ -76,23 +91,60 @@ pub struct KernelContract {
 }
 
 impl KernelContract {
-    pub const fn current(capabilities: CapabilitySet) -> Self {
-        Self {
-            abi_major: ABI_MAJOR,
-            abi_minor: ABI_MINOR,
-            capabilities,
-        }
-    }
-
-    pub const fn is_compatible_with(self, required_major: u16) -> bool {
-        self.abi_major == required_major
-    }
-
+    pub const fn current(capabilities: CapabilitySet) -> Self { Self { abi_major: ABI_MAJOR, abi_minor: ABI_MINOR, capabilities } }
+    pub const fn is_compatible_with(self, required_major: u16) -> bool { self.abi_major == required_major }
     pub const fn has_runtime_baseline(self) -> bool {
-        self.capabilities.bits() & REQUIRED_RUNTIME_CAPABILITIES.bits()
-            == REQUIRED_RUNTIME_CAPABILITIES.bits()
+        self.capabilities.bits() & REQUIRED_RUNTIME_CAPABILITIES.bits() == REQUIRED_RUNTIME_CAPABILITIES.bits()
+    }
+    pub const fn validate_service(self, service: ServiceContract) -> Result<(), ContractError> {
+        if self.abi_major != service.abi_major { return Err(ContractError::MajorVersionMismatch); }
+        if self.abi_minor < service.abi_minor { return Err(ContractError::MinorVersionTooOld); }
+        if self.capabilities.bits() & service.required_capabilities.bits() != service.required_capabilities.bits() {
+            return Err(ContractError::MissingCapability);
+        }
+        Ok(())
     }
 }
+
+pub const DRIVERD_CONTRACT: ServiceContract = ServiceContract::new(
+    ServiceId::Driverd,
+    ABI_MAJOR,
+    ABI_MINOR,
+    CapabilitySet::EMPTY
+        .with(KernelCapability::Ipc)
+        .with(KernelCapability::Security)
+        .with(KernelCapability::DeviceGrant)
+        .with(KernelCapability::Dma)
+        .with(KernelCapability::SharedMemory),
+);
+
+pub const APPD_CONTRACT: ServiceContract = ServiceContract::new(
+    ServiceId::Appd,
+    ABI_MAJOR,
+    ABI_MINOR,
+    CapabilitySet::EMPTY
+        .with(KernelCapability::Ipc)
+        .with(KernelCapability::Security)
+        .with(KernelCapability::SharedMemory),
+);
+
+pub const ASAPPD_CONTRACT: ServiceContract = ServiceContract::new(
+    ServiceId::Asappd,
+    ABI_MAJOR,
+    ABI_MINOR,
+    CapabilitySet::EMPTY
+        .with(KernelCapability::Ipc)
+        .with(KernelCapability::Security),
+);
+
+pub const AYUID_CONTRACT: ServiceContract = ServiceContract::new(
+    ServiceId::Ayuid,
+    ABI_MAJOR,
+    ABI_MINOR,
+    CapabilitySet::EMPTY
+        .with(KernelCapability::Ipc)
+        .with(KernelCapability::SharedMemory),
+);
 
 #[cfg(test)]
 mod tests {
@@ -100,20 +152,38 @@ mod tests {
 
     #[test]
     fn capability_operations_are_deterministic() {
-        let set = CapabilitySet::EMPTY
-            .with(KernelCapability::Memory)
-            .with(KernelCapability::Ipc);
+        let set = CapabilitySet::EMPTY.with(KernelCapability::Memory).with(KernelCapability::Ipc);
         assert!(set.contains(KernelCapability::Memory));
         assert!(set.contains(KernelCapability::Ipc));
-        assert!(!set.contains(KernelCapability::Network));
+        assert!(!set.contains(KernelCapability::Dma));
         assert!(!set.without(KernelCapability::Memory).contains(KernelCapability::Memory));
     }
 
     #[test]
-    fn current_contract_requires_only_declared_baseline() {
+    fn current_contract_requires_declared_baseline() {
         let contract = KernelContract::current(REQUIRED_RUNTIME_CAPABILITIES);
         assert!(contract.is_compatible_with(ABI_MAJOR));
         assert!(contract.has_runtime_baseline());
         assert!(!contract.is_compatible_with(ABI_MAJOR + 1));
+    }
+
+    #[test]
+    fn service_contract_checks_version_and_capabilities() {
+        let kernel = KernelContract::current(
+            REQUIRED_RUNTIME_CAPABILITIES
+                .with(KernelCapability::DeviceGrant)
+                .with(KernelCapability::Dma)
+                .with(KernelCapability::SharedMemory),
+        );
+        assert_eq!(kernel.validate_service(DRIVERD_CONTRACT), Ok(()));
+        let weak = KernelContract::current(REQUIRED_RUNTIME_CAPABILITIES);
+        assert_eq!(weak.validate_service(DRIVERD_CONTRACT), Err(ContractError::MissingCapability));
+    }
+
+    #[test]
+    fn minor_versions_are_forward_compatible() {
+        let kernel = KernelContract::current(REQUIRED_RUNTIME_CAPABILITIES);
+        let older = ServiceContract::new(ServiceId::Appd, ABI_MAJOR, 0, CapabilitySet::EMPTY.with(KernelCapability::Ipc));
+        assert_eq!(kernel.validate_service(older), Ok(()));
     }
 }
