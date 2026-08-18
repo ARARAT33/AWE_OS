@@ -50,13 +50,13 @@ jobs:
           exit "$status"
       - name: 90% package and recovery evidence
         if: steps.tests.outcome == 'success'
-        run: cargo test -p awe-product-core-tests --offline -- --nocapture asd awos ab_update downgrade
+        run: cargo test -p awe-product-core-tests --offline -- --nocapture
       - name: Persistent storage runtime evidence
         if: steps.tests.outcome == 'success'
-        run: cargo test -p awe-product-core-tests --offline -- --nocapture persistent_storage
+        run: cargo test -p awe-product-core-tests --offline -- --nocapture persistent_storage_runtime_round_trip_and_recovery
       - name: Network runtime evidence
         if: steps.tests.outcome == 'success'
-        run: cargo test -p awe-product-core-tests --offline -- --nocapture network_runtime
+        run: cargo test -p awe-product-core-tests --offline -- --nocapture network_runtime_socket_and_packet_validation
       - name: Upload workspace test diagnostics
         if: always()
         uses: actions/upload-artifact@v7
