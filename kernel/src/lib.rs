@@ -11,6 +11,7 @@
 // The kernel owns only minimal process/IPC/capability primitives needed to
 // isolate and communicate with those services.
 pub mod ac_boot_gate;
+pub mod ac_completion;
 pub mod ac_runtime;
 pub mod arch;
 pub mod boot_guard;
