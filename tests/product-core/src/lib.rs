@@ -1,10 +1,14 @@
 #[cfg(test)]
 mod product_core {
-    use awe_appd::{validate_awos, AppPackageState, AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_VERSION};
-    use awe_driverd::{validate_asd, AsdError, PackageState, ASD_HEADER_LEN, ASD_MAGIC, ASD_VERSION};
+    use awe_appd::{AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_VERSION, AppPackageState, validate_awos};
+    use awe_driverd::{
+        ASD_HEADER_LEN, ASD_MAGIC, ASD_VERSION, AsdError, PackageState, validate_asd,
+    };
     use awe_update::{Slot, SlotState, UpdateError, UpdateManager, UpdateManifest, Version};
     use aweos_kernel::net::{Endpoint, Ipv4Address, SocketTable, Transport};
-    use aweos_kernel::storage::{BlockDevice, NodeKind, RamBlockDevice, RecoveryAction, Vfs, BLOCK_SIZE};
+    use aweos_kernel::storage::{
+        BLOCK_SIZE, BlockDevice, NodeKind, RamBlockDevice, RecoveryAction, Vfs,
+    };
 
     fn asd_package(manifest: usize, payload: usize, signature: usize) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(ASD_HEADER_LEN + manifest + payload + signature);
@@ -57,10 +61,22 @@ mod product_core {
         malformed[16..18].copy_from_slice(&63u16.to_le_bytes());
         assert_eq!(validate_asd(&malformed), Err(AsdError::MissingSignature));
 
-        assert!(awe_driverd::package_transition(PackageState::Installed, PackageState::Active));
-        assert!(awe_driverd::package_transition(PackageState::Active, PackageState::Staged));
-        assert!(awe_driverd::package_transition(PackageState::Staged, PackageState::Failed));
-        assert!(!awe_driverd::package_transition(PackageState::Installed, PackageState::Failed));
+        assert!(awe_driverd::package_transition(
+            PackageState::Installed,
+            PackageState::Active
+        ));
+        assert!(awe_driverd::package_transition(
+            PackageState::Active,
+            PackageState::Staged
+        ));
+        assert!(awe_driverd::package_transition(
+            PackageState::Staged,
+            PackageState::Failed
+        ));
+        assert!(!awe_driverd::package_transition(
+            PackageState::Installed,
+            PackageState::Failed
+        ));
     }
 
     #[test]
@@ -72,10 +88,22 @@ mod product_core {
         malformed[24..28].copy_from_slice(&256u32.to_le_bytes());
         assert!(validate_awos(&malformed).is_err());
 
-        assert!(awe_appd::package_transition(AppPackageState::Installed, AppPackageState::Running));
-        assert!(awe_appd::package_transition(AppPackageState::Running, AppPackageState::Failed));
-        assert!(awe_appd::package_transition(AppPackageState::Failed, AppPackageState::Quarantined));
-        assert!(awe_appd::package_transition(AppPackageState::Installed, AppPackageState::Removed));
+        assert!(awe_appd::package_transition(
+            AppPackageState::Installed,
+            AppPackageState::Running
+        ));
+        assert!(awe_appd::package_transition(
+            AppPackageState::Running,
+            AppPackageState::Failed
+        ));
+        assert!(awe_appd::package_transition(
+            AppPackageState::Failed,
+            AppPackageState::Quarantined
+        ));
+        assert!(awe_appd::package_transition(
+            AppPackageState::Installed,
+            AppPackageState::Removed
+        ));
     }
 
     #[test]
@@ -89,7 +117,9 @@ mod product_core {
         assert_eq!(manager.active(), Slot::A);
         assert_eq!(manager.generation(), 10);
 
-        manager.stage(Slot::B, manifest(11)).expect("restage update");
+        manager
+            .stage(Slot::B, manifest(11))
+            .expect("restage update");
         manager.boot_pending().expect("boot pending");
         manager.mark_healthy(Slot::B).expect("healthy boot");
         assert_eq!(manager.active(), Slot::B);
@@ -122,7 +152,9 @@ mod product_core {
 
         let mut vfs = Vfs::<16, 8>::new();
         vfs.format().expect("format");
-        let file = vfs.create(1, b"runtime.log", NodeKind::File).expect("create");
+        let file = vfs
+            .create(1, b"runtime.log", NodeKind::File)
+            .expect("create");
         let sequence = vfs
             .begin_write(file.id, 7, 0x1111, 0x2222)
             .expect("journal begin");
@@ -143,7 +175,8 @@ mod product_core {
         assert!(sockets.bind(local, Transport::Tcp).is_err());
 
         let udp = [0x1F, 0x90, 0x01, 0xBB, 0x00, 0x0C, 0, 0, 1, 2, 3, 4];
-        let (src, dst, payload) = aweos_kernel::net::transport::udp_payload(&udp).expect("UDP");
+        let (src, dst, payload) =
+            aweos_kernel::net::transport::udp_payload(&udp).expect("UDP");
         assert_eq!(src.port, 8080);
         assert_eq!(dst.port, 443);
         assert_eq!(payload, &[1, 2, 3, 4]);
@@ -152,7 +185,10 @@ mod product_core {
         tcp[0..2].copy_from_slice(&8080u16.to_be_bytes());
         tcp[2..4].copy_from_slice(&443u16.to_be_bytes());
         tcp[12] = 5 << 4;
-        assert_eq!(aweos_kernel::net::transport::tcp_header_valid(&tcp).expect("TCP"), 20);
+        assert_eq!(
+            aweos_kernel::net::transport::tcp_header_valid(&tcp).expect("TCP"),
+            20
+        );
         assert!(aweos_kernel::net::transport::udp_payload(&[0; 7]).is_err());
     }
 }
