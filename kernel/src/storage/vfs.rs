@@ -166,10 +166,11 @@ impl<const N: usize, const J: usize> Vfs<N, J> {
     pub fn lookup(&self, parent: u32, name: &[u8]) -> Result<Inode, FsError> {
         let name = FileName::new(name)?;
         for i in 0..N {
-            if let (Some(inode), Some((pid, stored))) = (self.inodes[i], self.names[i]) {
-                if pid == parent && stored.as_bytes() == name.as_bytes() {
-                    return Ok(inode);
-                }
+            if let (Some(inode), Some((pid, stored))) = (self.inodes[i], self.names[i])
+                && pid == parent
+                && stored.as_bytes() == name.as_bytes()
+            {
+                return Ok(inode);
             }
         }
         Err(FsError::NotFound)
