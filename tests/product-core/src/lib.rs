@@ -2,7 +2,9 @@
 mod product_core {
     use awe_appd::{validate_awos, AppPackageState, AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_VERSION};
     use awe_driverd::{validate_asd, AsdError, PackageState, ASD_HEADER_LEN, ASD_MAGIC, ASD_VERSION};
-    use awe_update::{Slot, SlotState, UpdateManager, UpdateManifest, Version};
+    use awe_update::{Slot, SlotState, UpdateError, UpdateManager, UpdateManifest, Version};
+    use aweos_kernel::net::{Endpoint, Ipv4Address, SocketTable, Transport};
+    use aweos_kernel::storage::{BlockDevice, NodeKind, RamBlockDevice, RecoveryAction, Vfs, BLOCK_SIZE};
 
     fn asd_package(manifest: usize, payload: usize, signature: usize) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(ASD_HEADER_LEN + manifest + payload + signature);
@@ -97,6 +99,60 @@ mod product_core {
     #[test]
     fn downgrade_is_rejected_by_the_runtime_update_path() {
         let mut manager = UpdateManager::new(20);
-        assert_eq!(manager.stage(Slot::B, manifest(19)), Err(awe_update::UpdateError::Downgrade));
+        assert_eq!(
+            manager.stage(Slot::B, manifest(19)),
+            Err(UpdateError::Downgrade)
+        );
+    }
+
+    #[test]
+    fn persistent_storage_runtime_round_trip_and_recovery() {
+        let mut disk = RamBlockDevice::default();
+        let mut block = [0u8; BLOCK_SIZE];
+        block[0] = 0xA5;
+        block[BLOCK_SIZE - 1] = 0x5A;
+        disk.write_block(7, &block).expect("persistent write");
+        assert!(disk.is_dirty());
+
+        let mut readback = [0u8; BLOCK_SIZE];
+        disk.read_block(7, &mut readback).expect("persistent read");
+        assert_eq!(readback, block);
+        disk.flush().expect("flush");
+        assert!(!disk.is_dirty());
+
+        let mut vfs = Vfs::<16, 8>::new();
+        vfs.format().expect("format");
+        let file = vfs.create(1, b"runtime.log", NodeKind::File).expect("create");
+        let sequence = vfs
+            .begin_write(file.id, 7, 0x1111, 0x2222)
+            .expect("journal begin");
+        assert_eq!(vfs.recovery_action(), RecoveryAction::Rollback);
+        vfs.commit(sequence).expect("journal commit");
+        assert_eq!(vfs.recovery_action(), RecoveryAction::Replay);
+        vfs.fsck().expect("fsck");
+    }
+
+    #[test]
+    fn network_runtime_socket_and_packet_validation() {
+        let mut sockets = SocketTable::<4>::new();
+        let local = Endpoint::new(Ipv4Address::LOOPBACK, 8080);
+        let remote = Endpoint::new(Ipv4Address::LOOPBACK, 443);
+        let slot = sockets.bind(local, Transport::Tcp).expect("bind TCP");
+        sockets.connect(slot, remote).expect("connect TCP");
+        assert!(sockets.get(slot).expect("socket").connected);
+        assert!(sockets.bind(local, Transport::Tcp).is_err());
+
+        let udp = [0x1F, 0x90, 0x01, 0xBB, 0x00, 0x0C, 0, 0, 1, 2, 3, 4];
+        let (src, dst, payload) = aweos_kernel::net::transport::udp_payload(&udp).expect("UDP");
+        assert_eq!(src.port, 8080);
+        assert_eq!(dst.port, 443);
+        assert_eq!(payload, &[1, 2, 3, 4]);
+
+        let mut tcp = [0u8; 20];
+        tcp[0..2].copy_from_slice(&8080u16.to_be_bytes());
+        tcp[2..4].copy_from_slice(&443u16.to_be_bytes());
+        tcp[12] = 5 << 4;
+        assert_eq!(aweos_kernel::net::transport::tcp_header_valid(&tcp).expect("TCP"), 20);
+        assert!(aweos_kernel::net::transport::udp_payload(&[0; 7]).is_err());
     }
 }
