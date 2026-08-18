@@ -37,7 +37,7 @@ jobs:
       - name: Build kernel
         env:
           AWEOS_QEMU_SMOKE: "1"
-        run: cargo build --release -p aweos-kernel-bin --target x86_64-unknown-none --locked
+        run: cargo build --release -p aweos-kernel-bin --target x86_64-unknown-none --offline
       - name: Validate ELF
         run: |
           file target/x86_64-unknown-none/release/aweos
