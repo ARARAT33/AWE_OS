@@ -68,22 +68,10 @@ mod product_core {
         malformed[16..18].copy_from_slice(&63u16.to_le_bytes());
         assert_eq!(validate_asd(&malformed), Err(AsdError::MissingSignature));
 
-        assert!(awe_driverd::package_transition(
-            PackageState::Installed,
-            PackageState::Active
-        ));
-        assert!(awe_driverd::package_transition(
-            PackageState::Active,
-            PackageState::Staged
-        ));
-        assert!(awe_driverd::package_transition(
-            PackageState::Staged,
-            PackageState::Failed
-        ));
-        assert!(!awe_driverd::package_transition(
-            PackageState::Installed,
-            PackageState::Failed
-        ));
+        assert!(awe_driverd::package_transition(PackageState::Installed, PackageState::Active));
+        assert!(awe_driverd::package_transition(PackageState::Active, PackageState::Staged));
+        assert!(awe_driverd::package_transition(PackageState::Staged, PackageState::Failed));
+        assert!(!awe_driverd::package_transition(PackageState::Installed, PackageState::Failed));
     }
 
     #[test]
@@ -95,22 +83,10 @@ mod product_core {
         malformed[24..28].copy_from_slice(&256u32.to_le_bytes());
         assert!(validate_awos(&malformed).is_err());
 
-        assert!(awe_appd::package_transition(
-            AppPackageState::Installed,
-            AppPackageState::Running
-        ));
-        assert!(awe_appd::package_transition(
-            AppPackageState::Running,
-            AppPackageState::Failed
-        ));
-        assert!(awe_appd::package_transition(
-            AppPackageState::Failed,
-            AppPackageState::Quarantined
-        ));
-        assert!(awe_appd::package_transition(
-            AppPackageState::Installed,
-            AppPackageState::Removed
-        ));
+        assert!(awe_appd::package_transition(AppPackageState::Installed, AppPackageState::Running));
+        assert!(awe_appd::package_transition(AppPackageState::Running, AppPackageState::Failed));
+        assert!(awe_appd::package_transition(AppPackageState::Failed, AppPackageState::Quarantined));
+        assert!(awe_appd::package_transition(AppPackageState::Installed, AppPackageState::Removed));
     }
 
     #[test]
@@ -124,9 +100,7 @@ mod product_core {
         assert_eq!(manager.active(), Slot::A);
         assert_eq!(manager.generation(), 10);
 
-        manager
-            .stage(Slot::B, manifest(11))
-            .expect("restage update");
+        manager.stage(Slot::B, manifest(11)).expect("restage update");
         manager.boot_pending().expect("boot pending");
         manager.mark_healthy(Slot::B).expect("healthy boot");
         assert_eq!(manager.active(), Slot::B);
@@ -136,10 +110,7 @@ mod product_core {
     #[test]
     fn downgrade_is_rejected_by_the_runtime_update_path() {
         let mut manager = UpdateManager::new(20);
-        assert_eq!(
-            manager.stage(Slot::B, manifest(19)),
-            Err(UpdateError::Downgrade)
-        );
+        assert_eq!(manager.stage(Slot::B, manifest(19)), Err(UpdateError::Downgrade));
     }
 
     #[test]
@@ -159,12 +130,8 @@ mod product_core {
 
         let mut vfs = Vfs::<16, 8>::new();
         vfs.format().expect("format");
-        let file = vfs
-            .create(1, b"runtime.log", NodeKind::File)
-            .expect("create");
-        let sequence = vfs
-            .begin_write(file.id, 7, 0x1111, 0x2222)
-            .expect("journal begin");
+        let file = vfs.create(1, b"runtime.log", NodeKind::File).expect("create");
+        let sequence = vfs.begin_write(file.id, 7, 0x1111, 0x2222).expect("journal begin");
         assert_eq!(vfs.recovery_action(), RecoveryAction::Rollback);
         vfs.commit(sequence).expect("journal commit");
         assert_eq!(vfs.recovery_action(), RecoveryAction::Replay);
@@ -191,10 +158,7 @@ mod product_core {
         tcp[0..2].copy_from_slice(&8080u16.to_be_bytes());
         tcp[2..4].copy_from_slice(&443u16.to_be_bytes());
         tcp[12] = 5 << 4;
-        assert_eq!(
-            aweos_kernel::net::transport::tcp_header_valid(&tcp).expect("TCP"),
-            20
-        );
+        assert_eq!(aweos_kernel::net::transport::tcp_header_valid(&tcp).expect("TCP"), 20);
         assert!(aweos_kernel::net::transport::udp_payload(&[0; 7]).is_err());
     }
 
@@ -204,16 +168,9 @@ mod product_core {
         assert!(negotiate(AbiVersion { major: 1, minor: 2 }).is_ok());
 
         assert!(validate_io(IoKind::Read, 4096, CAP_FS_READ).is_ok());
-        assert_eq!(
-            validate_io(IoKind::Write, 128, CAP_FS_READ),
-            Err(RuntimeError::CapabilityDenied)
-        );
+        assert_eq!(validate_io(IoKind::Write, 128, CAP_FS_READ), Err(RuntimeError::CapabilityDenied));
 
-        let credential = Credential {
-            user: UserId(1000),
-            primary_group: GroupId(1000),
-            capability_mask: CAP_FS_READ | CAP_IPC,
-        };
+        let credential = Credential { user: UserId(1000), primary_group: GroupId(1000), capability_mask: CAP_FS_READ | CAP_IPC };
         assert!(authorize(credential, CAP_FS_READ).is_ok());
         assert!(authorize(credential, 1 << 20).is_err());
         let mut groups = GroupSet::new();
@@ -229,40 +186,69 @@ mod product_core {
         assert_eq!(readback, block);
 
         let mut sockets = SocketTable::<2>::new();
-        let slot = sockets
-            .bind(Endpoint::new(Ipv4Address::LOOPBACK, 5353), Transport::Udp)
-            .expect("UDP bind");
+        let slot = sockets.bind(Endpoint::new(Ipv4Address::LOOPBACK, 5353), Transport::Udp).expect("UDP bind");
         assert!(sockets.get(slot).is_some());
 
-        let spec = ServiceSpec {
-            id: ServiceId(2),
-            restart: RestartPolicy::OnFailure,
-            capability_mask: CAP_FS_READ,
-            memory_limit_pages: 8,
-            cpu_budget_ticks: 100,
-        };
+        let spec = ServiceSpec { id: ServiceId(2), restart: RestartPolicy::OnFailure, capability_mask: CAP_FS_READ, memory_limit_pages: 8, cpu_budget_ticks: 100 };
         let mut services = ServiceTable::new();
         services.register(spec).expect("register service");
-        services
-            .set_state(ServiceId(2), ServiceState::Starting)
-            .expect("start");
-        services
-            .set_state(ServiceId(2), ServiceState::Running)
-            .expect("run");
-        services
-            .set_state(ServiceId(2), ServiceState::Failed)
-            .expect("fail");
+        services.set_state(ServiceId(2), ServiceState::Starting).expect("start");
+        services.set_state(ServiceId(2), ServiceState::Running).expect("run");
+        services.set_state(ServiceId(2), ServiceState::Failed).expect("fail");
         services.restart(ServiceId(2)).expect("restart");
         assert_eq!(services.state(ServiceId(2)), Some(ServiceState::Starting));
 
         assert!(validate_io(IoKind::Message, 128, CAP_IPC).is_ok());
-        assert_eq!(
-            validate_io(IoKind::Message, 128, 0),
-            Err(RuntimeError::CapabilityDenied)
-        );
+        assert_eq!(validate_io(IoKind::Message, 128, 0), Err(RuntimeError::CapabilityDenied));
 
         let app = awos_package(16, 64, 16, 64);
         assert!(validate_awos(&app).is_ok());
         assert_eq!(awe_awosa::required_capability(IoKind::Read), CAP_FS_READ);
+    }
+
+    #[test]
+    fn app_ui_and_kernel_boundaries_are_exercised_together() {
+        use awe_appd::{validate_declarations, validate_manifest, AppId, AppManifest};
+        use awe_ayui::{Compositor, Rect};
+        use aweos_kernel::process::ProcessState;
+        use aweos_kernel::time::MonotonicClock;
+
+        let manifest = AppManifest {
+            id: AppId(1),
+            abi_major: awe_appd::AWE_APP_ABI_MAJOR,
+            abi_minor: awe_appd::AWE_APP_ABI_MINOR,
+            memory_limit_pages: 16,
+            capability_mask: 0,
+            dependency_count: 2,
+            resource_count: 2,
+        };
+        assert!(validate_manifest(manifest).is_ok());
+        assert!(validate_declarations(2, 2).is_ok());
+
+        let mut compositor = Compositor::new();
+        let window = compositor.create_window(Rect { x: 0, y: 0, width: 800, height: 600 }).expect("valid window");
+        compositor.focus(window).expect("focus");
+        assert_eq!(compositor.window_count(), 1);
+
+        assert!(ProcessState::Created.can_transition(ProcessState::Runnable));
+        assert!(!ProcessState::Created.can_transition(ProcessState::Running));
+        let mut clock = MonotonicClock::new();
+        clock.advance(10);
+        assert_eq!(clock.now().0, 10);
+    }
+
+    #[test]
+    fn app_ui_budget_overflow_fails_closed() {
+        use awe_appd::{validate_declarations, AppError, MAX_DEPS, MAX_RESOURCES};
+        use awe_ayui::{Compositor, Rect, UiError, MAX_HEIGHT, MAX_WIDTH};
+
+        assert_eq!(validate_declarations(MAX_DEPS + 1, 0), Err(AppError::TooManyDependencies));
+        assert_eq!(validate_declarations(0, MAX_RESOURCES + 1), Err(AppError::TooManyResources));
+
+        let mut compositor = Compositor::new();
+        assert_eq!(
+            compositor.create_window(Rect { x: 0, y: 0, width: MAX_WIDTH + 1, height: MAX_HEIGHT }),
+            Err(UiError::InvalidRect)
+        );
     }
 }
