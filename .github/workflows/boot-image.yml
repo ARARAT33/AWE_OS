@@ -16,13 +16,14 @@ concurrency:
 jobs:
   build-x86_64:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-none
       - name: Cache Cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -36,7 +37,7 @@ jobs:
       - name: Build kernel
         env:
           AWEOS_QEMU_SMOKE: "1"
-        run: cargo build --release -p aweos-kernel-bin --target x86_64-unknown-none
+        run: cargo build --release -p aweos-kernel-bin --target x86_64-unknown-none --locked
       - name: Validate ELF
         run: |
           file target/x86_64-unknown-none/release/aweos
@@ -82,13 +83,14 @@ jobs:
           if [ "$boot_ok" -ne 0 ] || [ "$running_ok" -ne 0 ] || [ "$alive_ok" -ne 0 ]; then exit 1; fi
       - name: Upload ISO and boot diagnostics
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: aweos-x86_64-iso
           path: |
             dist/aweos-x86_64.iso
             dist/qemu.log
             dist/qemu-debug.log
+          if-no-files-found: warn
       - name: Boot diagnostics summary
         if: always()
         run: |
