@@ -3,6 +3,14 @@
 //! AWE native application admission service. Package policy remains outside
 //! CellKernel and every untrusted field is validated before admission.
 
+mod awos;
+
+pub use awos::{
+    AppPackageState, AwosError, AwosHeader, AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_MAX_CODE,
+    AWOS_MAX_DATA, AWOS_MAX_MANIFEST, AWOS_MIN_SIGNATURE, AWOS_VERSION, package_transition,
+    validate_awos,
+};
+
 pub const AWE_APP_ABI_MAJOR: u16 = 1;
 pub const AWE_APP_ABI_MINOR: u16 = 3;
 pub const MAX_DEPS: usize = 32;
