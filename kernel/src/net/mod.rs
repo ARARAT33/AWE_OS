@@ -4,9 +4,11 @@
 
 #![allow(dead_code)]
 
+pub mod arp;
 pub mod ipv4;
 pub mod transport;
 
+pub use arp::{ArpCache, ArpError, ArpPacket};
 pub use transport::{
     Endpoint, SocketEntry, SocketTable, Transport, internet_checksum, tcp_header_valid, udp_payload,
 };
