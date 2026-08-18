@@ -66,11 +66,15 @@ impl DriverManifest {
     }
 
     pub const fn targets(self, architecture_bit: u64) -> bool {
-        self.architecture_mask & architecture_bit != 0
+        architecture_bit != 0
+            && architecture_bit.is_power_of_two()
+            && self.architecture_mask & architecture_bit != 0
     }
 
-    pub const fn declares(self, capability_bit: u64) -> bool {
-        self.capability_mask & capability_bit != 0
+    /// Return true only when every requested capability bit is declared.
+    pub const fn declares(self, required_capabilities: u64) -> bool {
+        required_capabilities != 0
+            && self.capability_mask & required_capabilities == required_capabilities
     }
 
     pub const fn is_trusted_for_execution(self) -> bool {
@@ -192,8 +196,32 @@ mod tests {
             DriverTrust::Verified,
         );
         assert!(manifest.targets(0b0010));
+        assert!(!manifest.targets(0b0011));
         assert!(manifest.declares(0b0010));
+        assert!(manifest.declares(0b0110));
+        assert!(!manifest.declares(0b1000));
         assert!(manifest.is_trusted_for_execution());
+    }
+
+    #[test]
+    fn execution_admission_requires_all_capabilities() {
+        let manifest = DriverManifest::new(
+            DriverId(5),
+            DriverClass::Network,
+            1,
+            2,
+            0b1010,
+            0b0110,
+            DriverTrust::Verified,
+        );
+        assert_eq!(
+            manifest.validate_for_execution(0b0010, 0b0110, 1),
+            Ok(())
+        );
+        assert_eq!(
+            manifest.validate_for_execution(0b0010, 0b0111, 1),
+            Err(LifecycleError::InvalidManifest)
+        );
     }
 
     #[test]
@@ -218,6 +246,10 @@ mod tests {
         assert_eq!(
             manifest.validate_for_execution(0b0010, 0b0010, 2),
             Err(LifecycleError::AbiMismatch)
+        );
+        assert_eq!(
+            manifest.validate_for_execution(0, 0b0010, 1),
+            Err(LifecycleError::InvalidManifest)
         );
 
         let revoked = DriverManifest::new(
