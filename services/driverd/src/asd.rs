@@ -43,11 +43,21 @@ pub fn validate_asd(bytes: &[u8]) -> Result<AsdHeader, AsdError> {
         return Err(AsdError::BadMagic);
     }
     let u16_at = |o: usize| u16::from_le_bytes([bytes[o], bytes[o + 1]]);
-    let u32_at = |o: usize| u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]);
-    let u64_at = |o: usize| u64::from_le_bytes([
-        bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3],
-        bytes[o + 4], bytes[o + 5], bytes[o + 6], bytes[o + 7],
-    ]);
+    let u32_at = |o: usize| {
+        u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]])
+    };
+    let u64_at = |o: usize| {
+        u64::from_le_bytes([
+            bytes[o],
+            bytes[o + 1],
+            bytes[o + 2],
+            bytes[o + 3],
+            bytes[o + 4],
+            bytes[o + 5],
+            bytes[o + 6],
+            bytes[o + 7],
+        ])
+    };
     let header = AsdHeader {
         version: u16_at(4),
         architecture: u16_at(6),
@@ -92,13 +102,15 @@ pub enum PackageState {
 }
 
 pub const fn package_transition(from: PackageState, to: PackageState) -> bool {
-    matches!((from, to),
+    matches!(
+        (from, to),
         (PackageState::Installed, PackageState::Active)
             | (PackageState::Active, PackageState::Staged)
             | (PackageState::Staged, PackageState::Active)
             | (PackageState::Staged, PackageState::Failed)
             | (PackageState::Failed, PackageState::Staged)
-            | (PackageState::Failed, PackageState::Quarantined))
+            | (PackageState::Failed, PackageState::Quarantined)
+    )
 }
 
 #[cfg(test)]
@@ -106,7 +118,9 @@ mod tests {
     use super::*;
 
     fn header(manifest: u32, payload: u32, sig: u16) -> Vec<u8> {
-        let mut b = Vec::with_capacity(ASD_HEADER_LEN + manifest as usize + payload as usize + sig as usize);
+        let mut b = Vec::with_capacity(
+            ASD_HEADER_LEN + manifest as usize + payload as usize + sig as usize,
+        );
         b.extend_from_slice(&ASD_MAGIC);
         b.extend_from_slice(&ASD_VERSION.to_le_bytes());
         b.extend_from_slice(&0x8664u16.to_le_bytes());
@@ -117,19 +131,31 @@ mod tests {
         b.extend_from_slice(&0u16.to_le_bytes());
         b.extend_from_slice(&0u64.to_le_bytes());
         b.extend_from_slice(&0u64.to_le_bytes());
-        b.extend(core::iter::repeat_n(0u8, manifest as usize + payload as usize + sig as usize));
+        b.extend(core::iter::repeat_n(
+            0u8,
+            manifest as usize + payload as usize + sig as usize,
+        ));
         b
     }
 
     #[test]
     fn validates_canonical_header_and_bounds() {
         assert!(validate_asd(&header(8, 32, 64)).is_ok());
-        assert_eq!(validate_asd(&header(8, 32, 63)), Err(AsdError::MissingSignature));
+        assert_eq!(
+            validate_asd(&header(8, 32, 63)),
+            Err(AsdError::MissingSignature)
+        );
     }
 
     #[test]
     fn lifecycle_is_fail_closed() {
-        assert!(package_transition(PackageState::Staged, PackageState::Active));
-        assert!(!package_transition(PackageState::Installed, PackageState::Staged));
+        assert!(package_transition(
+            PackageState::Staged,
+            PackageState::Active
+        ));
+        assert!(!package_transition(
+            PackageState::Installed,
+            PackageState::Staged
+        ));
     }
 }
