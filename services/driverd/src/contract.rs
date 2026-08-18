@@ -2,9 +2,9 @@
 
 //! AWE 62.5 driver-service contract.
 //!
-//! This freezes the driver lifecycle and manifest boundary without implementing
-//! concrete PCI/ACPI/VirtIO hardware execution, which remains reserved for the
-//! 65% checkpoint.
+//! This freezes the driver lifecycle and manifest boundary. Execution admission
+//! is fail-closed: architecture, ABI, capabilities and trust must all match
+//! before a driver may enter the lifecycle.
 
 use crate::{DriverClass, DriverId, DriverState};
 
@@ -64,14 +64,42 @@ impl DriverManifest {
             trust,
         }
     }
+
     pub const fn targets(self, architecture_bit: u64) -> bool {
         self.architecture_mask & architecture_bit != 0
     }
+
     pub const fn declares(self, capability_bit: u64) -> bool {
         self.capability_mask & capability_bit != 0
     }
+
     pub const fn is_trusted_for_execution(self) -> bool {
         matches!(self.trust, DriverTrust::Verified)
+    }
+
+    /// Validate the immutable admission contract before lifecycle execution.
+    ///
+    /// A zero architecture/capability mask is rejected, revoked/unverified
+    /// packages are rejected, and ABI major versions must match exactly.
+    pub const fn validate_for_execution(
+        self,
+        architecture_bit: u64,
+        required_capabilities: u64,
+        expected_abi_major: u16,
+    ) -> Result<(), LifecycleError> {
+        if !self.is_trusted_for_execution() {
+            return Err(LifecycleError::Untrusted);
+        }
+        if self.abi_major != expected_abi_major {
+            return Err(LifecycleError::AbiMismatch);
+        }
+        if architecture_bit == 0 || required_capabilities == 0 {
+            return Err(LifecycleError::InvalidManifest);
+        }
+        if !self.targets(architecture_bit) || !self.declares(required_capabilities) {
+            return Err(LifecycleError::InvalidManifest);
+        }
+        Ok(())
     }
 }
 
@@ -80,6 +108,7 @@ pub enum LifecycleError {
     InvalidTransition,
     Untrusted,
     AbiMismatch,
+    InvalidManifest,
 }
 
 pub const fn transition(
@@ -165,6 +194,45 @@ mod tests {
         assert!(manifest.targets(0b0010));
         assert!(manifest.declares(0b0010));
         assert!(manifest.is_trusted_for_execution());
+    }
+
+    #[test]
+    fn execution_admission_is_fail_closed() {
+        let manifest = DriverManifest::new(
+            DriverId(5),
+            DriverClass::Network,
+            1,
+            2,
+            0b1010,
+            0b0110,
+            DriverTrust::Verified,
+        );
+        assert_eq!(
+            manifest.validate_for_execution(0b0010, 0b0010, 1),
+            Ok(())
+        );
+        assert_eq!(
+            manifest.validate_for_execution(0b0100, 0b0010, 1),
+            Err(LifecycleError::InvalidManifest)
+        );
+        assert_eq!(
+            manifest.validate_for_execution(0b0010, 0b0010, 2),
+            Err(LifecycleError::AbiMismatch)
+        );
+
+        let revoked = DriverManifest::new(
+            DriverId(6),
+            DriverClass::Network,
+            1,
+            0,
+            0b0010,
+            0b0010,
+            DriverTrust::Revoked,
+        );
+        assert_eq!(
+            revoked.validate_for_execution(0b0010, 0b0010, 1),
+            Err(LifecycleError::Untrusted)
+        );
     }
 
     #[test]
