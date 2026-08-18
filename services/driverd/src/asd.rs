@@ -43,13 +43,18 @@ pub fn validate_asd(bytes: &[u8]) -> Result<AsdHeader, AsdError> {
         return Err(AsdError::BadMagic);
     }
     let u16_at = |o: usize| u16::from_le_bytes([bytes[o], bytes[o + 1]]);
-    let u32_at = |o: usize| {
-        u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]])
-    };
+    let u32_at =
+        |o: usize| u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]);
     let u64_at = |o: usize| {
         u64::from_le_bytes([
-            bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3], bytes[o + 4], bytes[o + 5],
-            bytes[o + 6], bytes[o + 7],
+            bytes[o],
+            bytes[o + 1],
+            bytes[o + 2],
+            bytes[o + 3],
+            bytes[o + 4],
+            bytes[o + 5],
+            bytes[o + 6],
+            bytes[o + 7],
         ])
     };
     let header = AsdHeader {
@@ -143,7 +148,13 @@ mod tests {
 
     #[test]
     fn lifecycle_is_fail_closed() {
-        assert!(package_transition(PackageState::Staged, PackageState::Active));
-        assert!(!package_transition(PackageState::Installed, PackageState::Staged));
+        assert!(package_transition(
+            PackageState::Staged,
+            PackageState::Active
+        ));
+        assert!(!package_transition(
+            PackageState::Installed,
+            PackageState::Staged
+        ));
     }
 }
