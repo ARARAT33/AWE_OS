@@ -4,9 +4,9 @@ This document defines the bar for calling AWE_OS a real bootable product rather 
 
 ## Current product readiness
 
-**85% — AWE_OS 1.0 implementation readiness.**
+**90% — AWE_OS 1.0 implementation readiness.**
 
-The 85% checkpoint advances the roadmap from hardware/storage/network foundations into concrete userspace service lifecycle, identity and AWOSA native-runtime contracts. This is an implementation milestone; release certification remains a separate evidence gate and cannot be claimed until the required CI/QEMU/runtime/recovery evidence is green.
+The 90% checkpoint extends the 85% userspace/native foundation with bounded `.asd` driver-package admission, bounded `.awos` application-package admission/lifecycle, and an atomic A/B update/recovery state machine. This is an implementation milestone; release certification remains a separate evidence gate and cannot be claimed until the required CI/QEMU/runtime/recovery evidence is green.
 
 ## Implemented kernel foundations
 
@@ -100,14 +100,37 @@ The 85% checkpoint advances the roadmap from hardware/storage/network foundation
 - [x] Bounded package header/manifest/payload/signature-length validation.
 - [x] Fail-closed package admission before execution.
 
-## 85.0 validation evidence gate — PENDING
+## 90.0 product-core checkpoint — IMPLEMENTED
 
-The implementation has advanced to the 85% checkpoint, but the following evidence is still required before calling 85% release-certified:
+### `.asd` native driver ecosystem
+- [x] Versioned canonical `.asd` container header.
+- [x] Architecture and driver ABI fields.
+- [x] Bounded manifest/payload/signature lengths with overflow-safe total-size validation.
+- [x] Signature-presence boundary before admission; cryptographic verification remains delegated to the platform trust service.
+- [x] Explicit install/active/staged/failed/quarantined lifecycle transitions.
 
-- [ ] Quality Gate green on the final 85% checkpoint tree.
+### `.awos` native application ecosystem
+- [x] Versioned canonical `.awos` container header.
+- [x] Bounded manifest/code/data/signature lengths.
+- [x] Entry-point and total-size validation before execution.
+- [x] Explicit installed/running/staged/failed/quarantined/removed lifecycle transitions.
+
+### Update and recovery lifecycle
+- [x] New `awe-update` userspace service contract.
+- [x] A/B slot model with active/staged/booting/healthy/failed/quarantined states.
+- [x] Generation monotonicity and downgrade rejection.
+- [x] Atomic promotion only after healthy boot confirmation.
+- [x] Explicit failed-update rollback path.
+
+## 90.0 validation evidence gate — PENDING
+
+The implementation has advanced to the 90% checkpoint, but certification evidence is intentionally not being claimed yet:
+
+- [ ] Quality Gate green on the final 90% checkpoint tree.
 - [ ] Boot Image/QEMU smoke green on the same tree.
-- [ ] Userspace service lifecycle exercised in an emulator/runtime path.
-- [ ] AWOSA ABI exercised through a native-runtime integration test.
+- [ ] `.asd` package admission exercised end-to-end.
+- [ ] `.awos` package admission/lifecycle exercised end-to-end.
+- [ ] A/B update and rollback exercised in a runtime/recovery path.
 - [ ] Persistent storage and network runtime exercises remain green.
 - [ ] No high/critical release blocker remains.
 
@@ -117,18 +140,17 @@ The implementation has advanced to the 85% checkpoint, but the following evidenc
 - [ ] Full NVMe/AHCI runtime, xHCI/USB, HID, Ethernet/Wi-Fi/Bluetooth, audio and GPU runtime.
 - [ ] Full VFS/native filesystem persistence, journaling replay and fsck tools.
 - [ ] Ethernet/ARP/IPv4/IPv6/ICMP, UDP/TCP/DNS/DHCP, TLS, firewall and network recovery.
-- [ ] Userspace loader integration, device/filesystem/network managers, update/logging/security services and crash recovery.
+- [ ] Userspace loader integration, device/filesystem/network managers, logging/security services and crash recovery.
 - [ ] Full AWOSA SDK, headers and bindings.
-- [ ] Signed `.asd` driver package ecosystem.
-- [ ] Signed `.awos` application ecosystem.
+- [ ] Cryptographic signing/verification integration for `.asd` and `.awos` trust roots.
 - [ ] AYUI desktop and first-party applications.
 - [ ] Isolated Linux/Windows/Android compatibility.
 - [ ] App Builder/SDK.
-- [ ] Security hardening, atomic update and recovery lifecycle.
+- [ ] Security hardening and complete update/recovery lifecycle integration.
 - [ ] ARM64/RISC-V64 production validation.
 - [ ] Hardware matrix, fuzz/stress and reproducible release certification.
 
-The remaining 85→100 roadmap follows `docs/AWE_OS_100_PERCENT_MASTER_PLAN.md`: runtime integration → `.asd` → `.awos` → AYUI → compatibility → App Builder → native ecosystem → security/update/recovery → multi-architecture → release validation.
+The remaining 90→100 roadmap follows `docs/AWE_OS_100_PERCENT_MASTER_PLAN.md`: runtime integration → full package trust/signing → AYUI → compatibility → App Builder → native ecosystem → security hardening → hardware matrix → release validation.
 
 ## Definition of done
 
