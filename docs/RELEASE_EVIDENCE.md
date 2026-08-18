@@ -22,6 +22,7 @@ A feature is release-certified only when implementation, tests, runtime/emulator
 | Driver dependency cycle rejection | `DependencyGraph` rejects self and transitive cycles | Implementation + unit-test evidence present |
 | Driver lifecycle/recovery | `DriverSupervisor` plus `DriverLifecycle` enforce deterministic transitions, bounded restart budget and explicit quarantine | Implementation + unit-test evidence present; runtime certification pending |
 | PCI enumeration boundary | `PciEnumerator` now has bounded multi-bus scanning plus validated PCI mechanism-#1 BDF/config-address construction; platform I/O remains an explicit adapter boundary | Implementation + unit-test evidence present; hardware enumeration pending |
+| PCI BAR resource validation | `decode_bar` validates I/O and 32/64-bit memory BAR size, alignment, overflow and 64-bit upper-pair requirements | New implementation + unit-test evidence present; hardware BAR probing pending |
 | VirtIO PCI transport boundary | Identity, BAR/capability/queue/feature validation and driver-ready state | Implementation + unit-test evidence present; hardware register exercise pending |
 | PCI → VirtIO bridge | `VirtioPciProbe` classifies supported VirtIO functions and translates validated BAR windows into transport state without unsafe MMIO writes | Implementation + unit-test evidence present; physical device exercise pending |
 | VirtIO block request plane | Bounded sector validation, DMA-bounded descriptor submission, queue completion and interrupt acknowledgment contract | Implementation + unit-test evidence present; persistent VirtIO device exercise pending |
@@ -37,6 +38,7 @@ A feature is release-certified only when implementation, tests, runtime/emulator
 
 ## Latest implementation commits
 
+- `ea617b94c05b0b3b12a4433ec5d5d230b1cc81c2` — harden PCI BAR resource decoding with bounded 32/64-bit memory and I/O BAR validation, overflow/alignment checks, and regression tests.
 - `bf6501856d4312b93576fba856196fdb38151911` — harden bounded PCI discovery with validated mechanism-#1 BDF/config-address construction and deterministic multi-bus scanning. This remains a runtime-neutral discovery layer and deliberately does not claim physical PCI I/O evidence.
 - `d5445bc2c7a07da636584981283ba68fbecc8c48` — add the VirtIO block contract/QEMU runtime CI gate. This verifies the existing bounded VirtIO block contract under workspace tests and boots the image with a real QEMU `virtio-blk-pci` device; it deliberately does not claim guest-side persistent I/O certification.
 - `5c6cc09f25ed6d421e2ecda34a6d5363faa244f9` — VirtIO block request/completion bounds hardening.
