@@ -24,6 +24,7 @@ A feature is release-certified only when implementation, tests, runtime/emulator
 | PCI enumeration boundary | Bounded PCI config-space enumeration validates vendor/device/header/function limits and is wired into the driver module | Implementation + unit-test evidence present; hardware enumeration pending |
 | VirtIO PCI transport boundary | Identity, BAR/capability/queue/feature validation and driver-ready state | Implementation + unit-test evidence present; hardware register exercise pending |
 | VirtIO block request plane | Bounded sector validation, DMA-bounded descriptor submission, queue completion and interrupt acknowledgment contract | Implementation + unit-test evidence present; persistent VirtIO device exercise pending |
+| VirtIO block QEMU gate | New `virtio-runtime.yml` runs workspace tests, builds the x86_64 image, boots QEMU with a `virtio-blk-pci` device, and uploads serial/debug evidence | Pending green CI run; device exercise is not yet equivalent to successful guest I/O |
 | Storage GPT path | Bounded GPT scan is exercised through `BlockDevice` | Implementation + unit-test evidence present; persistent-device certification pending |
 | Storage crash recovery | `JournalTxn` models prepare/commit/abort and converts non-durable states to `NeedsRecovery` | Implementation + unit-test evidence present; crash-injection evidence pending |
 | Networking packet core | Ethernet/ARP/IPv4 routing and bounded UDP/TCP metadata validation | Implementation + unit-test evidence present; runtime certification pending |
@@ -33,9 +34,10 @@ A feature is release-certified only when implementation, tests, runtime/emulator
 | Fuzz/stress/resource exhaustion | Required by master plan | Not certified |
 | Signed reproducible release artifacts | Required by master plan | Not certified |
 
-## Latest implementation commit
+## Latest implementation commits
 
-- `pending` — VirtIO block request-plane hardening: bounded block requests, DMA-safe descriptor submission, completion accounting and interrupt acknowledgment. Certification remains pending until CI and runtime evidence are green.
+- `d5445bc2c7a07da636584981283ba68fbecc8c48` — add the VirtIO block contract/QEMU runtime CI gate. This verifies the existing bounded VirtIO block contract under workspace tests and boots the image with a real QEMU `virtio-blk-pci` device; it deliberately does not claim guest-side persistent I/O certification.
+- `5c6cc09f25ed6d421e2ecda34a6d5363faa244f9` — VirtIO block request/completion bounds hardening.
 - `f1257764bb790d9047553b8733812257a6f18de5` — wire bounded PCI enumeration into the driver module.
 - `c9825cb8d947ba20f1b35e9d647e0b280e8970d8` — bounded PCI config-space enumeration.
 - `325f4c16ed0d823d6cd22f8ffd04574d8966dfb1` — bounded VirtIO PCI transport boundary.
@@ -44,11 +46,12 @@ A feature is release-certified only when implementation, tests, runtime/emulator
 
 1. Mandatory CI gates must be green on the current revision.
 2. QEMU runtime evidence must be green on the current revision.
-3. Hardware matrix, fuzz/stress and recovery evidence remain required.
-4. Cryptographic trust/signing and package tooling remain incomplete where the master plan marks them open.
-5. Storage, networking, userspace, AWOSA, `.asd`, `.awos`, AYUI, compatibility and App Builder release gates still require their full runtime evidence.
-6. The A-C completion primitives are validation/state machinery; they do not by themselves constitute physical GDT/TSS/IDT/APIC/SMP/page-table activation or context-switch execution.
-7. The driver lifecycle, PCI and VirtIO additions are bounded policy/state machinery; they do not by themselves constitute hardware-in-loop or persistent crash-injection evidence.
+3. The VirtIO QEMU gate must evolve from device-present boot evidence to verified guest-side read/write/flush behavior before storage certification can be claimed.
+4. Hardware matrix, fuzz/stress and recovery evidence remain required.
+5. Cryptographic trust/signing and package tooling remain incomplete where the master plan marks them open.
+6. Storage, networking, userspace, AWOSA, `.asd`, `.awos`, AYUI, compatibility and App Builder release gates still require their full runtime evidence.
+7. The A-C completion primitives are validation/state machinery; they do not by themselves constitute physical GDT/TSS/IDT/APIC/SMP/page-table activation or context-switch execution.
+8. The driver lifecycle, PCI and VirtIO additions are bounded policy/state machinery; they do not by themselves constitute hardware-in-loop or persistent crash-injection evidence.
 
 ## Policy
 
