@@ -25,6 +25,23 @@ impl ProcessTable {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ProcessState { Created = 0, Runnable = 1, Running = 2, Blocked = 3, Exited = 4 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ProcessTransitionError { InvalidTransition }
+
+impl ProcessState {
+    pub const fn can_transition(self, next: Self) -> bool {
+        match (self, next) {
+            (Self::Created, Self::Runnable) => true,
+            (Self::Created, Self::Exited) => true,
+            (Self::Runnable, Self::Running) => true,
+            (Self::Runnable, Self::Exited) => true,
+            (Self::Running, Self::Runnable | Self::Blocked | Self::Exited) => true,
+            (Self::Blocked, Self::Runnable | Self::Exited) => true,
+            _ => false,
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ResourceBudget { pub cpu_ticks: u64, pub memory_bytes: u64, pub ipc_messages: u64 }
@@ -42,15 +59,39 @@ impl ResourceBudget {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ProcessDescriptor { pub id: ProcessId, pub state: ProcessState, pub budget: ResourceBudget }
 
+impl ProcessDescriptor {
+    pub const fn transition(&mut self, next: ProcessState) -> Result<(), ProcessTransitionError> {
+        if self.state.can_transition(next) { self.state = next; Ok(()) } else { Err(ProcessTransitionError::InvalidTransition) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn descriptor() -> ProcessDescriptor {
+        ProcessDescriptor { id: ProcessId(1), state: ProcessState::Created, budget: ResourceBudget { cpu_ticks: 10, memory_bytes: 4096, ipc_messages: 2 } }
+    }
     #[test]
     fn process_ids_are_monotonic() {
         let table = ProcessTable::new();
         assert_eq!(table.allocate_id(), ProcessId(1));
         assert_eq!(table.allocate_id(), ProcessId(2));
         assert_eq!(table.allocate_id(), ProcessId(3));
+    }
+    #[test]
+    fn lifecycle_accepts_only_valid_transitions() {
+        let mut p = descriptor();
+        assert!(p.transition(ProcessState::Runnable).is_ok());
+        assert!(p.transition(ProcessState::Running).is_ok());
+        assert!(p.transition(ProcessState::Blocked).is_ok());
+        assert!(p.transition(ProcessState::Runnable).is_ok());
+        assert!(p.transition(ProcessState::Exited).is_ok());
+        assert_eq!(p.transition(ProcessState::Running), Err(ProcessTransitionError::InvalidTransition));
+    }
+    #[test]
+    fn lifecycle_rejects_created_to_running() {
+        let mut p = descriptor();
+        assert_eq!(p.transition(ProcessState::Running), Err(ProcessTransitionError::InvalidTransition));
     }
     #[test]
     fn budget_consumption_is_atomic_on_failure() {

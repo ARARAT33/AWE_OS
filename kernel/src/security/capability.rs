@@ -7,7 +7,6 @@ pub struct CapabilityId(pub u64);
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Rights(pub u64);
-
 impl Rights {
     pub const NONE: Self = Self(0);
     pub const READ: Self = Self(1 << 0);
@@ -17,68 +16,115 @@ impl Rights {
     pub const DEVICE: Self = Self(1 << 4);
     pub const NETWORK: Self = Self(1 << 5);
     pub const ADMIN: Self = Self(1 << 63);
-
-    pub const fn contains(self, other: Self) -> bool {
-        (self.0 & other.0) == other.0
-    }
-    pub const fn union(self, other: Self) -> Self {
-        Self(self.0 | other.0)
-    }
-    pub const fn intersect(self, other: Self) -> Self {
-        Self(self.0 & other.0)
-    }
-    pub const fn is_empty(self) -> bool {
-        self.0 == 0
-    }
+    pub const fn contains(self, other: Self) -> bool { (self.0 & other.0) == other.0 }
+    pub const fn union(self, other: Self) -> Self { Self(self.0 | other.0) }
+    pub const fn intersect(self, other: Self) -> Self { Self(self.0 & other.0) }
+    pub const fn is_empty(self) -> bool { self.0 == 0 }
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
-pub struct Capability {
-    pub id: CapabilityId,
-    pub rights: Rights,
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Capability { pub id: CapabilityId, pub rights: Rights }
+impl Capability {
+    pub const fn permits(&self, required: Rights) -> bool { self.rights.contains(required) }
+    pub const fn derive(&self, id: CapabilityId, requested: Rights) -> Self { Self { id, rights: self.rights.intersect(requested) } }
+    pub const fn revoked(id: CapabilityId) -> Self { Self { id, rights: Rights::NONE } }
 }
 
-impl Capability {
-    pub const fn permits(&self, required: Rights) -> bool {
-        self.rights.contains(required)
-    }
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum CapabilityError { Full, NotFound, Revoked, InvalidId }
 
-    /// Derive a strictly weaker capability. Escalation is impossible because
-    /// the resulting rights are an intersection with the parent capability.
-    pub const fn derive(&self, id: CapabilityId, requested: Rights) -> Self {
-        Self {
-            id,
-            rights: self.rights.intersect(requested),
-        }
+pub struct CapabilityTable<const N: usize> {
+    entries: [Option<Capability>; N],
+    next_id: u64,
+}
+impl<const N: usize> Default for CapabilityTable<N> { fn default() -> Self { Self::new() } }
+impl<const N: usize> CapabilityTable<N> {
+    pub const fn new() -> Self { Self { entries: [None; N], next_id: 1 } }
+    pub const fn len(&self) -> usize {
+        let mut count = 0;
+        let mut i = 0;
+        while i < N { if self.entries[i].is_some() { count += 1; } i += 1; }
+        count
     }
-
-    /// Revocation is represented by deriving an empty capability. Callers must
-    /// retain the returned value; no global mutable authority is introduced.
-    pub const fn revoked(id: CapabilityId) -> Self {
-        Self {
-            id,
-            rights: Rights::NONE,
+    pub const fn is_full(&self) -> bool { self.len() == N }
+    pub fn insert(&mut self, rights: Rights) -> Result<CapabilityId, CapabilityError> {
+        if N == 0 { return Err(CapabilityError::Full); }
+        let mut i = 0;
+        while i < N {
+            if self.entries[i].is_none() {
+                let id = CapabilityId(self.next_id);
+                self.next_id = self.next_id.wrapping_add(1).max(1);
+                self.entries[i] = Some(Capability { id, rights });
+                return Ok(id);
+            }
+            i += 1;
         }
+        Err(CapabilityError::Full)
+    }
+    pub fn get(&self, id: CapabilityId) -> Result<Capability, CapabilityError> {
+        let mut i = 0;
+        while i < N {
+            if let Some(cap) = self.entries[i] {
+                if cap.id == id {
+                    if cap.rights.is_empty() { return Err(CapabilityError::Revoked); }
+                    return Ok(cap);
+                }
+            }
+            i += 1;
+        }
+        Err(CapabilityError::NotFound)
+    }
+    pub fn revoke(&mut self, id: CapabilityId) -> Result<(), CapabilityError> {
+        let mut i = 0;
+        while i < N {
+            if let Some(cap) = self.entries[i] {
+                if cap.id == id { self.entries[i] = Some(Capability::revoked(id)); return Ok(()); }
+            }
+            i += 1;
+        }
+        Err(CapabilityError::NotFound)
+    }
+    pub fn remove(&mut self, id: CapabilityId) -> Result<(), CapabilityError> {
+        let mut i = 0;
+        while i < N {
+            if let Some(cap) = self.entries[i] {
+                if cap.id == id { self.entries[i] = None; return Ok(()); }
+            }
+            i += 1;
+        }
+        Err(CapabilityError::NotFound)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn derivation_cannot_escalate() {
-        let root = Capability {
-            id: CapabilityId(1),
-            rights: Rights::READ.union(Rights::WRITE),
-        };
+        let root = Capability { id: CapabilityId(1), rights: Rights::READ.union(Rights::WRITE) };
         let child = root.derive(CapabilityId(2), Rights::WRITE.union(Rights::NETWORK));
         assert!(child.permits(Rights::WRITE));
         assert!(!child.permits(Rights::NETWORK));
         assert!(!child.permits(Rights::READ));
     }
-
+    #[test]
+    fn table_allocates_revokes_and_reuses_slots() {
+        let mut table: CapabilityTable<1> = CapabilityTable::new();
+        let id = table.insert(Rights::READ).unwrap();
+        assert_eq!(table.get(id).unwrap().rights, Rights::READ);
+        assert_eq!(table.insert(Rights::WRITE), Err(CapabilityError::Full));
+        assert!(table.revoke(id).is_ok());
+        assert_eq!(table.get(id), Err(CapabilityError::Revoked));
+        assert!(table.remove(id).is_ok());
+        assert!(table.insert(Rights::WRITE).is_ok());
+    }
+    #[test]
+    fn zero_capacity_fails_closed() {
+        let mut table: CapabilityTable<0> = CapabilityTable::new();
+        assert_eq!(table.insert(Rights::READ), Err(CapabilityError::Full));
+        assert!(table.is_full());
+    }
     #[test]
     fn revoked_capability_has_no_authority() {
         let cap = Capability::revoked(CapabilityId(3));
