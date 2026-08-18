@@ -77,14 +77,8 @@ pub enum UpdateError {
 
 pub const MAX_PAYLOAD: u64 = 4 * 1024 * 1024 * 1024;
 
-pub const fn validate_manifest(
-    m: UpdateManifest,
-    current_generation: u64,
-) -> Result<(), UpdateError> {
-    if m.version.len == 0
-        || m.version.len as usize > MAX_VERSION_LEN
-        || m.payload_len == 0
-    {
+pub const fn validate_manifest(m: UpdateManifest, current_generation: u64) -> Result<(), UpdateError> {
+    if m.version.len == 0 || m.version.len as usize > MAX_VERSION_LEN || m.payload_len == 0 {
         return Err(UpdateError::InvalidManifest);
     }
     if m.payload_len > MAX_PAYLOAD {
@@ -256,10 +250,7 @@ mod tests {
 
     #[test]
     fn downgrades_are_rejected() {
-        assert_eq!(
-            validate_manifest(manifest(1), 2),
-            Err(UpdateError::Downgrade)
-        );
+        assert_eq!(validate_manifest(manifest(1), 2), Err(UpdateError::Downgrade));
     }
 
     #[test]
