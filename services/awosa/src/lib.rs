@@ -77,11 +77,7 @@ pub const fn required_capability(kind: IoKind) -> u64 {
     }
 }
 
-pub const fn validate_io(
-    kind: IoKind,
-    size: usize,
-    capabilities: u64,
-) -> Result<(), RuntimeError> {
+pub const fn validate_io(kind: IoKind, size: usize, capabilities: u64) -> Result<(), RuntimeError> {
     let limit = match kind {
         IoKind::Read | IoKind::Write => MAX_IO,
         IoKind::Message => MAX_MESSAGE,
