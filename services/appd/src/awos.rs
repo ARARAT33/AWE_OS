@@ -4,7 +4,7 @@
 
 pub const AWOS_MAGIC: [u8; 4] = *b"AWOS";
 pub const AWOS_VERSION: u16 = 1;
-pub const AWOS_HEADER_LEN: usize = 36;
+pub const AWOS_HEADER_LEN: usize = 32;
 pub const AWOS_MAX_MANIFEST: usize = 64 * 1024;
 pub const AWOS_MAX_CODE: usize = 256 * 1024 * 1024;
 pub const AWOS_MAX_DATA: usize = 256 * 1024 * 1024;
