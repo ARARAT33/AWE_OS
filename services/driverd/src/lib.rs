@@ -26,36 +26,36 @@ mod supervisor;
 mod virtio;
 
 pub use access::{
-    AccessKind, AccessRegion, HardwareAccessPlan, InterruptMode, InterruptOwnership, PowerState,
-    power_transition_allowed,
+    power_transition_allowed, AccessKind, AccessRegion, HardwareAccessPlan, InterruptMode,
+    InterruptOwnership, PowerState,
 };
 pub use acpi::{
-    AcpiError, AcpiTableRef, MadtRecord, SdtHeader, checksum_ok, find_table, parse_header,
-    parse_madt,
+    checksum_ok, find_table, parse_header, parse_madt, AcpiError, AcpiTableRef, MadtRecord,
+    SdtHeader,
 };
-pub use acpi_root::{RsdpError, RsdpInfo, parse_pointer_table, validate_rsdp};
+pub use acpi_root::{parse_pointer_table, validate_rsdp, RsdpError, RsdpInfo};
 pub use apic::{ApicError, IoApic, IrqRoute, LocalApic};
 pub use asd::{
-    AsdError, AsdHeader, PackageState, ASD_HEADER_LEN, ASD_MAGIC, ASD_MAX_MANIFEST,
-    ASD_MAX_PAYLOAD, ASD_MIN_SIGNATURE, ASD_VERSION, package_transition, validate_asd,
+    package_transition, validate_asd, AsdError, AsdHeader, PackageState, ASD_HEADER_LEN,
+    ASD_MAGIC, ASD_MAX_MANIFEST, ASD_MAX_PAYLOAD, ASD_MIN_SIGNATURE, ASD_VERSION,
 };
-pub use catalog::{BUILTIN_DRIVER_COUNT, BUILTIN_DRIVERS, BuiltinDriver, descriptors};
+pub use catalog::{descriptors, BuiltinDriver, BUILTIN_DRIVER_COUNT, BUILTIN_DRIVERS};
 pub use contract::{
-    DriverLifecycle, DriverManifest, DriverTrust, LifecycleError, lifecycle_maps_to_state,
-    transition,
+    lifecycle_maps_to_state, transition, DriverLifecycle, DriverManifest, DriverTrust,
+    LifecycleError,
 };
 pub use dependency::{
     DependencyError, DependencyGraph, DriverDependency, DriverHealth, ResourceOwnership,
 };
 pub use pci::{
-    PciConfigAccess, PciDevice, PciDeviceTable, PciError, PciLocation, enumerate as enumerate_pci,
+    enumerate as enumerate_pci, PciConfigAccess, PciDevice, PciDeviceTable, PciError, PciLocation,
 };
 #[cfg(target_arch = "x86_64")]
 pub use pci_x86::X86CfgIo;
 pub use protocol::{DriverClass, DriverCommand, DriverEvent, DriverId, DriverReply, DriverState};
 pub use reference::{
-    BlockRequest, DisplayRect, InputEvent, NetFrame, ReferenceDevice, ReferenceError,
-    validate_block_request, validate_display_rect,
+    validate_block_request, validate_display_rect, BlockRequest, DisplayRect, InputEvent, NetFrame,
+    ReferenceDevice, ReferenceError,
 };
 pub use registry::{DriverDescriptor, DriverRegistry, RegistryError};
 pub use supervisor::{DriverSupervisor, SupervisorError};
