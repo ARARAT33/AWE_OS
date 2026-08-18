@@ -23,6 +23,15 @@ name = "awe-initd"
 version = "0.1.0"
 
 [[package]]
+name = "awe-product-core-tests"
+version = "0.1.0"
+dependencies = [
+ "awe-appd",
+ "awe-driverd",
+ "awe-update",
+]
+
+[[package]]
 name = "awe-update"
 version = "0.1.0"
 
