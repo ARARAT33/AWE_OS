@@ -6,8 +6,9 @@
 mod awos;
 
 pub use awos::{
-    package_transition, validate_awos, AppPackageState, AwosError, AwosHeader, AWOS_HEADER_LEN,
-    AWOS_MAGIC, AWOS_MAX_CODE, AWOS_MAX_DATA, AWOS_MAX_MANIFEST, AWOS_MIN_SIGNATURE, AWOS_VERSION,
+    AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_MAX_CODE, AWOS_MAX_DATA, AWOS_MAX_MANIFEST,
+    AWOS_MIN_SIGNATURE, AWOS_VERSION, AppPackageState, AwosError, AwosHeader, package_transition,
+    validate_awos,
 };
 
 pub const AWE_APP_ABI_MAJOR: u16 = 1;
