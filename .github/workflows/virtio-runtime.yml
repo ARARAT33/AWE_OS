@@ -1,0 +1,96 @@
+name: AWEOS VirtIO Runtime
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: virtio-runtime-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  virtio-block-contract-and-qemu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-none
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-virtio-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-virtio-cargo-
+
+      - name: Install QEMU and boot-image tools
+        run: sudo apt-get update && sudo apt-get install -y grub-pc-bin grub-common xorriso mtools qemu-system-x86
+
+      - name: Run storage and driver contract tests
+        run: cargo test --workspace --all-targets --offline
+
+      - name: Build kernel
+        env:
+          AWEOS_QEMU_SMOKE: "1"
+        run: cargo build --release -p aweos-kernel-bin --target x86_64-unknown-none --offline
+
+      - name: Validate kernel ELF
+        run: |
+          file target/x86_64-unknown-none/release/aweos
+          grub-file --is-x86-multiboot2 target/x86_64-unknown-none/release/aweos
+
+      - name: Build QEMU boot image
+        run: |
+          mkdir -p dist/iso/boot/grub
+          cp target/x86_64-unknown-none/release/aweos dist/iso/boot/aweos
+          cp kernel-bin/grub.cfg dist/iso/boot/grub/grub.cfg
+          grub-mkrescue -o dist/aweos-x86_64.iso dist/iso
+          truncate -s 64M dist/virtio-disk.img
+
+      - name: QEMU boot with VirtIO block device
+        shell: bash
+        run: |
+          set +e
+          timeout 15s qemu-system-x86_64 \
+            -M q35 \
+            -m 512M \
+            -cdrom dist/aweos-x86_64.iso \
+            -drive if=none,id=aweblk,format=raw,file=dist/virtio-disk.img \
+            -device virtio-blk-pci,drive=aweblk \
+            -display none \
+            -serial stdio \
+            -no-reboot \
+            -no-shutdown \
+            -d guest_errors,cpu_reset \
+            -D dist/qemu-virtio-debug.log \
+            > dist/qemu-virtio.log 2>&1
+          status=$?
+          cat dist/qemu-virtio.log
+          cat dist/qemu-virtio-debug.log || true
+          if [ "$status" -ne 124 ] && [ "$status" -ne 0 ]; then exit 1; fi
+          grep -q "AWEOS: boot protocol validated" dist/qemu-virtio.log
+          grep -q "AWEOS: kernel state = RUNNING" dist/qemu-virtio.log
+          grep -q "AWEOS: kernel is alive" dist/qemu-virtio.log
+
+      - name: Publish VirtIO runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: aweos-virtio-runtime-evidence
+          path: |
+            dist/aweos-x86_64.iso
+            dist/virtio-disk.img
+            dist/qemu-virtio.log
+            dist/qemu-virtio-debug.log
+          if-no-files-found: warn
