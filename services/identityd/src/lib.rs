@@ -43,12 +43,12 @@ pub const fn validate_group(group: GroupId) -> Result<(), IdentityError> {
     }
 }
 
-pub const fn validate_credential(credential: Credential) -> Result<(), IdentityError> {
+pub fn validate_credential(credential: Credential) -> Result<(), IdentityError> {
     validate_user(credential.user)?;
     validate_group(credential.primary_group)
 }
 
-pub const fn authorize(credential: Credential, required: u64) -> Result<(), IdentityError> {
+pub fn authorize(credential: Credential, required: u64) -> Result<(), IdentityError> {
     validate_credential(credential)?;
     if credential.capability_mask & required == required {
         Ok(())
@@ -101,7 +101,7 @@ impl GroupSet {
         Ok(())
     }
 
-    pub const fn contains(&self, group: GroupId) -> bool {
+    pub fn contains(&self, group: GroupId) -> bool {
         let mut i = 0;
         while i < self.len {
             if self.groups[i] == group {
