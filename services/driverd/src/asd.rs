@@ -5,7 +5,7 @@
 
 pub const ASD_MAGIC: [u8; 4] = *b"ASD1";
 pub const ASD_VERSION: u16 = 1;
-pub const ASD_HEADER_LEN: usize = 32;
+pub const ASD_HEADER_LEN: usize = 38;
 pub const ASD_MAX_MANIFEST: usize = 64 * 1024;
 pub const ASD_MAX_PAYLOAD: usize = 128 * 1024 * 1024;
 pub const ASD_MIN_SIGNATURE: usize = 64;
@@ -68,7 +68,7 @@ pub fn validate_asd(bytes: &[u8]) -> Result<AsdHeader, AsdError> {
     if header.payload_len as usize > ASD_MAX_PAYLOAD {
         return Err(AsdError::OversizedPayload);
     }
-    if header.signature_len as usize < ASD_MIN_SIGNATURE {
+    if (header.signature_len as usize) < ASD_MIN_SIGNATURE {
         return Err(AsdError::MissingSignature);
     }
     let expected = ASD_HEADER_LEN
