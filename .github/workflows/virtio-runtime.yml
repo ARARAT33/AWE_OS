@@ -66,7 +66,7 @@ jobs:
       - name: QEMU boot with VirtIO block device
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           rm -f dist/qemu-virtio.qmp dist/qemu-virtio.log dist/qemu-virtio-debug.log
           qemu-system-x86_64 \
             -M q35 \
@@ -98,23 +98,36 @@ jobs:
 
           sock_path = Path("dist/qemu-virtio.qmp")
           s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-          s.settimeout(3)
+          s.settimeout(5)
           s.connect(str(sock_path))
-          s.recv(65536)
-          s.sendall((json.dumps({"execute": "qmp_capabilities"}) + "\r\n").encode())
-          s.recv(65536)
-          s.sendall((json.dumps({"execute": "query-pci"}) + "\r\n").encode())
+          greeting = s.recv(65536).decode("utf-8", "replace")
+          s.sendall((json.dumps({"execute": "qmp_capabilities", "id": 1}) + "\r\n").encode())
+          caps = s.recv(65536).decode("utf-8", "replace")
+          s.sendall((json.dumps({"execute": "query-pci", "id": 2}) + "\r\n").encode())
           data = s.recv(262144).decode("utf-8", "replace")
           s.close()
 
+          parsed = json.loads(data)
+          devices = [d for bus in parsed.get("return", []) for d in bus.get("devices", [])]
+          virtio = [
+              d for d in devices
+              if int(d.get("vendor_id", -1)) == 0x1AF4
+              and int(d.get("device_id", -1)) in range(0x1000, 0x1100)
+          ]
           evidence = {
               "qmp_socket_present": True,
-              "virtio_block": "virtio" in data.lower(),
-              "query_pci_response": data,
+              "qmp_greeting_present": bool(greeting),
+              "qmp_capabilities_ok": '"return": {}' in caps,
+              "pci_device_count": len(devices),
+              "virtio_pci_devices": virtio,
+              "virtio_block_vendor_id": "0x1af4",
+              "query_pci_response": parsed,
           }
           Path("dist/qemu-device-evidence.json").write_text(json.dumps(evidence, indent=2))
-          if not evidence["virtio_block"]:
-              raise SystemExit("QEMU did not expose VirtIO evidence through QMP")
+          if not evidence["qmp_capabilities_ok"]:
+              raise SystemExit("QMP capabilities negotiation failed")
+          if not virtio:
+              raise SystemExit("QEMU query-pci did not expose a VirtIO PCI device")
           PY
 
           sleep 3
