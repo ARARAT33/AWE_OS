@@ -8,3 +8,4 @@ publish = false
 awe-driverd = { path = "../../services/driverd" }
 awe-appd = { path = "../../services/appd" }
 awe-update = { path = "../../services/update" }
+awe-kernel = { package = "awe-kernel", path = "../../kernel" }
