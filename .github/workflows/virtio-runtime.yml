@@ -57,11 +57,17 @@ jobs:
           cp kernel-bin/grub.cfg dist/iso/boot/grub/grub.cfg
           grub-mkrescue -o dist/aweos-x86_64.iso dist/iso
           truncate -s 64M dist/virtio-disk.img
+          sha256sum dist/aweos-x86_64.iso dist/virtio-disk.img > dist/artifact-sha256.txt
+
+      - name: Verify QEMU exposes VirtIO block transport
+        run: |
+          qemu-system-x86_64 -device help | grep -E '^name "virtio-blk-pci"'
 
       - name: QEMU boot with VirtIO block device
         shell: bash
         run: |
           set +e
+          rm -f dist/qemu-virtio.qmp
           timeout 15s qemu-system-x86_64 \
             -M q35 \
             -m 512M \
@@ -69,19 +75,53 @@ jobs:
             -drive if=none,id=aweblk,format=raw,file=dist/virtio-disk.img \
             -device virtio-blk-pci,drive=aweblk \
             -display none \
-            -serial stdio \
+            -serial file:dist/qemu-virtio.log \
+            -qmp unix:dist/qemu-virtio.qmp,server=on,wait=off \
             -no-reboot \
             -no-shutdown \
             -d guest_errors,cpu_reset \
-            -D dist/qemu-virtio-debug.log \
-            > dist/qemu-virtio.log 2>&1
+            -D dist/qemu-virtio-debug.log
           status=$?
-          cat dist/qemu-virtio.log
+
+          cat dist/qemu-virtio.log || true
           cat dist/qemu-virtio-debug.log || true
+
           if [ "$status" -ne 124 ] && [ "$status" -ne 0 ]; then exit 1; fi
           grep -q "AWEOS: boot protocol validated" dist/qemu-virtio.log
           grep -q "AWEOS: kernel state = RUNNING" dist/qemu-virtio.log
           grep -q "AWEOS: kernel is alive" dist/qemu-virtio.log
+
+      - name: Record QEMU device evidence
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          import socket
+          import time
+          from pathlib import Path
+
+          sock_path = Path("dist/qemu-virtio.qmp")
+          evidence = {"qmp_socket_present": sock_path.exists(), "virtio_block": False}
+          if sock_path.exists():
+              s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+              try:
+                  s.settimeout(2)
+                  s.connect(str(sock_path))
+                  s.recv(65536)
+                  s.sendall((json.dumps({"execute": "qmp_capabilities"}) + "\r\n").encode())
+                  s.recv(65536)
+                  s.sendall((json.dumps({"execute": "query-pci"}) + "\r\n").encode())
+                  data = s.recv(262144).decode("utf-8", "replace")
+                  evidence["virtio_block"] = "virtio" in data.lower()
+                  evidence["query_pci_response"] = data
+              except Exception as exc:
+                  evidence["qmp_error"] = str(exc)
+              finally:
+                  s.close()
+          Path("dist/qemu-device-evidence.json").write_text(json.dumps(evidence, indent=2))
+          if not evidence["virtio_block"]:
+              raise SystemExit("QEMU did not expose VirtIO evidence through QMP")
+          PY
 
       - name: Publish VirtIO runtime evidence
         if: always()
@@ -91,6 +131,8 @@ jobs:
           path: |
             dist/aweos-x86_64.iso
             dist/virtio-disk.img
+            dist/artifact-sha256.txt
             dist/qemu-virtio.log
             dist/qemu-virtio-debug.log
+            dist/qemu-device-evidence.json
           if-no-files-found: warn
