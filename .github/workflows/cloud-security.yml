@@ -36,13 +36,13 @@ jobs:
       - name: Format workspace
         run: cargo fmt --all -- --check
       - name: Compile every workspace crate
-        run: cargo check --workspace --locked
+        run: cargo check --workspace --offline
       - name: Execute every workspace test
         id: tests
         shell: bash
         run: |
           set -o pipefail
-          cargo test --workspace --all-targets --no-fail-fast --locked -- --nocapture 2>&1 | tee workspace-tests.log
+          cargo test --workspace --all-targets --no-fail-fast --offline -- --nocapture 2>&1 | tee workspace-tests.log
           status=${PIPESTATUS[0]}
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit "$status"
@@ -55,12 +55,12 @@ jobs:
           if-no-files-found: warn
       - name: Security-focused tests
         if: steps.tests.outcome == 'success'
-        run: cargo test --workspace --all-targets --locked -- security
+        run: cargo test --workspace --all-targets --offline -- security
       - name: Clippy diagnostics
         if: steps.tests.outcome == 'success'
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings -A dead_code -A unused_attributes -A bad_asm_style -A unused_imports
+        run: cargo clippy --workspace --all-targets --offline -- -D warnings -A dead_code -A unused_attributes -A bad_asm_style -A unused_imports
       - name: Dependency audit surface
-        run: cargo tree --workspace --locked
+        run: cargo tree --workspace --offline
 
   cloud-release-contract:
     runs-on: ubuntu-latest
