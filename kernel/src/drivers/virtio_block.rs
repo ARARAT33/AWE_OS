@@ -5,6 +5,9 @@ use super::{VirtioDescriptor, VirtioError, VirtioSplitQueue, VirtioTransportStat
 pub const SECTOR_SIZE: u64 = 512;
 pub const MAX_REQUEST_SECTORS: u32 = 128;
 pub const MAX_REQUEST_BYTES: u64 = MAX_REQUEST_SECTORS as u64 * SECTOR_SIZE;
+pub const VIRTIO_BLK_S_OK: u8 = 0;
+pub const VIRTIO_BLK_S_IOERR: u8 = 1;
+pub const VIRTIO_BLK_S_UNSUPP: u8 = 2;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BlockOp { Read, Write, Flush }
@@ -25,6 +28,8 @@ pub enum BlockError {
     Unsupported,
     InvalidDescriptor,
     InvalidCompletion,
+    DeviceIoError,
+    DeviceUnsupported,
     Queue(VirtioError),
 }
 
@@ -68,6 +73,17 @@ impl VirtioBlockConfig {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct BlockCompletion { pub request_id: u16, pub status: u8, pub bytes: u32 }
 
+impl BlockCompletion {
+    pub const fn result(self) -> Result<u32, BlockError> {
+        match self.status {
+            VIRTIO_BLK_S_OK => Ok(self.bytes),
+            VIRTIO_BLK_S_IOERR => Err(BlockError::DeviceIoError),
+            VIRTIO_BLK_S_UNSUPP => Err(BlockError::DeviceUnsupported),
+            _ => Err(BlockError::InvalidCompletion),
+        }
+    }
+}
+
 pub struct VirtioBlockQueue<const N: usize> {
     queue: VirtioSplitQueue<N>,
 }
@@ -99,15 +115,18 @@ impl<const N: usize> VirtioBlockQueue<N> {
         Ok(())
     }
 
-    pub fn complete(&mut self, request_id: u16, bytes: u32, mmio: &mut super::VirtioMmioRegisters) -> Result<(), BlockError> {
+    pub fn complete(&mut self, request_id: u16, bytes: u32, status: u8, mmio: &mut super::VirtioMmioRegisters) -> Result<(), BlockError> {
         if request_id as usize >= N { return Err(BlockError::Queue(VirtioError::InvalidQueueIndex)); }
         if bytes as u64 > MAX_REQUEST_BYTES { return Err(BlockError::InvalidCompletion); }
+        if !matches!(status, VIRTIO_BLK_S_OK | VIRTIO_BLK_S_IOERR | VIRTIO_BLK_S_UNSUPP) {
+            return Err(BlockError::InvalidCompletion);
+        }
         self.queue.complete(request_id, bytes, mmio)?;
         Ok(())
     }
 
     pub fn poll_completion(&mut self) -> Result<Option<BlockCompletion>, BlockError> {
-        Ok(self.queue.pop_completion()?.map(|entry| BlockCompletion { request_id: entry.id, status: 0, bytes: entry.len }))
+        Ok(self.queue.pop_completion()?.map(|entry| BlockCompletion { request_id: entry.id, status: VIRTIO_BLK_S_OK, bytes: entry.len }))
     }
 }
 
@@ -140,7 +159,9 @@ mod tests {
         transport.driver_ok().unwrap();
         let mut queue: VirtioBlockQueue<1> = VirtioBlockQueue::new();
         assert_eq!(queue.submit::<32>(0, VirtioDescriptor { addr: 0x1000, len: 0, flags: 0, next: 0 }, CFG, &mut transport, &mut mmio), Err(BlockError::InvalidDescriptor));
-        assert_eq!(queue.complete(0, (MAX_REQUEST_BYTES + 1) as u32, &mut mmio), Err(BlockError::InvalidCompletion));
+        assert_eq!(queue.complete(0, (MAX_REQUEST_BYTES + 1) as u32, VIRTIO_BLK_S_OK, &mut mmio), Err(BlockError::InvalidCompletion));
+        assert_eq!(BlockCompletion { request_id: 0, status: VIRTIO_BLK_S_IOERR, bytes: 0 }.result(), Err(BlockError::DeviceIoError));
+        assert_eq!(BlockCompletion { request_id: 0, status: VIRTIO_BLK_S_UNSUPP, bytes: 0 }.result(), Err(BlockError::DeviceUnsupported));
     }
 
     #[test]
@@ -155,7 +176,7 @@ mod tests {
         let mut queue: VirtioBlockQueue<1> = VirtioBlockQueue::new();
         queue.submit::<32>(0, VirtioDescriptor { addr: 0x1000, len: 528, flags: 0, next: 0 }, CFG, &mut transport, &mut mmio).unwrap();
         assert_eq!(mmio.queue_notify, 0);
-        queue.complete(0, 512, &mut mmio).unwrap();
-        assert_eq!(queue.poll_completion().unwrap(), Some(BlockCompletion { request_id: 0, status: 0, bytes: 512 }));
+        queue.complete(0, 512, VIRTIO_BLK_S_OK, &mut mmio).unwrap();
+        assert_eq!(queue.poll_completion().unwrap(), Some(BlockCompletion { request_id: 0, status: VIRTIO_BLK_S_OK, bytes: 512 }));
     }
 }
