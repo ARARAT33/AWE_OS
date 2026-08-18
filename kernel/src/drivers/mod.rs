@@ -35,6 +35,7 @@ pub mod linux_resource_transaction;
 pub mod linux_driver_resource_binding;
 pub mod linux_driver_execution_guard;
 pub mod product_gate;
+pub mod pci;
 pub mod virtio;
 pub mod virtio_pci;
 pub mod universal;
@@ -76,8 +77,9 @@ pub use linux_resource_transaction::{ResourceTransaction,ResourceTransactionErro
 pub use linux_driver_resource_binding::{BindingError,DriverResourceBinding};
 pub use linux_driver_execution_guard::{ExecutionGuard,ExecutionGuardError};
 pub use product_gate::{ProductGate,ProductGateError};
+pub use pci::{ConfigSpace,PciError as PciEnumerationError,PciFunction,Enumerator as PciEnumerator,MAX_PCI_FUNCTIONS};
 pub use virtio::{validate_chain,VirtioDescriptor,VirtioDevice,VirtioError,VirtioFeatures,VirtioQueueConfig,VirtioSplitQueue,DESC_INDIRECT,DESC_NEXT,DESC_WRITE};
-pub use virtio_pci::{Bar,PciError,PciId,VirtioPciCapabilities,VirtioPciTransport,VIRTIO_VENDOR_ID};
+pub use virtio_pci::{Bar,PciError,VirtioPciCapabilities,VirtioPciTransport,VIRTIO_VENDOR_ID};
 pub use universal::{validate_request,DriverAbi,DriverAction,DriverError,DriverOs,DriverRequest,DriverResult};
 pub use installer::{plan_install,InstallError,InstallPlan,InstallerPackage,PackageFormat};
 pub use windows::WindowsLayer;
