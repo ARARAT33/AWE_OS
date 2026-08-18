@@ -10,6 +10,8 @@
 // VirtIO/Linux/Windows/Android driver execution live in services/driverd.
 // The kernel owns only minimal process/IPC/capability primitives needed to
 // isolate and communicate with those services.
+pub mod ac_boot_gate;
+pub mod ac_runtime;
 pub mod arch;
 pub mod boot_guard;
 pub mod boot_phase;
