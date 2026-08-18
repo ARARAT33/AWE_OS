@@ -9,6 +9,7 @@ members = [
     "services/identityd",
     "services/awosa",
     "services/appd",
+    "services/update",
     "tools/aweosa-builder",
 ]
 resolver = "2"
@@ -23,6 +24,7 @@ awe-initd = { path = "services/initd" }
 awe-identityd = { path = "services/identityd" }
 awe-awosa = { path = "services/awosa" }
 awe-appd = { path = "services/appd" }
+awe-update = { path = "services/update" }
 
 [profile.dev]
 panic = "abort"
