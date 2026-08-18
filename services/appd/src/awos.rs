@@ -44,7 +44,9 @@ pub fn validate_awos(bytes: &[u8]) -> Result<AwosHeader, AwosError> {
         return Err(AwosError::BadMagic);
     }
     let u16_at = |o: usize| u16::from_le_bytes([bytes[o], bytes[o + 1]]);
-    let u32_at = |o: usize| u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]);
+    let u32_at = |o: usize| {
+        u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]])
+    };
     let header = AwosHeader {
         version: u16_at(4),
         abi_major: u16_at(6),
@@ -97,7 +99,8 @@ pub enum AppPackageState {
 }
 
 pub const fn package_transition(from: AppPackageState, to: AppPackageState) -> bool {
-    matches!((from, to),
+    matches!(
+        (from, to),
         (AppPackageState::Installed, AppPackageState::Running)
             | (AppPackageState::Installed, AppPackageState::Staged)
             | (AppPackageState::Running, AppPackageState::Staged)
@@ -106,7 +109,8 @@ pub const fn package_transition(from: AppPackageState, to: AppPackageState) -> b
             | (AppPackageState::Staged, AppPackageState::Failed)
             | (AppPackageState::Failed, AppPackageState::Staged)
             | (AppPackageState::Failed, AppPackageState::Quarantined)
-            | (AppPackageState::Installed, AppPackageState::Removed))
+            | (AppPackageState::Installed, AppPackageState::Removed)
+    )
 }
 
 #[cfg(test)]
