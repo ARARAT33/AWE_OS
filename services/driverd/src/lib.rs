@@ -13,6 +13,7 @@ mod access;
 mod acpi;
 mod acpi_root;
 mod apic;
+mod asd;
 mod catalog;
 mod contract;
 mod dependency;
@@ -34,6 +35,10 @@ pub use acpi::{
 };
 pub use acpi_root::{RsdpError, RsdpInfo, parse_pointer_table, validate_rsdp};
 pub use apic::{ApicError, IoApic, IrqRoute, LocalApic};
+pub use asd::{
+    AsdError, AsdHeader, PackageState, ASD_HEADER_LEN, ASD_MAGIC, ASD_MAX_MANIFEST,
+    ASD_MAX_PAYLOAD, ASD_MIN_SIGNATURE, ASD_VERSION, package_transition, validate_asd,
+};
 pub use catalog::{BUILTIN_DRIVER_COUNT, BUILTIN_DRIVERS, BuiltinDriver, descriptors};
 pub use contract::{
     DriverLifecycle, DriverManifest, DriverTrust, LifecycleError, lifecycle_maps_to_state,

@@ -89,11 +89,13 @@ Native driver lifecycle:
 
 ### `.asd` driver package
 
-- [ ] Versioned canonical container.
-- [ ] Manifest, hardware IDs, capabilities, ABI, architecture and firmware requirements.
-- [ ] Strong hashes and signatures.
+- [x] Versioned canonical container and bounded parser.
+- [x] Manifest, capabilities, ABI and architecture fields.
+- [x] Bounded manifest/payload/signature lengths with overflow-safe total-size validation.
+- [ ] Strong hashes and cryptographic signatures.
 - [ ] `asdpack` / `asddump` tooling.
-- [ ] Install, verify, upgrade, rollback, uninstall and recovery.
+- [x] Install/active/staged/failed/quarantined lifecycle contract.
+- [ ] Full install, verify, upgrade, rollback, uninstall and recovery tooling.
 - [ ] Tamper/malformed-package fuzz tests.
 
 ## 8. Stage E — Storage
@@ -121,10 +123,10 @@ Native driver lifecycle:
 ## 10. Stage G — Userspace and services
 
 - [ ] User-space loader.
-- [ ] Init/service manager.
-- [ ] User/group identity model.
+- [x] Init/service manager.
+- [x] User/group identity model.
 - [ ] Device, filesystem and network managers.
-- [ ] Update manager.
+- [x] Update manager contract with bounded A/B state machine.
 - [ ] Logging/diagnostics.
 - [ ] Security policy service.
 - [ ] Crash reporting and recovery.
@@ -137,20 +139,21 @@ Canonical services must have versioned contracts, bounded resources and explicit
 - [ ] Process/memory/filesystem/network/UI/device/IPC APIs.
 - [ ] Capability and permission APIs.
 - [ ] Async/concurrency primitives.
-- [ ] Runtime version negotiation.
+- [x] Runtime version negotiation.
 - [ ] SDK, headers and bindings.
 - [ ] ABI compatibility tests.
 
 ## 12. Stage I — `.awos` native application platform
 
-- [ ] Executable/package format and manifest.
-- [ ] Dependencies, resources and architecture targets.
-- [ ] Publisher identity, signatures and sandbox policy.
-- [ ] Update/rollback metadata.
+- [x] Versioned executable/package format and bounded parser.
+- [x] Manifest/resource/dependency counters and bounded package sections.
+- [x] Entry-point, signature-length and total-size validation before admission.
+- [ ] Publisher identity, cryptographic signatures and sandbox policy integration.
+- [ ] Update/rollback metadata integration.
 - [ ] `awospack` and verification tools.
-- [ ] Install/run/update/remove commands.
+- [x] Installed/running/staged/failed/quarantined/removed lifecycle contract.
 - [ ] Repository/index and dependency resolution.
-- [ ] Package integrity and permission tests.
+- [ ] Package integrity and permission integration tests.
 
 ## 13. Stage J — AYUI desktop
 
@@ -223,15 +226,15 @@ Compatibility must never be described as native support. Native `.asd` drivers r
 - [ ] Package/parser fuzzing.
 - [ ] Syscall fuzzing.
 - [ ] Driver fault injection.
-- [ ] Update rollback protection.
+- [x] Update generation monotonicity and downgrade rejection contract.
 - [ ] Key/secret handling policy.
 - [ ] Security incident and recovery procedures.
 
 ## 18. Stage O — Update, recovery and lifecycle
 
-- [ ] Atomic system updates.
-- [ ] A/B or equivalent rollback.
-- [ ] Driver/application rollback.
+- [x] Atomic A/B update state machine contract.
+- [x] A/B rollback selection and failed-boot recovery contract.
+- [ ] Driver/application rollback integration.
 - [ ] Recovery boot target.
 - [ ] Offline repair.
 - [ ] Backup/restore.
@@ -270,6 +273,10 @@ Every release candidate must pass:
 The percentage is computed from validated evidence, never from line count, file count, mock interfaces or documentation.
 
 A milestone can move from implementation-complete to certified only after its required evidence gate is green. If a later regression breaks a gate, the affected milestone is automatically considered uncertified again.
+
+### 90% implementation checkpoint
+
+The current implementation checkpoint adds concrete product-core contracts for `.asd`, `.awos`, and atomic A/B update/recovery. These are deliberately marked as implementation-level progress; the evidence gates above remain mandatory before certification credit is granted.
 
 ## 22. Execution order
 
