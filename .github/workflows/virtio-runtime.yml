@@ -66,9 +66,9 @@ jobs:
       - name: QEMU boot with VirtIO block device
         shell: bash
         run: |
-          set +e
-          rm -f dist/qemu-virtio.qmp
-          timeout 15s qemu-system-x86_64 \
+          set -e
+          rm -f dist/qemu-virtio.qmp dist/qemu-virtio.log dist/qemu-virtio-debug.log
+          qemu-system-x86_64 \
             -M q35 \
             -m 512M \
             -cdrom dist/aweos-x86_64.iso \
@@ -80,48 +80,54 @@ jobs:
             -no-reboot \
             -no-shutdown \
             -d guest_errors,cpu_reset \
-            -D dist/qemu-virtio-debug.log
-          status=$?
+            -D dist/qemu-virtio-debug.log \
+            > dist/qemu-host.log 2>&1 &
+          qemu_pid=$!
+          trap 'kill "$qemu_pid" 2>/dev/null || true; wait "$qemu_pid" 2>/dev/null || true' EXIT
 
-          cat dist/qemu-virtio.log || true
-          cat dist/qemu-virtio-debug.log || true
+          for _ in $(seq 1 30); do
+            [ -S dist/qemu-virtio.qmp ] && break
+            sleep 0.5
+          done
+          test -S dist/qemu-virtio.qmp
 
-          if [ "$status" -ne 124 ] && [ "$status" -ne 0 ]; then exit 1; fi
-          grep -q "AWEOS: boot protocol validated" dist/qemu-virtio.log
-          grep -q "AWEOS: kernel state = RUNNING" dist/qemu-virtio.log
-          grep -q "AWEOS: kernel is alive" dist/qemu-virtio.log
-
-      - name: Record QEMU device evidence
-        if: always()
-        run: |
           python3 - <<'PY'
           import json
           import socket
-          import time
           from pathlib import Path
 
           sock_path = Path("dist/qemu-virtio.qmp")
-          evidence = {"qmp_socket_present": sock_path.exists(), "virtio_block": False}
-          if sock_path.exists():
-              s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-              try:
-                  s.settimeout(2)
-                  s.connect(str(sock_path))
-                  s.recv(65536)
-                  s.sendall((json.dumps({"execute": "qmp_capabilities"}) + "\r\n").encode())
-                  s.recv(65536)
-                  s.sendall((json.dumps({"execute": "query-pci"}) + "\r\n").encode())
-                  data = s.recv(262144).decode("utf-8", "replace")
-                  evidence["virtio_block"] = "virtio" in data.lower()
-                  evidence["query_pci_response"] = data
-              except Exception as exc:
-                  evidence["qmp_error"] = str(exc)
-              finally:
-                  s.close()
+          s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+          s.settimeout(3)
+          s.connect(str(sock_path))
+          s.recv(65536)
+          s.sendall((json.dumps({"execute": "qmp_capabilities"}) + "\r\n").encode())
+          s.recv(65536)
+          s.sendall((json.dumps({"execute": "query-pci"}) + "\r\n").encode())
+          data = s.recv(262144).decode("utf-8", "replace")
+          s.close()
+
+          evidence = {
+              "qmp_socket_present": True,
+              "virtio_block": "virtio" in data.lower(),
+              "query_pci_response": data,
+          }
           Path("dist/qemu-device-evidence.json").write_text(json.dumps(evidence, indent=2))
           if not evidence["virtio_block"]:
               raise SystemExit("QEMU did not expose VirtIO evidence through QMP")
           PY
+
+          sleep 3
+          kill "$qemu_pid" 2>/dev/null || true
+          wait "$qemu_pid" 2>/dev/null || true
+          trap - EXIT
+
+          cat dist/qemu-virtio.log || true
+          cat dist/qemu-host.log || true
+          cat dist/qemu-virtio-debug.log || true
+          grep -q "AWEOS: boot protocol validated" dist/qemu-virtio.log
+          grep -q "AWEOS: kernel state = RUNNING" dist/qemu-virtio.log
+          grep -q "AWEOS: kernel is alive" dist/qemu-virtio.log
 
       - name: Publish VirtIO runtime evidence
         if: always()
@@ -133,6 +139,7 @@ jobs:
             dist/virtio-disk.img
             dist/artifact-sha256.txt
             dist/qemu-virtio.log
+            dist/qemu-host.log
             dist/qemu-virtio-debug.log
             dist/qemu-device-evidence.json
           if-no-files-found: warn
