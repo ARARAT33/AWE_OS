@@ -4,6 +4,7 @@
 //! The platform layer supplies MMIO/PCI access; queue validation and feature
 //! negotiation are deterministic and allocation-free here.
 
+pub const VIRTIO_PCI_VENDOR_ID: u16 = 0x1AF4;
 pub const VIRTIO_F_VERSION_1: u64 = 1 << 32;
 pub const VIRTIO_STATUS_ACKNOWLEDGE: u8 = 1;
 pub const VIRTIO_STATUS_DRIVER: u8 = 2;
@@ -12,9 +13,12 @@ pub const VIRTIO_STATUS_FEATURES_OK: u8 = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VirtioError {
+    InvalidVendor,
+    InvalidDevice,
     MissingVersion1,
     QueueTooLarge,
     InvalidQueue,
+    QueueOverflow,
     NotReady,
 }
 
@@ -36,6 +40,19 @@ impl VirtioDevice {
             driver_features: 0,
             status: 0,
         }
+    }
+
+    /// Validate the PCI identity before any driver state transition.
+    /// VirtIO PCI devices use vendor 0x1AF4 and the modern device-id range
+    /// 0x1000..=0x107F. Rejecting everything else is fail-closed.
+    pub const fn validate_pci_identity(&self) -> Result<(), VirtioError> {
+        if self.vendor_id != VIRTIO_PCI_VENDOR_ID {
+            return Err(VirtioError::InvalidVendor);
+        }
+        if !(self.device_id >= 0x1000 && self.device_id <= 0x107F) {
+            return Err(VirtioError::InvalidDevice);
+        }
+        Ok(())
     }
 
     pub const fn acknowledge(mut self) -> Self {
@@ -87,8 +104,14 @@ impl VirtioQueue {
         })
     }
 
-    pub const fn pending(self) -> u16 {
-        self.avail_index.wrapping_sub(self.used_index)
+    /// Number of descriptors currently outstanding, with a bounded overflow
+    /// guard so a corrupted index cannot silently become a valid queue state.
+    pub const fn pending(self) -> Result<u16, VirtioError> {
+        let pending = self.avail_index.wrapping_sub(self.used_index);
+        if pending > self.size {
+            return Err(VirtioError::QueueOverflow);
+        }
+        Ok(pending)
     }
 }
 
@@ -105,8 +128,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn pci_identity_is_fail_closed() {
+        assert!(VirtioDevice::new(2, VIRTIO_PCI_VENDOR_ID, VIRTIO_F_VERSION_1).validate_pci_identity().is_ok());
+        assert_eq!(VirtioDevice::new(2, 0x1234, VIRTIO_F_VERSION_1).validate_pci_identity(), Err(VirtioError::InvalidVendor));
+        assert_eq!(VirtioDevice::new(0x10FF, VIRTIO_PCI_VENDOR_ID, VIRTIO_F_VERSION_1).validate_pci_identity(), Err(VirtioError::InvalidDevice));
+    }
+
+    #[test]
     fn version_1_is_required() {
-        let device = VirtioDevice::new(2, 0x1AF4, VIRTIO_F_VERSION_1);
+        let device = VirtioDevice::new(2, VIRTIO_PCI_VENDOR_ID, VIRTIO_F_VERSION_1);
         let ready = device
             .acknowledge()
             .driver_present()
@@ -121,5 +151,13 @@ mod tests {
         assert!(VirtioQueue::new(128).is_ok());
         assert_eq!(VirtioQueue::new(3), Err(VirtioError::QueueTooLarge));
         assert_eq!(VirtioQueue::new(2048), Err(VirtioError::QueueTooLarge));
+    }
+
+    #[test]
+    fn queue_pending_rejects_corrupt_distance() {
+        let queue = VirtioQueue { size: 8, used_index: 0, avail_index: 9 };
+        assert_eq!(queue.pending(), Err(VirtioError::QueueOverflow));
+        let queue = VirtioQueue { size: 8, used_index: 10, avail_index: 17 };
+        assert_eq!(queue.pending(), Ok(7));
     }
 }
