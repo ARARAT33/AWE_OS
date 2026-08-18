@@ -40,8 +40,18 @@ Experimental research layer:
 - Kernel module boundaries for architecture, memory, interrupts, process, scheduler, security, synchronization and syscalls.
 - Validated loader-to-kernel entry contract and architecture capability matrix.
 - A typed CellKernel system contract with an explicit ABI version and deterministic capability baseline.
+- Modular PCI/ACPI/APIC/VirtIO device contracts and bounded driver lifecycle supervision.
+- Bounded VFS/GPT/journal/recovery and IPv4/UDP/TCP transport foundations.
+- Versioned userspace service, identity and AWOSA runtime contracts.
+- Bounded `.asd` native-driver package admission and lifecycle states.
+- Bounded `.awos` native-application package admission and lifecycle states.
+- Atomic A/B update/recovery state-machine contract with generation-based downgrade rejection.
 - Automated formatting, workspace compilation, tests, Clippy and UEFI-loader checks in GitHub Actions.
 - Experimental product specifications for AWE Capsule and AWE XenoSense.
+
+## Product progress
+
+**90% implementation checkpoint.** This is not a 90% release-certification claim: QEMU/runtime, hardware, cryptographic signing, fuzz/stress and release evidence gates still have to pass before AWE_OS 1.0 is certified.
 
 ## Engineering documentation
 
@@ -86,7 +96,7 @@ These are **design proposals, not claims of proven technology or claims that nob
 
 ## Status
 
-AWE_OS is **not yet a finished daily-driver OS**. The foundation is materially stronger, but the product gate requires a real bootable x86_64 image, active hardware drivers, persistent storage, networking, user space and automated end-to-end QEMU validation.
+AWE_OS is **not yet a finished daily-driver OS**. The implementation is at the 90% product-core checkpoint, while final product certification still requires real boot/runtime evidence, broader hardware drivers, persistent storage/network integration, desktop/userspace completion, cryptographic trust integration, compatibility layers, recovery tooling and release validation.
 
 ## License
 
