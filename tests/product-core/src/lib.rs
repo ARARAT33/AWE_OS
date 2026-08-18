@@ -3,9 +3,14 @@ mod product_core {
     use awe_appd::{
         validate_awos, AppPackageState, AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_VERSION,
     };
+    use awe_awosa::{
+        negotiate, validate_io, AbiVersion, IoKind, RuntimeError, CAP_FS_READ, CAP_IPC,
+    };
     use awe_driverd::{
         validate_asd, AsdError, PackageState, ASD_HEADER_LEN, ASD_MAGIC, ASD_VERSION,
     };
+    use awe_identityd::{authorize, Credential, GroupId, GroupSet, UserId};
+    use awe_initd::{RestartPolicy, ServiceId, ServiceSpec, ServiceState, ServiceTable};
     use awe_update::{Slot, SlotState, UpdateError, UpdateManager, UpdateManifest, Version};
     use aweos_kernel::net::{Endpoint, Ipv4Address, SocketTable, Transport};
     use aweos_kernel::storage::{
@@ -191,5 +196,73 @@ mod product_core {
             20
         );
         assert!(aweos_kernel::net::transport::udp_payload(&[0; 7]).is_err());
+    }
+
+    #[test]
+    fn stages_a_to_j_cross_service_contracts_are_bounded_and_fail_closed() {
+        assert!(negotiate(AbiVersion { major: 2, minor: 0 }).is_err());
+        assert!(negotiate(AbiVersion { major: 1, minor: 2 }).is_ok());
+
+        assert!(validate_io(IoKind::Read, 4096, CAP_FS_READ).is_ok());
+        assert_eq!(
+            validate_io(IoKind::Write, 128, CAP_FS_READ),
+            Err(RuntimeError::CapabilityDenied)
+        );
+
+        let credential = Credential {
+            user: UserId(1000),
+            primary_group: GroupId(1000),
+            capability_mask: CAP_FS_READ | CAP_IPC,
+        };
+        assert!(authorize(credential, CAP_FS_READ).is_ok());
+        assert!(authorize(credential, 1 << 20).is_err());
+        let mut groups = GroupSet::new();
+        groups.add(GroupId(1000)).expect("group");
+        groups.add(GroupId(1000)).expect("deduplicated group");
+        assert_eq!(groups.len(), 1);
+
+        let mut disk = RamBlockDevice::default();
+        let block = [0x5Au8; BLOCK_SIZE];
+        disk.write_block(3, &block).expect("block write");
+        let mut readback = [0u8; BLOCK_SIZE];
+        disk.read_block(3, &mut readback).expect("block read");
+        assert_eq!(readback, block);
+
+        let mut sockets = SocketTable::<2>::new();
+        let slot = sockets
+            .bind(Endpoint::new(Ipv4Address::LOOPBACK, 5353), Transport::Udp)
+            .expect("UDP bind");
+        assert!(sockets.get(slot).is_some());
+
+        let spec = ServiceSpec {
+            id: ServiceId(2),
+            restart: RestartPolicy::OnFailure,
+            capability_mask: CAP_FS_READ,
+            memory_limit_pages: 8,
+            cpu_budget_ticks: 100,
+        };
+        let mut services = ServiceTable::new();
+        services.register(spec).expect("register service");
+        services
+            .set_state(ServiceId(2), ServiceState::Starting)
+            .expect("start");
+        services
+            .set_state(ServiceId(2), ServiceState::Running)
+            .expect("run");
+        services
+            .set_state(ServiceId(2), ServiceState::Failed)
+            .expect("fail");
+        services.restart(ServiceId(2)).expect("restart");
+        assert_eq!(services.state(ServiceId(2)), Some(ServiceState::Starting));
+
+        assert!(validate_io(IoKind::Message, 128, CAP_IPC).is_ok());
+        assert_eq!(
+            validate_io(IoKind::Message, 128, 0),
+            Err(RuntimeError::CapabilityDenied)
+        );
+
+        let app = awos_package(16, 64, 16, 64);
+        assert!(validate_awos(&app).is_ok());
+        assert_eq!(awe_awosa::required_capability(IoKind::Read), CAP_FS_READ);
     }
 }
