@@ -3,11 +3,23 @@
 version = 4
 
 [[package]]
+name = "awe-appd"
+version = "0.1.0"
+
+[[package]]
 name = "awe-boot-protocol"
 version = "0.1.0"
 
 [[package]]
 name = "awe-driverd"
+version = "0.1.0"
+
+[[package]]
+name = "awe-identityd"
+version = "0.1.0"
+
+[[package]]
+name = "awe-initd"
 version = "0.1.0"
 
 [[package]]
