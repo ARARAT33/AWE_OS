@@ -86,12 +86,15 @@ pub const fn validate_io(
         IoKind::Read | IoKind::Write => MAX_IO,
         IoKind::Message => MAX_MESSAGE,
     };
+
     if size == 0 || size > limit {
         return Err(RuntimeError::ResourceExhausted);
     }
+
     if capabilities & required_capability(kind) == 0 {
         return Err(RuntimeError::CapabilityDenied);
     }
+
     Ok(())
 }
 
