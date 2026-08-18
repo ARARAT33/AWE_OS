@@ -1,13 +1,15 @@
 #[cfg(test)]
 mod product_core {
-    use awe_appd::{AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_VERSION, AppPackageState, validate_awos};
+    use awe_appd::{
+        validate_awos, AppPackageState, AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_VERSION,
+    };
     use awe_driverd::{
-        ASD_HEADER_LEN, ASD_MAGIC, ASD_VERSION, AsdError, PackageState, validate_asd,
+        validate_asd, AsdError, PackageState, ASD_HEADER_LEN, ASD_MAGIC, ASD_VERSION,
     };
     use awe_update::{Slot, SlotState, UpdateError, UpdateManager, UpdateManifest, Version};
     use aweos_kernel::net::{Endpoint, Ipv4Address, SocketTable, Transport};
     use aweos_kernel::storage::{
-        BLOCK_SIZE, BlockDevice, NodeKind, RamBlockDevice, RecoveryAction, Vfs,
+        BlockDevice, NodeKind, RamBlockDevice, RecoveryAction, Vfs, BLOCK_SIZE,
     };
 
     fn asd_package(manifest: usize, payload: usize, signature: usize) -> Vec<u8> {
@@ -175,8 +177,7 @@ mod product_core {
         assert!(sockets.bind(local, Transport::Tcp).is_err());
 
         let udp = [0x1F, 0x90, 0x01, 0xBB, 0x00, 0x0C, 0, 0, 1, 2, 3, 4];
-        let (src, dst, payload) =
-            aweos_kernel::net::transport::udp_payload(&udp).expect("UDP");
+        let (src, dst, payload) = aweos_kernel::net::transport::udp_payload(&udp).expect("UDP");
         assert_eq!(src.port, 8080);
         assert_eq!(dst.port, 443);
         assert_eq!(payload, &[1, 2, 3, 4]);
