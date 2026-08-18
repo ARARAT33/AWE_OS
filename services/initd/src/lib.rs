@@ -3,8 +3,15 @@
 //! Bounded init/service-manager contracts. The kernel exposes only the
 //! primitives needed for isolation; policy and lifecycle stay in userspace.
 
+mod core;
+pub use core::{
+    recovery_action, start_core_manager, validate_user_image, BoundedPath, CoreError,
+    CoreManager, CoreManagerKind, CoreManagerRegistry, CrashRecord, LogLevel, LogRecord,
+    RecoveryAction, SecurityPolicy, UserImage, MAX_CORE_MANAGERS, MAX_LOG_MESSAGE, MAX_PATH,
+};
+
 pub const INIT_ABI_MAJOR: u16 = 1;
-pub const INIT_ABI_MINOR: u16 = 2;
+pub const INIT_ABI_MINOR: u16 = 3;
 pub const MAX_SERVICES: usize = 32;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
