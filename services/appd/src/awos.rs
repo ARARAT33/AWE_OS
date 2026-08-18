@@ -44,9 +44,8 @@ pub fn validate_awos(bytes: &[u8]) -> Result<AwosHeader, AwosError> {
         return Err(AwosError::BadMagic);
     }
     let u16_at = |o: usize| u16::from_le_bytes([bytes[o], bytes[o + 1]]);
-    let u32_at = |o: usize| {
-        u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]])
-    };
+    let u32_at =
+        |o: usize| u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]);
     let header = AwosHeader {
         version: u16_at(4),
         abi_major: u16_at(6),
