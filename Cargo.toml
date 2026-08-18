@@ -10,6 +10,7 @@ members = [
     "services/awosa",
     "services/appd",
     "services/update",
+    "services/platformd",
     "tools/aweosa-builder",
     "tests/product-core",
 ]
@@ -26,6 +27,7 @@ awe-identityd = { path = "services/identityd" }
 awe-awosa = { path = "services/awosa" }
 awe-appd = { path = "services/appd" }
 awe-update = { path = "services/update" }
+awe-platformd = { path = "services/platformd" }
 
 [profile.dev]
 panic = "abort"
