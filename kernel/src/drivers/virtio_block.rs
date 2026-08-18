@@ -88,11 +88,16 @@ impl BlockCompletion {
 pub struct VirtioBlockQueue<const N: usize> {
     queue: VirtioSplitQueue<N>,
     pending_status: [Option<u8>; N],
+    pending_bytes: [Option<u32>; N],
 }
 
 impl<const N: usize> VirtioBlockQueue<N> {
     pub const fn new() -> Self {
-        Self { queue: VirtioSplitQueue::new(), pending_status: [None; N] }
+        Self {
+            queue: VirtioSplitQueue::new(),
+            pending_status: [None; N],
+            pending_bytes: [None; N],
+        }
     }
 
     pub fn submit<const DMA_BITS: u8>(
@@ -108,7 +113,7 @@ impl<const N: usize> VirtioBlockQueue<N> {
         if descriptor.len < VIRTIO_BLK_HEADER_BYTES || descriptor.len as u64 > MAX_REQUEST_BYTES.saturating_add(VIRTIO_BLK_HEADER_BYTES as u64) {
             return Err(BlockError::InvalidDescriptor);
         }
-        if self.pending_status[request_id as usize].is_some() {
+        if self.pending_status[request_id as usize].is_some() || self.pending_bytes[request_id as usize].is_some() {
             return Err(BlockError::Queue(VirtioError::QueueFull));
         }
         self.queue.submit_and_notify_checked(
@@ -120,17 +125,20 @@ impl<const N: usize> VirtioBlockQueue<N> {
             mmio,
         )?;
         self.pending_status[request_id as usize] = None;
+        self.pending_bytes[request_id as usize] = Some(descriptor.len.saturating_sub(VIRTIO_BLK_HEADER_BYTES));
         Ok(())
     }
 
     pub fn complete(&mut self, request_id: u16, bytes: u32, status: u8, mmio: &mut super::VirtioMmioRegisters) -> Result<(), BlockError> {
         if request_id as usize >= N { return Err(BlockError::Queue(VirtioError::InvalidQueueIndex)); }
-        if bytes as u64 > MAX_REQUEST_BYTES { return Err(BlockError::InvalidCompletion); }
+        let index = request_id as usize;
+        let submitted = self.pending_bytes[index].ok_or(BlockError::InvalidCompletion)?;
+        if bytes as u64 > MAX_REQUEST_BYTES || bytes > submitted { return Err(BlockError::InvalidCompletion); }
         if !matches!(status, VIRTIO_BLK_S_OK | VIRTIO_BLK_S_IOERR | VIRTIO_BLK_S_UNSUPP) {
             return Err(BlockError::InvalidCompletion);
         }
         self.queue.complete(request_id, bytes, mmio)?;
-        self.pending_status[request_id as usize] = Some(status);
+        self.pending_status[index] = Some(status);
         Ok(())
     }
 
@@ -139,6 +147,7 @@ impl<const N: usize> VirtioBlockQueue<N> {
         let index = entry.id as usize;
         if index >= N { return Err(BlockError::Queue(VirtioError::InvalidQueueIndex)); }
         let status = self.pending_status[index].take().ok_or(BlockError::InvalidCompletion)?;
+        self.pending_bytes[index] = None;
         Ok(Some(BlockCompletion { request_id: entry.id, status, bytes: entry.len }))
     }
 }
@@ -190,6 +199,22 @@ mod tests {
         queue.submit::<32>(0, VirtioDescriptor { addr: 0x1000, len: 528, flags: 0, next: 0 }, CFG, &mut transport, &mut mmio).unwrap();
         queue.complete(0, 0, VIRTIO_BLK_S_IOERR, &mut mmio).unwrap();
         assert_eq!(queue.poll_completion().unwrap(), Some(BlockCompletion { request_id: 0, status: VIRTIO_BLK_S_IOERR, bytes: 0 }));
+    }
+
+    #[test]
+    fn rejects_completion_larger_than_submitted_payload() {
+        let mut transport = super::super::VirtioTransportState::new(VirtioFeatures::VERSION_1);
+        let mut mmio = VirtioMmioRegisters::new(2, 1, VirtioFeatures::VERSION_1);
+        transport.acknowledge().unwrap();
+        transport.set_driver().unwrap();
+        transport.negotiate(VirtioFeatures::VERSION_1).unwrap();
+        transport.configure_queues(1).unwrap();
+        transport.driver_ok().unwrap();
+        let mut queue: VirtioBlockQueue<1> = VirtioBlockQueue::new();
+        queue.submit::<32>(0, VirtioDescriptor { addr: 0x1000, len: 528, flags: 0, next: 0 }, CFG, &mut transport, &mut mmio).unwrap();
+        assert_eq!(queue.complete(513, 0, VIRTIO_BLK_S_OK, &mut mmio), Err(BlockError::Queue(VirtioError::InvalidQueueIndex)));
+        assert_eq!(queue.complete(0, 513, VIRTIO_BLK_S_OK, &mut mmio), Err(BlockError::InvalidCompletion));
+        queue.complete(0, 512, VIRTIO_BLK_S_OK, &mut mmio).unwrap();
     }
 
     #[test]
