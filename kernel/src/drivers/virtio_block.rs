@@ -4,6 +4,7 @@ use super::{VirtioDescriptor, VirtioError, VirtioSplitQueue, VirtioTransportStat
 
 pub const SECTOR_SIZE: u64 = 512;
 pub const MAX_REQUEST_SECTORS: u32 = 128;
+pub const MAX_REQUEST_BYTES: u64 = MAX_REQUEST_SECTORS as u64 * SECTOR_SIZE;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BlockOp { Read, Write, Flush }
@@ -22,6 +23,8 @@ pub enum BlockError {
     OutOfRange,
     ArithmeticOverflow,
     Unsupported,
+    InvalidDescriptor,
+    InvalidCompletion,
     Queue(VirtioError),
 }
 
@@ -50,6 +53,9 @@ impl VirtioBlockConfig {
         self.validate()?;
         if request.sectors == 0 { return Err(BlockError::ZeroLength); }
         if request.sectors > MAX_REQUEST_SECTORS { return Err(BlockError::TooLarge); }
+        if matches!(request.op, BlockOp::Flush) && request.sectors != 1 {
+            return Err(BlockError::InvalidCompletion);
+        }
         let end = match request.sector.checked_add(request.sectors as u64) {
             Some(value) => value,
             None => return Err(BlockError::ArithmeticOverflow),
@@ -79,6 +85,9 @@ impl<const N: usize> VirtioBlockQueue<N> {
     ) -> Result<(), BlockError> {
         if request_id as usize >= N { return Err(BlockError::Queue(VirtioError::InvalidQueueIndex)); }
         config.validate()?;
+        if descriptor.len == 0 || descriptor.len as u64 > MAX_REQUEST_BYTES.saturating_add(16) {
+            return Err(BlockError::InvalidDescriptor);
+        }
         self.queue.submit_and_notify_checked(
             request_id,
             descriptor,
@@ -91,6 +100,8 @@ impl<const N: usize> VirtioBlockQueue<N> {
     }
 
     pub fn complete(&mut self, request_id: u16, bytes: u32, mmio: &mut super::VirtioMmioRegisters) -> Result<(), BlockError> {
+        if request_id as usize >= N { return Err(BlockError::Queue(VirtioError::InvalidQueueIndex)); }
+        if bytes as u64 > MAX_REQUEST_BYTES { return Err(BlockError::InvalidCompletion); }
         self.queue.complete(request_id, bytes, mmio)?;
         Ok(())
     }
@@ -116,6 +127,20 @@ mod tests {
     fn rejects_end_overflow_and_capacity_escape() {
         assert_eq!(CFG.validate_request(BlockRequest { op: BlockOp::Read, sector: u64::MAX, sectors: 1 }), Err(BlockError::ArithmeticOverflow));
         assert_eq!(CFG.validate_request(BlockRequest { op: BlockOp::Read, sector: 4095, sectors: 2 }), Err(BlockError::OutOfRange));
+    }
+
+    #[test]
+    fn rejects_invalid_descriptor_and_completion() {
+        let mut transport = super::super::VirtioTransportState::new(VirtioFeatures::VERSION_1);
+        let mut mmio = VirtioMmioRegisters::new(2, 1, VirtioFeatures::VERSION_1);
+        transport.acknowledge().unwrap();
+        transport.set_driver().unwrap();
+        transport.negotiate(VirtioFeatures::VERSION_1).unwrap();
+        transport.configure_queues(1).unwrap();
+        transport.driver_ok().unwrap();
+        let mut queue: VirtioBlockQueue<1> = VirtioBlockQueue::new();
+        assert_eq!(queue.submit::<32>(0, VirtioDescriptor { addr: 0x1000, len: 0, flags: 0, next: 0 }, CFG, &mut transport, &mut mmio), Err(BlockError::InvalidDescriptor));
+        assert_eq!(queue.complete(0, (MAX_REQUEST_BYTES + 1) as u32, &mut mmio), Err(BlockError::InvalidCompletion));
     }
 
     #[test]
