@@ -10,13 +10,15 @@ A feature is release-certified only when implementation, tests, runtime/emulator
 
 | Gate | Current evidence | Certification |
 |---|---|---|
-| Rust workspace formatting/check/tests | CI workflow configured | Pending latest green run |
-| Clippy | CI workflow configured | Pending latest green run |
+| Rust workspace formatting/check/tests | CI workflow configured; latest revision has no reported run yet | Pending latest green run |
+| Clippy | CI workflow configured; latest revision has no reported run yet | Pending latest green run |
 | UEFI loader check | CI workflow configured | Pending latest green run |
 | x86_64 boot image | `boot-image.yml` builds ISO and validates ELF | Pending latest green run |
 | QEMU boot smoke | Workflow checks boot/running/alive markers | Pending latest green run |
 | Kernel dependency isolation | `kernel/Cargo.toml` contains only boot protocol dependency | Implemented by current source structure |
-| A-C bounded runtime | `ac_boot_gate` / `ac_runtime` and tests are present | Implementation evidence present; runtime certification pending |
+| A-C bounded runtime | `ac_boot_gate`, `ac_runtime` and `ac_completion` with deterministic tests | Implementation evidence present; runtime certification pending |
+| A-C bring-up ordering | `BringupGate` covers BootInfo -> GDT/TSS -> IDT -> interrupts -> APIC -> memory -> paging -> heap -> SMP -> kernel-ready | Implementation + unit-test evidence present; hardware execution pending |
+| A-C execution boundaries | Context-frame, syscall, IPC quota, capability generation, timer and trace validation are bounded and fail-closed | Implementation + unit-test evidence present; runtime certification pending |
 | Driver dependency cycle rejection | `DependencyGraph` rejects self and transitive cycles | Implementation + unit-test evidence present |
 | Storage/network product-core exercise | Product-core integration tests exist | Pending latest green run |
 | Cryptographic signing | Required by master plan | Not certified |
@@ -31,6 +33,7 @@ A feature is release-certified only when implementation, tests, runtime/emulator
 3. Hardware matrix, fuzz/stress and recovery evidence remain required.
 4. Cryptographic trust/signing and package tooling remain incomplete where the master plan marks them open.
 5. Storage, networking, userspace, AWOSA, `.asd`, `.awos`, AYUI, compatibility and App Builder release gates still require their full runtime evidence.
+6. The new A-C completion primitives are validation/state machinery; they do not by themselves constitute physical GDT/TSS/IDT/APIC/SMP/page-table activation or context-switch execution.
 
 ## Policy
 
