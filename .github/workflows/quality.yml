@@ -55,6 +55,9 @@ jobs:
           cargo test --workspace --no-fail-fast --offline 2>&1 | tee test-output.log
           exit ${PIPESTATUS[0]}
 
+      - name: 90% product-core evidence
+        run: cargo test -p awe-product-core-tests --offline -- --nocapture
+
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v7
