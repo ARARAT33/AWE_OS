@@ -11,11 +11,13 @@
 // The kernel owns only minimal process/IPC/capability primitives needed to
 // isolate and communicate with those services.
 pub mod arch;
+pub mod boot_guard;
 pub mod boot_phase;
 pub mod boot_state;
 pub mod device;
 pub mod entry;
 pub mod engineering_contracts;
+pub mod execution_core;
 pub mod formats;
 pub mod interrupts;
 pub mod ipc;
