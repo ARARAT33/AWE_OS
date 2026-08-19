@@ -93,7 +93,7 @@ impl<const N: usize> RouteTable<N> {
     pub fn lookup(&self, address: Ipv4Address) -> Result<Route, NetError> {
         let mut best = None;
         for route in self.routes.iter().flatten().copied() {
-            if route.matches(address) && best.map_or(true, |current: Route| route.prefix_len > current.prefix_len) { best = Some(route); }
+            if route.matches(address) && best.is_none_or(|current: Route| route.prefix_len > current.prefix_len) { best = Some(route); }
         }
         best.ok_or(NetError::NoRoute)
     }

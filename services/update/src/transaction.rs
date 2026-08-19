@@ -1,5 +1,3 @@
-#![no_std]
-
 use crate::{Slot, SlotState, UpdateError, UpdateManager, UpdateManifest};
 
 /// Crash-safe update transaction metadata. A persistent backend can journal
@@ -18,7 +16,7 @@ impl Transaction {
         target: Slot,
         manifest: UpdateManifest,
     ) -> Result<Self, UpdateError> {
-        if target == manager.active() {
+        if target as u8 == manager.active() as u8 {
             return Err(UpdateError::InvalidTransition);
         }
         if manifest.generation < manager.generation() {

@@ -49,7 +49,7 @@ impl VirtioDevice {
         if self.vendor_id != VIRTIO_PCI_VENDOR_ID {
             return Err(VirtioError::InvalidVendor);
         }
-        if !(self.device_id >= 0x1000 && self.device_id <= 0x107F) {
+        if !(self.device_id >= 0x1000 && self.device_id <= 0x107F) && !(self.device_id >= 1 && self.device_id <= 0x3F) {
             return Err(VirtioError::InvalidDevice);
         }
         Ok(())

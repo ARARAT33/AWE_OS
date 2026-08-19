@@ -7,6 +7,14 @@ name = "awe-appd"
 version = "0.1.0"
 
 [[package]]
+name = "awe-awosa"
+version = "0.1.0"
+
+[[package]]
+name = "awe-ayui"
+version = "0.1.0"
+
+[[package]]
 name = "awe-boot-protocol"
 version = "0.1.0"
 
@@ -23,12 +31,21 @@ name = "awe-initd"
 version = "0.1.0"
 
 [[package]]
+name = "awe-platformd"
+version = "0.1.0"
+
+[[package]]
 name = "awe-product-core-tests"
 version = "0.1.0"
 dependencies = [
  "awe-appd",
+ "awe-awosa",
+ "awe-ayui",
  "awe-driverd",
+ "awe-identityd",
+ "awe-initd",
  "awe-update",
+ "aweos-kernel",
 ]
 
 [[package]]

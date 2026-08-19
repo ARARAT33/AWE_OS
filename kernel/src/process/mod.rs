@@ -30,15 +30,15 @@ pub enum ProcessTransitionError { InvalidTransition }
 
 impl ProcessState {
     pub const fn can_transition(self, next: Self) -> bool {
-        match (self, next) {
-            (Self::Created, Self::Runnable) => true,
-            (Self::Created, Self::Exited) => true,
-            (Self::Runnable, Self::Running) => true,
-            (Self::Runnable, Self::Exited) => true,
-            (Self::Running, Self::Runnable | Self::Blocked | Self::Exited) => true,
-            (Self::Blocked, Self::Runnable | Self::Exited) => true,
-            _ => false,
-        }
+        matches!(
+            (self, next),
+            (Self::Created, Self::Runnable)
+                | (Self::Created, Self::Exited)
+                | (Self::Runnable, Self::Running)
+                | (Self::Runnable, Self::Exited)
+                | (Self::Running, Self::Runnable | Self::Blocked | Self::Exited)
+                | (Self::Blocked, Self::Runnable | Self::Exited)
+        )
     }
 }
 

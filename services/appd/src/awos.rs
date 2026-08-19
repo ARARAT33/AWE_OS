@@ -54,6 +54,8 @@ pub const fn package_transition(from: AppPackageState, to: AppPackageState) -> b
 #[cfg(test)]
 mod tests {
     use super::*;
+    extern crate std;
+    use std::vec::Vec;
     fn package() -> Vec<u8> { let manifest=4usize; let code=8usize; let data=2usize; let sig=64usize; let mut b=Vec::with_capacity(AWOS_HEADER_LEN+manifest+code+data+sig); b.extend_from_slice(&AWOS_MAGIC); b.extend_from_slice(&AWOS_VERSION.to_le_bytes()); b.extend_from_slice(&1u16.to_le_bytes()); b.extend_from_slice(&0u16.to_le_bytes()); b.extend_from_slice(&(manifest as u32).to_le_bytes()); b.extend_from_slice(&(code as u32).to_le_bytes()); b.extend_from_slice(&(data as u32).to_le_bytes()); b.extend_from_slice(&(sig as u16).to_le_bytes()); b.extend_from_slice(&0u32.to_le_bytes()); b.extend_from_slice(&0u32.to_le_bytes()); b.extend(core::iter::repeat_n(0u8, manifest+code+data+sig)); b }
     #[test] fn validates_package_before_admission() { assert!(validate_awos(&package()).is_ok()); }
     #[test] fn exposes_bounded_sections() { let b=package(); let h=validate_awos(&b).unwrap(); let (m,c,d,s)=package_parts(&b,h).unwrap(); assert_eq!((m.len(),c.len(),d.len(),s.len()),(4,8,2,64)); }

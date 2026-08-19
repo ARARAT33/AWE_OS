@@ -58,10 +58,14 @@ impl<const N: usize> ExecutionCore<N> {
     }
 
     pub fn consume_cpu(&mut self, id: ProcessId, ticks: u64) -> Result<(), CoreError> {
-        match self.find_mut(id) {
-            Some(process) if process.budget.consume_cpu(ticks) => Ok(()),
-            Some(_) => Err(CoreError::BudgetExceeded),
-            None => Err(CoreError::InvalidTransition),
+        if let Some(process) = self.find_mut(id) {
+            if process.budget.consume_cpu(ticks) {
+                Ok(())
+            } else {
+                Err(CoreError::BudgetExceeded)
+            }
+        } else {
+            Err(CoreError::InvalidTransition)
         }
     }
 

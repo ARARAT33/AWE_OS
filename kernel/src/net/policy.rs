@@ -24,7 +24,7 @@ impl<const N: usize> Firewall<N> {
         for (index, rule) in self.rules.iter().flatten().copied().enumerate() {
             if rule.matches(endpoint, transport) {
                 let candidate=(rule.specificity(), index, rule.action);
-                if best.map_or(true, |current| candidate.0 > current.0 || (candidate.0 == current.0 && candidate.1 < current.1)) { best=Some(candidate); }
+                if best.is_none_or(|current| candidate.0 > current.0 || (candidate.0 == current.0 && candidate.1 < current.1)) { best=Some(candidate); }
             }
         }
         best.map_or(Action::Deny, |(_,_,action)| action)

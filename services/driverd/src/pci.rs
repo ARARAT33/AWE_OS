@@ -61,11 +61,11 @@ pub fn decode_bar(index: u8, value: u32, probe: u32, upper: Option<(u32, u32)>) 
 
     if (value & 1) != 0 {
         let base = (value & 0xFFFF_FFFC) as u64;
-        let mask = (probe & 0xFFFF_FFFC) as u64;
-        if mask == 0 {
+        let mask_32 = probe & 0xFFFF_FFFC;
+        if mask_32 == 0 {
             return Err(PciBarError::InvalidSize);
         }
-        let size = (!mask).wrapping_add(1);
+        let size = (!mask_32).wrapping_add(1) as u64;
         if size == 0 || !size.is_power_of_two() {
             return Err(PciBarError::InvalidSize);
         }
@@ -84,17 +84,17 @@ pub fn decode_bar(index: u8, value: u32, probe: u32, upper: Option<(u32, u32)>) 
     let mem_type = (value >> 1) & 0x3;
     let prefetchable = (value & 0x8) != 0;
     let low_base = (value & 0xFFFF_FFF0) as u64;
-    let low_mask = (probe & 0xFFFF_FFF0) as u64;
+    let low_mask_32 = probe & 0xFFFF_FFF0;
 
-    if low_mask == 0 {
+    if low_mask_32 == 0 {
         return Err(PciBarError::InvalidSize);
     }
 
     let (base, mask) = match mem_type {
-        0 => (low_base, low_mask),
+        0 => (low_base, (0xFFFF_FFFF_0000_0000u64 | (low_mask_32 as u64))),
         2 => {
             let (upper_value, upper_probe) = upper.ok_or(PciBarError::Unsupported64BitPair)?;
-            (((upper_value as u64) << 32) | low_base, ((upper_probe as u64) << 32) | low_mask)
+            (((upper_value as u64) << 32) | low_base, ((upper_probe as u64) << 32) | (low_mask_32 as u64))
         }
         _ => return Err(PciBarError::InvalidSize),
     };

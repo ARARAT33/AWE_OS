@@ -1,11 +1,11 @@
 #![no_std]
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct CapabilityId(pub u64);
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Rights(pub u64);
 impl Rights {
     pub const NONE: Self = Self(0);
@@ -65,11 +65,11 @@ impl<const N: usize> CapabilityTable<N> {
     pub fn get(&self, id: CapabilityId) -> Result<Capability, CapabilityError> {
         let mut i = 0;
         while i < N {
-            if let Some(cap) = self.entries[i] {
-                if cap.id == id {
-                    if cap.rights.is_empty() { return Err(CapabilityError::Revoked); }
-                    return Ok(cap);
-                }
+            if let Some(cap) = self.entries[i]
+                && cap.id == id
+            {
+                if cap.rights.is_empty() { return Err(CapabilityError::Revoked); }
+                return Ok(cap);
             }
             i += 1;
         }
@@ -78,8 +78,11 @@ impl<const N: usize> CapabilityTable<N> {
     pub fn revoke(&mut self, id: CapabilityId) -> Result<(), CapabilityError> {
         let mut i = 0;
         while i < N {
-            if let Some(cap) = self.entries[i] {
-                if cap.id == id { self.entries[i] = Some(Capability::revoked(id)); return Ok(()); }
+            if let Some(cap) = self.entries[i]
+                && cap.id == id
+            {
+                self.entries[i] = Some(Capability::revoked(id));
+                return Ok(());
             }
             i += 1;
         }
@@ -88,8 +91,11 @@ impl<const N: usize> CapabilityTable<N> {
     pub fn remove(&mut self, id: CapabilityId) -> Result<(), CapabilityError> {
         let mut i = 0;
         while i < N {
-            if let Some(cap) = self.entries[i] {
-                if cap.id == id { self.entries[i] = None; return Ok(()); }
+            if let Some(cap) = self.entries[i]
+                && cap.id == id
+            {
+                self.entries[i] = None;
+                return Ok(());
             }
             i += 1;
         }
