@@ -92,7 +92,7 @@ pub fn validate_awos(bytes: &[u8]) -> Result<AwosHeader, AwosError> {
     Ok(header)
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::needless_lifetimes, clippy::type_complexity)]
 pub fn package_parts<'a>(
     bytes: &'a [u8],
     header: AwosHeader,

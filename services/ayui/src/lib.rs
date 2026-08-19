@@ -105,10 +105,10 @@ impl Compositor {
     }
 
     pub fn push_input(&mut self, event: InputEvent) -> Result<(), UiError> {
-        if let InputEvent::Pointer { x, y, .. } = event {
-            if x < -1_048_576 || y < -1_048_576 || x > 1_048_576 || y > 1_048_576 {
-                return Err(UiError::InvalidEvent);
-            }
+        if let InputEvent::Pointer { x, y, .. } = event
+            && (x < -1_048_576 || y < -1_048_576 || x > 1_048_576 || y > 1_048_576)
+        {
+            return Err(UiError::InvalidEvent);
         }
         if self.event_len == MAX_EVENTS {
             return Err(UiError::Full);

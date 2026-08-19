@@ -102,6 +102,7 @@ pub fn validate_asd(bytes: &[u8]) -> Result<AsdHeader, AsdError> {
     Ok(header)
 }
 
+#[allow(clippy::needless_lifetimes, clippy::type_complexity)]
 pub fn package_parts<'a>(
     bytes: &'a [u8],
     header: AsdHeader,
