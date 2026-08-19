@@ -33,7 +33,11 @@ pub struct DriverLifecycle {
 
 impl DriverLifecycle {
     pub const fn new(device: DeviceId) -> Self {
-        Self { device, state: DeviceState::Discovered, restarts: 0 }
+        Self {
+            device,
+            state: DeviceState::Discovered,
+            restarts: 0,
+        }
     }
 
     pub fn apply(&mut self, event: LifecycleEvent) -> Result<DeviceState, LifecycleError> {
@@ -45,7 +49,9 @@ impl DriverLifecycle {
             (DeviceState::Active, LifecycleEvent::Stop) => DeviceState::Bound,
             (DeviceState::Bound, LifecycleEvent::Remove) => DeviceState::Discovered,
             (DeviceState::Active, LifecycleEvent::Fault) => DeviceState::Failed,
-            (DeviceState::Failed, LifecycleEvent::Recover) if self.restarts < MAX_DRIVER_RESTARTS => {
+            (DeviceState::Failed, LifecycleEvent::Recover)
+                if self.restarts < MAX_DRIVER_RESTARTS =>
+            {
                 self.restarts += 1;
                 DeviceState::Bound
             }
@@ -78,21 +84,36 @@ mod tests {
     #[test]
     fn lifecycle_rejects_invalid_order_and_recovers_boundedly() {
         let mut driver = DriverLifecycle::new(DeviceId(1));
-        assert_eq!(driver.apply(LifecycleEvent::Start), Err(LifecycleError::InvalidTransition));
+        assert_eq!(
+            driver.apply(LifecycleEvent::Start),
+            Err(LifecycleError::InvalidTransition)
+        );
         driver.apply(LifecycleEvent::Bind).unwrap();
         driver.apply(LifecycleEvent::Initialize).unwrap();
         driver.apply(LifecycleEvent::Fault).unwrap();
-        for _ in 0..MAX_DRIVER_RESTARTS { driver.apply(LifecycleEvent::Recover).unwrap(); driver.apply(LifecycleEvent::Initialize).unwrap(); driver.apply(LifecycleEvent::Fault).unwrap(); }
-        assert_eq!(driver.apply(LifecycleEvent::Recover), Ok(DeviceState::Quarantined));
+        for _ in 0..MAX_DRIVER_RESTARTS {
+            driver.apply(LifecycleEvent::Recover).unwrap();
+            driver.apply(LifecycleEvent::Initialize).unwrap();
+            driver.apply(LifecycleEvent::Fault).unwrap();
+        }
+        assert_eq!(
+            driver.apply(LifecycleEvent::Recover),
+            Ok(DeviceState::Quarantined)
+        );
     }
 
     #[test]
     fn lifecycle_state_can_be_published_to_registry() {
         let mut registry: DeviceRegistry<1> = DeviceRegistry::new();
-        registry.register(DeviceContract::new(DeviceId(9), DeviceClass::Network, 1, 2)).unwrap();
+        registry
+            .register(DeviceContract::new(DeviceId(9), DeviceClass::Network, 1, 2))
+            .unwrap();
         let mut driver = DriverLifecycle::new(DeviceId(9));
         driver.apply(LifecycleEvent::Bind).unwrap();
         sync_registry(&mut registry, driver).unwrap();
-        assert_eq!(registry.find(DeviceId(9)).unwrap().state, DeviceState::Bound);
+        assert_eq!(
+            registry.find(DeviceId(9)).unwrap().state,
+            DeviceState::Bound
+        );
     }
 }

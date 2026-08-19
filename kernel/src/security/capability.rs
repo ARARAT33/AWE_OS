@@ -16,40 +16,86 @@ impl Rights {
     pub const DEVICE: Self = Self(1 << 4);
     pub const NETWORK: Self = Self(1 << 5);
     pub const ADMIN: Self = Self(1 << 63);
-    pub const fn contains(self, other: Self) -> bool { (self.0 & other.0) == other.0 }
-    pub const fn union(self, other: Self) -> Self { Self(self.0 | other.0) }
-    pub const fn intersect(self, other: Self) -> Self { Self(self.0 & other.0) }
-    pub const fn is_empty(self) -> bool { self.0 == 0 }
+    pub const fn contains(self, other: Self) -> bool {
+        (self.0 & other.0) == other.0
+    }
+    pub const fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+    pub const fn intersect(self, other: Self) -> Self {
+        Self(self.0 & other.0)
+    }
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Capability { pub id: CapabilityId, pub rights: Rights }
+pub struct Capability {
+    pub id: CapabilityId,
+    pub rights: Rights,
+}
 impl Capability {
-    pub const fn permits(&self, required: Rights) -> bool { self.rights.contains(required) }
-    pub const fn derive(&self, id: CapabilityId, requested: Rights) -> Self { Self { id, rights: self.rights.intersect(requested) } }
-    pub const fn revoked(id: CapabilityId) -> Self { Self { id, rights: Rights::NONE } }
+    pub const fn permits(&self, required: Rights) -> bool {
+        self.rights.contains(required)
+    }
+    pub const fn derive(&self, id: CapabilityId, requested: Rights) -> Self {
+        Self {
+            id,
+            rights: self.rights.intersect(requested),
+        }
+    }
+    pub const fn revoked(id: CapabilityId) -> Self {
+        Self {
+            id,
+            rights: Rights::NONE,
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum CapabilityError { Full, NotFound, Revoked, InvalidId }
+pub enum CapabilityError {
+    Full,
+    NotFound,
+    Revoked,
+    InvalidId,
+}
 
 pub struct CapabilityTable<const N: usize> {
     entries: [Option<Capability>; N],
     next_id: u64,
 }
-impl<const N: usize> Default for CapabilityTable<N> { fn default() -> Self { Self::new() } }
+impl<const N: usize> Default for CapabilityTable<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl<const N: usize> CapabilityTable<N> {
-    pub const fn new() -> Self { Self { entries: [None; N], next_id: 1 } }
+    pub const fn new() -> Self {
+        Self {
+            entries: [None; N],
+            next_id: 1,
+        }
+    }
     pub const fn len(&self) -> usize {
         let mut count = 0;
         let mut i = 0;
-        while i < N { if self.entries[i].is_some() { count += 1; } i += 1; }
+        while i < N {
+            if self.entries[i].is_some() {
+                count += 1;
+            }
+            i += 1;
+        }
         count
     }
-    pub const fn is_full(&self) -> bool { self.len() == N }
+    pub const fn is_full(&self) -> bool {
+        self.len() == N
+    }
     pub fn insert(&mut self, rights: Rights) -> Result<CapabilityId, CapabilityError> {
-        if N == 0 { return Err(CapabilityError::Full); }
+        if N == 0 {
+            return Err(CapabilityError::Full);
+        }
         let mut i = 0;
         while i < N {
             if self.entries[i].is_none() {
@@ -68,7 +114,9 @@ impl<const N: usize> CapabilityTable<N> {
             if let Some(cap) = self.entries[i]
                 && cap.id == id
             {
-                if cap.rights.is_empty() { return Err(CapabilityError::Revoked); }
+                if cap.rights.is_empty() {
+                    return Err(CapabilityError::Revoked);
+                }
                 return Ok(cap);
             }
             i += 1;
@@ -108,7 +156,10 @@ mod tests {
     use super::*;
     #[test]
     fn derivation_cannot_escalate() {
-        let root = Capability { id: CapabilityId(1), rights: Rights::READ.union(Rights::WRITE) };
+        let root = Capability {
+            id: CapabilityId(1),
+            rights: Rights::READ.union(Rights::WRITE),
+        };
         let child = root.derive(CapabilityId(2), Rights::WRITE.union(Rights::NETWORK));
         assert!(child.permits(Rights::WRITE));
         assert!(!child.permits(Rights::NETWORK));

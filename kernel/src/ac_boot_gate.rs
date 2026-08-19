@@ -4,10 +4,19 @@ use crate::ac_runtime::AcRuntime;
 use crate::process::{ProcessId, ResourceBudget};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum BootStage { Reset, CpuValidated, MemoryValidated, KernelReady }
+pub enum BootStage {
+    Reset,
+    CpuValidated,
+    MemoryValidated,
+    KernelReady,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum AcGateError { WrongStage, InvalidCpu, InvalidMemory }
+pub enum AcGateError {
+    WrongStage,
+    InvalidCpu,
+    InvalidMemory,
+}
 
 /// Deterministic A-C bring-up gate. The gate is deliberately small: hardware
 /// discovery remains outside the kernel, while the privileged transition into
@@ -16,14 +25,28 @@ pub struct AcBootGate {
     stage: BootStage,
 }
 
-impl Default for AcBootGate { fn default() -> Self { Self::new() } }
+impl Default for AcBootGate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl AcBootGate {
-    pub const fn new() -> Self { Self { stage: BootStage::Reset } }
+    pub const fn new() -> Self {
+        Self {
+            stage: BootStage::Reset,
+        }
+    }
 
-    pub const fn stage(&self) -> BootStage { self.stage }
+    pub const fn stage(&self) -> BootStage {
+        self.stage
+    }
 
-    pub fn validate_cpu(&mut self, cpu_count: usize, stack_alignment: u64) -> Result<(), AcGateError> {
+    pub fn validate_cpu(
+        &mut self,
+        cpu_count: usize,
+        stack_alignment: u64,
+    ) -> Result<(), AcGateError> {
         if self.stage != BootStage::Reset || cpu_count == 0 || stack_alignment & 0xf != 0 {
             return Err(AcGateError::InvalidCpu);
         }
@@ -40,7 +63,9 @@ impl AcBootGate {
     }
 
     pub fn activate(&mut self) -> Result<(), AcGateError> {
-        if self.stage != BootStage::MemoryValidated { return Err(AcGateError::WrongStage); }
+        if self.stage != BootStage::MemoryValidated {
+            return Err(AcGateError::WrongStage);
+        }
         self.stage = BootStage::KernelReady;
         Ok(())
     }
@@ -50,8 +75,12 @@ impl AcBootGate {
         runtime: &mut AcRuntime<N>,
         budget: ResourceBudget,
     ) -> Result<ProcessId, AcGateError> {
-        if self.stage != BootStage::KernelReady { return Err(AcGateError::WrongStage); }
-        runtime.create_process(budget).map_err(|_| AcGateError::WrongStage)
+        if self.stage != BootStage::KernelReady {
+            return Err(AcGateError::WrongStage);
+        }
+        runtime
+            .create_process(budget)
+            .map_err(|_| AcGateError::WrongStage)
     }
 }
 
@@ -75,7 +104,10 @@ mod tests {
         assert_eq!(gate.validate_cpu(0, 0x1000), Err(AcGateError::InvalidCpu));
         assert_eq!(gate.stage(), BootStage::Reset);
         gate.validate_cpu(1, 0x1000).unwrap();
-        assert_eq!(gate.validate_memory(2048, 4096), Err(AcGateError::InvalidMemory));
+        assert_eq!(
+            gate.validate_memory(2048, 4096),
+            Err(AcGateError::InvalidMemory)
+        );
         assert_eq!(gate.stage(), BootStage::CpuValidated);
     }
 }

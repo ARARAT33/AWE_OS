@@ -32,7 +32,10 @@ impl BoundedPath {
         }
         let mut bytes = [0u8; MAX_PATH];
         bytes[..path.len()].copy_from_slice(path);
-        Ok(Self { bytes, len: path.len() as u16 })
+        Ok(Self {
+            bytes,
+            len: path.len() as u16,
+        })
     }
 
     pub const fn len(&self) -> usize {
@@ -85,7 +88,10 @@ pub struct CoreManagerRegistry {
 
 impl CoreManagerRegistry {
     pub const fn new() -> Self {
-        Self { entries: [None; MAX_CORE_MANAGERS], len: 0 }
+        Self {
+            entries: [None; MAX_CORE_MANAGERS],
+            len: 0,
+        }
     }
 
     pub const fn len(&self) -> usize {
@@ -93,7 +99,12 @@ impl CoreManagerRegistry {
     }
 
     pub fn register(&mut self, manager: CoreManager) -> Result<(), CoreError> {
-        if self.entries.iter().flatten().any(|entry| entry.id == manager.id || entry.kind == manager.kind) {
+        if self
+            .entries
+            .iter()
+            .flatten()
+            .any(|entry| entry.id == manager.id || entry.kind == manager.kind)
+        {
             return Err(CoreError::Duplicate);
         }
         if self.len == MAX_CORE_MANAGERS {
@@ -105,7 +116,11 @@ impl CoreManagerRegistry {
     }
 
     pub fn get(&self, kind: CoreManagerKind) -> Option<CoreManager> {
-        self.entries.iter().flatten().find(|entry| entry.kind == kind).copied()
+        self.entries
+            .iter()
+            .flatten()
+            .find(|entry| entry.kind == kind)
+            .copied()
     }
 }
 
@@ -134,7 +149,12 @@ pub struct LogRecord {
 }
 
 impl LogRecord {
-    pub fn new(sequence: u64, level: LogLevel, service: ServiceId, message: &[u8]) -> Result<Self, CoreError> {
+    pub fn new(
+        sequence: u64,
+        level: LogLevel,
+        service: ServiceId,
+        message: &[u8],
+    ) -> Result<Self, CoreError> {
         if message.len() > MAX_LOG_MESSAGE {
             return Err(CoreError::InvalidPath);
         }
@@ -162,7 +182,10 @@ pub struct SecurityPolicy {
 
 impl SecurityPolicy {
     pub const fn deny_all() -> Self {
-        Self { allowed_caps: 0, deny_by_default: true }
+        Self {
+            allowed_caps: 0,
+            deny_by_default: true,
+        }
     }
 
     pub const fn authorize(&self, requested: u64) -> Result<(), CoreError> {
@@ -210,12 +233,18 @@ pub fn start_core_manager(
         return Err(CoreError::InvalidState);
     };
     if state == ServiceState::Failed {
-        services.restart(manager.id).map_err(|_| CoreError::RecoveryRequired)?;
+        services
+            .restart(manager.id)
+            .map_err(|_| CoreError::RecoveryRequired)?;
         return Ok(());
     }
     if state == ServiceState::Declared {
-        services.set_state(manager.id, ServiceState::Starting).map_err(|_| CoreError::InvalidState)?;
-        services.set_state(manager.id, ServiceState::Running).map_err(|_| CoreError::InvalidState)?;
+        services
+            .set_state(manager.id, ServiceState::Starting)
+            .map_err(|_| CoreError::InvalidState)?;
+        services
+            .set_state(manager.id, ServiceState::Running)
+            .map_err(|_| CoreError::InvalidState)?;
         return Ok(());
     }
     if state == ServiceState::Running {
@@ -232,11 +261,25 @@ mod tests {
     #[test]
     fn loader_rejects_missing_entry_and_caps() {
         assert_eq!(
-            validate_user_image(UserImage { entry: 0, image_len: 1, required_caps: 0 }, 0),
+            validate_user_image(
+                UserImage {
+                    entry: 0,
+                    image_len: 1,
+                    required_caps: 0
+                },
+                0
+            ),
             Err(CoreError::InvalidImage)
         );
         assert_eq!(
-            validate_user_image(UserImage { entry: 1, image_len: 1, required_caps: 4 }, 2),
+            validate_user_image(
+                UserImage {
+                    entry: 1,
+                    image_len: 1,
+                    required_caps: 4
+                },
+                2
+            ),
             Err(CoreError::CapabilityDenied)
         );
     }
@@ -244,7 +287,11 @@ mod tests {
     #[test]
     fn manager_registry_is_bounded_and_unique() {
         let mut registry = CoreManagerRegistry::new();
-        let manager = CoreManager { id: ServiceId(1), kind: CoreManagerKind::Network, capabilities: 1 };
+        let manager = CoreManager {
+            id: ServiceId(1),
+            kind: CoreManagerKind::Network,
+            capabilities: 1,
+        };
         registry.register(manager).unwrap();
         assert_eq!(registry.get(CoreManagerKind::Network), Some(manager));
         assert_eq!(registry.register(manager), Err(CoreError::Duplicate));
@@ -258,9 +305,20 @@ mod tests {
 
     #[test]
     fn crash_policy_restarts_only_recoverable_failed_services() {
-        let record = CrashRecord { service: ServiceId(2), state: ServiceState::Failed, fault_code: 7, recoverable: true };
+        let record = CrashRecord {
+            service: ServiceId(2),
+            state: ServiceState::Failed,
+            fault_code: 7,
+            recoverable: true,
+        };
         assert_eq!(recovery_action(record), RecoveryAction::Restart);
-        assert_eq!(recovery_action(CrashRecord { recoverable: false, ..record }), RecoveryAction::Halt);
+        assert_eq!(
+            recovery_action(CrashRecord {
+                recoverable: false,
+                ..record
+            }),
+            RecoveryAction::Halt
+        );
     }
 
     #[test]
@@ -277,7 +335,11 @@ mod tests {
             .unwrap();
         start_core_manager(
             &mut services,
-            CoreManager { id: ServiceId(3), kind: CoreManagerKind::Filesystem, capabilities: 1 },
+            CoreManager {
+                id: ServiceId(3),
+                kind: CoreManagerKind::Filesystem,
+                capabilities: 1,
+            },
         )
         .unwrap();
         assert_eq!(services.state(ServiceId(3)), Some(ServiceState::Running));

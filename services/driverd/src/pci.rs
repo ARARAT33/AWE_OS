@@ -54,7 +54,12 @@ pub enum PciBarError {
 
 /// Decodes a PCI BAR from its value and the probe mask returned after writing
 /// all ones to the BAR. The caller owns the hardware write/read sequence.
-pub fn decode_bar(index: u8, value: u32, probe: u32, upper: Option<(u32, u32)>) -> Result<PciBar, PciBarError> {
+pub fn decode_bar(
+    index: u8,
+    value: u32,
+    probe: u32,
+    upper: Option<(u32, u32)>,
+) -> Result<PciBar, PciBarError> {
     if index >= 6 {
         return Err(PciBarError::InvalidIndex);
     }
@@ -94,7 +99,10 @@ pub fn decode_bar(index: u8, value: u32, probe: u32, upper: Option<(u32, u32)>) 
         0 => (low_base, (0xFFFF_FFFF_0000_0000u64 | (low_mask_32 as u64))),
         2 => {
             let (upper_value, upper_probe) = upper.ok_or(PciBarError::Unsupported64BitPair)?;
-            (((upper_value as u64) << 32) | low_base, ((upper_probe as u64) << 32) | (low_mask_32 as u64))
+            (
+                ((upper_value as u64) << 32) | low_base,
+                ((upper_probe as u64) << 32) | (low_mask_32 as u64),
+            )
         }
         _ => return Err(PciBarError::InvalidSize),
     };
@@ -110,7 +118,11 @@ pub fn decode_bar(index: u8, value: u32, probe: u32, upper: Option<(u32, u32)>) 
 
     Ok(PciBar {
         index,
-        kind: if mem_type == 2 { PciBarKind::Memory64 } else { PciBarKind::Memory32 },
+        kind: if mem_type == 2 {
+            PciBarKind::Memory64
+        } else {
+            PciBarKind::Memory32
+        },
         base,
         size,
         prefetchable,
@@ -268,7 +280,10 @@ mod tests {
 
     #[test]
     fn rejects_invalid_bar_size() {
-        assert_eq!(decode_bar(0, 0x1000, 0, None), Err(PciBarError::InvalidSize));
+        assert_eq!(
+            decode_bar(0, 0x1000, 0, None),
+            Err(PciBarError::InvalidSize)
+        );
     }
 
     #[test]

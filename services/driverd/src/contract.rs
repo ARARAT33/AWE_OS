@@ -214,10 +214,7 @@ mod tests {
             0b0110,
             DriverTrust::Verified,
         );
-        assert_eq!(
-            manifest.validate_for_execution(0b0010, 0b0110, 1),
-            Ok(())
-        );
+        assert_eq!(manifest.validate_for_execution(0b0010, 0b0110, 1), Ok(()));
         assert_eq!(
             manifest.validate_for_execution(0b0010, 0b0111, 1),
             Err(LifecycleError::InvalidManifest)
@@ -235,10 +232,7 @@ mod tests {
             0b0110,
             DriverTrust::Verified,
         );
-        assert_eq!(
-            manifest.validate_for_execution(0b0010, 0b0010, 1),
-            Ok(())
-        );
+        assert_eq!(manifest.validate_for_execution(0b0010, 0b0010, 1), Ok(()));
         assert_eq!(
             manifest.validate_for_execution(0b0100, 0b0010, 1),
             Err(LifecycleError::InvalidManifest)
