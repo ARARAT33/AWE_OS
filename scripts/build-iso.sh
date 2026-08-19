@@ -3,11 +3,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/dist"
+BUILD="$ROOT/build"
 ISO="$OUT/aweos-x86_64.iso"
 IMG="$OUT/aweos-x86_64.img"
 KERNEL="$ROOT/target/x86_64-unknown-none/release/aweos"
 
-mkdir -p "$OUT"
+mkdir -p "$OUT" "$BUILD"
 
 rustup target add x86_64-unknown-none 2>/dev/null || true
 rustup target add x86_64-unknown-uefi 2>/dev/null || true
@@ -32,3 +33,5 @@ fi
 
 printf 'AWEOS ISO: %s\n' "$ISO"
 printf 'AWEOS IMG: %s\n' "$IMG"
+printf 'AWEOS UEFI IMG: %s/aweos-uefi.img\n' "$OUT"
+printf 'AWEOS BIOS IMG: %s/aweos-bios.img\n' "$OUT"
