@@ -4,16 +4,31 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/dist"
 ISO="$OUT/aweos-x86_64.iso"
+IMG="$OUT/aweos-x86_64.img"
 KERNEL="$ROOT/target/x86_64-unknown-none/release/aweos"
 
-rustup target add x86_64-unknown-none
-cargo build --release -p aweos-kernel-bin --target x86_64-unknown-none -Zbuild-std=core,compiler_builtins 2>/dev/null || \
+mkdir -p "$OUT"
+
+rustup target add x86_64-unknown-none 2>/dev/null || true
+rustup target add x86_64-unknown-uefi 2>/dev/null || true
+
+printf '==> Building AWEOS Kernel (x86_64-unknown-none)...\n'
 cargo build --release -p aweos-kernel-bin --target x86_64-unknown-none
 
-rm -rf "$OUT/iso"
-mkdir -p "$OUT/iso/boot/grub"
-cp "$KERNEL" "$OUT/iso/boot/aweos"
-cp "$ROOT/kernel-bin/grub.cfg" "$OUT/iso/boot/grub/grub.cfg"
+printf '==> Building AWEOS EFI Loader (x86_64-unknown-uefi)...\n'
+cargo build --release -p aweloader --target x86_64-unknown-uefi || true
 
-grub-mkrescue -o "$ISO" "$OUT/iso"
+printf '==> Generating AWEOS ISO and IMG images...\n'
+python3 "$ROOT/scripts/make_images.py"
+
+if command -v grub-mkrescue >/dev/null 2>&1; then
+    printf '==> Running grub-mkrescue for GRUB ISO...\n'
+    rm -rf "$OUT/iso"
+    mkdir -p "$OUT/iso/boot/grub"
+    cp "$KERNEL" "$OUT/iso/boot/aweos"
+    cp "$ROOT/kernel-bin/grub.cfg" "$OUT/iso/boot/grub/grub.cfg"
+    grub-mkrescue -o "$ISO" "$OUT/iso" 2>/dev/null || true
+fi
+
 printf 'AWEOS ISO: %s\n' "$ISO"
+printf 'AWEOS IMG: %s\n' "$IMG"

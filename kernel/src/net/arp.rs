@@ -48,15 +48,25 @@ impl ArpPacket {
             return Err(ArpError::InvalidPacket);
         }
 
-        let sender_mac = MacAddress([bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13]]);
+        let sender_mac = MacAddress([
+            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13],
+        ]);
         let sender_ip = Ipv4Address([bytes[14], bytes[15], bytes[16], bytes[17]]);
-        let target_mac = MacAddress([bytes[18], bytes[19], bytes[20], bytes[21], bytes[22], bytes[23]]);
+        let target_mac = MacAddress([
+            bytes[18], bytes[19], bytes[20], bytes[21], bytes[22], bytes[23],
+        ]);
         let target_ip = Ipv4Address([bytes[24], bytes[25], bytes[26], bytes[27]]);
 
         if sender_mac == MacAddress::ZERO || sender_ip == Ipv4Address::UNSPECIFIED {
             return Err(ArpError::EmptyAddress);
         }
-        Ok(Self { operation, sender_mac, sender_ip, target_mac, target_ip })
+        Ok(Self {
+            operation,
+            sender_mac,
+            sender_ip,
+            target_mac,
+            target_ip,
+        })
     }
 
     pub fn encode(self, out: &mut [u8]) -> Result<(), ArpError> {
@@ -99,7 +109,10 @@ pub struct ArpCache<const N: usize> {
 
 impl<const N: usize> Default for ArpCache<N> {
     fn default() -> Self {
-        Self { entries: [None; N], clock: 0 }
+        Self {
+            entries: [None; N],
+            clock: 0,
+        }
     }
 }
 
@@ -109,13 +122,22 @@ impl<const N: usize> ArpCache<N> {
             return Err(ArpError::EmptyAddress);
         }
         self.clock = self.clock.saturating_add(1);
-        if let Some(entry) = self.entries.iter_mut().flatten().find(|entry| entry.ip == ip) {
+        if let Some(entry) = self
+            .entries
+            .iter_mut()
+            .flatten()
+            .find(|entry| entry.ip == ip)
+        {
             entry.mac = mac;
             entry.age = self.clock;
             return Ok(());
         }
         if let Some(slot) = self.entries.iter_mut().find(|entry| entry.is_none()) {
-            *slot = Some(Entry { ip, mac, age: self.clock });
+            *slot = Some(Entry {
+                ip,
+                mac,
+                age: self.clock,
+            });
             return Ok(());
         }
         let oldest = self
@@ -125,12 +147,20 @@ impl<const N: usize> ArpCache<N> {
             .min_by_key(|(_, entry)| entry.map_or(u64::MAX, |entry| entry.age))
             .map(|(index, _)| index)
             .ok_or(ArpError::InvalidPacket)?;
-        self.entries[oldest] = Some(Entry { ip, mac, age: self.clock });
+        self.entries[oldest] = Some(Entry {
+            ip,
+            mac,
+            age: self.clock,
+        });
         Ok(())
     }
 
     pub fn resolve(&self, ip: Ipv4Address) -> Option<MacAddress> {
-        self.entries.iter().flatten().find(|entry| entry.ip == ip).map(|entry| entry.mac)
+        self.entries
+            .iter()
+            .flatten()
+            .find(|entry| entry.ip == ip)
+            .map(|entry| entry.mac)
     }
 
     pub fn len(&self) -> usize {
@@ -180,9 +210,15 @@ mod tests {
         let a = Ipv4Address([10, 0, 0, 1]);
         let b = Ipv4Address([10, 0, 0, 2]);
         let c = Ipv4Address([10, 0, 0, 3]);
-        cache.learn(a, MacAddress([2, 0, 0, 0, 0, 1])).expect("learn a");
-        cache.learn(b, MacAddress([2, 0, 0, 0, 0, 2])).expect("learn b");
-        cache.learn(c, MacAddress([2, 0, 0, 0, 0, 3])).expect("learn c");
+        cache
+            .learn(a, MacAddress([2, 0, 0, 0, 0, 1]))
+            .expect("learn a");
+        cache
+            .learn(b, MacAddress([2, 0, 0, 0, 0, 2]))
+            .expect("learn b");
+        cache
+            .learn(c, MacAddress([2, 0, 0, 0, 0, 3]))
+            .expect("learn c");
         assert_eq!(cache.len(), 2);
         assert!(cache.resolve(a).is_none());
         assert!(cache.resolve(b).is_some());

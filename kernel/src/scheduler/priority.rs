@@ -8,15 +8,24 @@ pub struct PriorityScheduler<const N: usize> {
     lengths: [usize; PRIORITY_LEVELS],
 }
 impl<const N: usize> Default for PriorityScheduler<N> {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 impl<const N: usize> PriorityScheduler<N> {
     pub const fn new() -> Self {
-        Self { queues: [[None; N]; PRIORITY_LEVELS], heads: [0; PRIORITY_LEVELS], tails: [0; PRIORITY_LEVELS], lengths: [0; PRIORITY_LEVELS] }
+        Self {
+            queues: [[None; N]; PRIORITY_LEVELS],
+            heads: [0; PRIORITY_LEVELS],
+            tails: [0; PRIORITY_LEVELS],
+            lengths: [0; PRIORITY_LEVELS],
+        }
     }
     pub fn enqueue(&mut self, process: ProcessId, priority: u8) -> bool {
         let p = priority as usize;
-        if p >= PRIORITY_LEVELS || self.lengths[p] == N || self.contains(process) { return false; }
+        if p >= PRIORITY_LEVELS || self.lengths[p] == N || self.contains(process) {
+            return false;
+        }
         self.queues[p][self.tails[p]] = Some(process);
         self.tails[p] = (self.tails[p] + 1) % N;
         self.lengths[p] += 1;
@@ -40,7 +49,9 @@ impl<const N: usize> PriorityScheduler<N> {
         while p < PRIORITY_LEVELS {
             let mut i = 0;
             while i < self.lengths[p] {
-                if self.queues[p][(self.heads[p] + i) % N] == Some(process) { return true; }
+                if self.queues[p][(self.heads[p] + i) % N] == Some(process) {
+                    return true;
+                }
                 i += 1;
             }
             p += 1;

@@ -81,7 +81,9 @@ pub struct BringupGate {
 
 impl BringupGate {
     pub const fn new() -> Self {
-        Self { phase: BringupPhase::Reset }
+        Self {
+            phase: BringupPhase::Reset,
+        }
     }
 
     pub const fn phase(self) -> BringupPhase {
@@ -138,9 +140,7 @@ impl SyscallBoundary {
             Some(p) => p != 0,
             None => true,
         };
-        self.arg_count <= self.max_args
-            && self.max_args <= 6
-            && ptr_ok
+        self.arg_count <= self.max_args && self.max_args <= 6 && ptr_ok
     }
 }
 
@@ -195,7 +195,10 @@ mod tests {
     #[test]
     fn bringup_is_strictly_ordered() {
         let gate = BringupGate::new();
-        assert_eq!(gate.advance(BringupPhase::IdtReady), Err(BringupError::InvalidTransition));
+        assert_eq!(
+            gate.advance(BringupPhase::IdtReady),
+            Err(BringupError::InvalidTransition)
+        );
         let gate = gate.advance(BringupPhase::BootInfoValidated).unwrap();
         let gate = gate.advance(BringupPhase::GdtTssReady).unwrap();
         let gate = gate.advance(BringupPhase::IdtReady).unwrap();
@@ -204,41 +207,151 @@ mod tests {
 
     #[test]
     fn memory_validation_is_overflow_and_alignment_safe() {
-        assert!(MemoryRange { start: 0x1000, len: 0x2000 }.validate(0x1000).is_ok());
-        assert_eq!(MemoryRange { start: u64::MAX, len: 1 }.validate(0x1000), Err(BringupError::InvalidMemoryRange));
-        assert_eq!(MemoryRange { start: 0x1001, len: 0x1000 }.validate(0x1000), Err(BringupError::MisalignedPage));
+        assert!(
+            MemoryRange {
+                start: 0x1000,
+                len: 0x2000
+            }
+            .validate(0x1000)
+            .is_ok()
+        );
+        assert_eq!(
+            MemoryRange {
+                start: u64::MAX,
+                len: 1
+            }
+            .validate(0x1000),
+            Err(BringupError::InvalidMemoryRange)
+        );
+        assert_eq!(
+            MemoryRange {
+                start: 0x1001,
+                len: 0x1000
+            }
+            .validate(0x1000),
+            Err(BringupError::MisalignedPage)
+        );
     }
 
     #[test]
     fn cpu_topology_rejects_invalid_online_sets() {
-        assert!(CpuTopology { boot_cpu: 0, online: 4, max_supported: 8 }.validate().is_ok());
-        assert_eq!(CpuTopology { boot_cpu: 4, online: 4, max_supported: 8 }.validate(), Err(BringupError::InvalidCpuTopology));
-        assert_eq!(CpuTopology { boot_cpu: 0, online: 9, max_supported: 8 }.validate(), Err(BringupError::InvalidCpuTopology));
+        assert!(
+            CpuTopology {
+                boot_cpu: 0,
+                online: 4,
+                max_supported: 8
+            }
+            .validate()
+            .is_ok()
+        );
+        assert_eq!(
+            CpuTopology {
+                boot_cpu: 4,
+                online: 4,
+                max_supported: 8
+            }
+            .validate(),
+            Err(BringupError::InvalidCpuTopology)
+        );
+        assert_eq!(
+            CpuTopology {
+                boot_cpu: 0,
+                online: 9,
+                max_supported: 8
+            }
+            .validate(),
+            Err(BringupError::InvalidCpuTopology)
+        );
     }
 
     #[test]
     fn context_and_syscall_boundaries_fail_closed() {
-        assert!(ContextFrame { instruction_pointer: 1, stack_pointer: 0x1000, flags: 0, address_space: 2 }.validate());
-        assert!(!ContextFrame { instruction_pointer: 1, stack_pointer: 0x1008, flags: 0, address_space: 2 }.validate());
-        assert!(SyscallBoundary { number: 3, arg_count: 2, max_args: 6, user_pointer: Some(0x1000) }.validate());
-        assert!(!SyscallBoundary { number: 3, arg_count: 7, max_args: 6, user_pointer: Some(0x1000) }.validate());
+        assert!(
+            ContextFrame {
+                instruction_pointer: 1,
+                stack_pointer: 0x1000,
+                flags: 0,
+                address_space: 2
+            }
+            .validate()
+        );
+        assert!(
+            !ContextFrame {
+                instruction_pointer: 1,
+                stack_pointer: 0x1008,
+                flags: 0,
+                address_space: 2
+            }
+            .validate()
+        );
+        assert!(
+            SyscallBoundary {
+                number: 3,
+                arg_count: 2,
+                max_args: 6,
+                user_pointer: Some(0x1000)
+            }
+            .validate()
+        );
+        assert!(
+            !SyscallBoundary {
+                number: 3,
+                arg_count: 7,
+                max_args: 6,
+                user_pointer: Some(0x1000)
+            }
+            .validate()
+        );
     }
 
     #[test]
     fn quotas_cap_ipc_and_capability_rejects_stale_authority() {
-        let quota = IpcQuota { messages: 8, bytes: 4096 };
+        let quota = IpcQuota {
+            messages: 8,
+            bytes: 4096,
+        };
         assert!(quota.permits(8, 4096));
         assert!(!quota.permits(9, 1));
-        let cap = CapabilityAudit { capability: 42, generation: 7, revoked: false };
+        let cap = CapabilityAudit {
+            capability: 42,
+            generation: 7,
+            revoked: false,
+        };
         assert!(cap.usable(7));
         assert!(!cap.usable(6));
-        assert!(!CapabilityAudit { revoked: true, ..cap }.usable(7));
+        assert!(
+            !CapabilityAudit {
+                revoked: true,
+                ..cap
+            }
+            .usable(7)
+        );
     }
 
     #[test]
     fn timer_and_trace_are_deterministic_values() {
-        assert!(!TimerDeadline { now: 9, deadline: 10 }.expired());
-        assert!(TimerDeadline { now: 10, deadline: 10 }.expired());
-        assert_eq!(TraceEvent { sequence: 4, kind: 2, subject: 9 }.sequence, 4);
+        assert!(
+            !TimerDeadline {
+                now: 9,
+                deadline: 10
+            }
+            .expired()
+        );
+        assert!(
+            TimerDeadline {
+                now: 10,
+                deadline: 10
+            }
+            .expired()
+        );
+        assert_eq!(
+            TraceEvent {
+                sequence: 4,
+                kind: 2,
+                subject: 9
+            }
+            .sequence,
+            4
+        );
     }
 }

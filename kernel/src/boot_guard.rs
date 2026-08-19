@@ -19,7 +19,11 @@ pub struct BootGuard {
 impl BootGuard {
     pub const STACK_ALIGNMENT: u64 = 16;
 
-    pub const fn validate(entry: u64, stack_top: u64, first_vector: u16) -> Result<Self, BootGuardError> {
+    pub const fn validate(
+        entry: u64,
+        stack_top: u64,
+        first_vector: u16,
+    ) -> Result<Self, BootGuardError> {
         if !canonical(entry) {
             return Err(BootGuardError::NonCanonicalEntry);
         }
@@ -35,8 +39,12 @@ impl BootGuard {
         Ok(Self { entry, stack_top })
     }
 
-    pub const fn entry(&self) -> u64 { self.entry }
-    pub const fn stack_top(&self) -> u64 { self.stack_top }
+    pub const fn entry(&self) -> u64 {
+        self.entry
+    }
+    pub const fn stack_top(&self) -> u64 {
+        self.stack_top
+    }
 }
 
 const fn canonical(value: u64) -> bool {

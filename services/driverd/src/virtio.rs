@@ -49,7 +49,9 @@ impl VirtioDevice {
         if self.vendor_id != VIRTIO_PCI_VENDOR_ID {
             return Err(VirtioError::InvalidVendor);
         }
-        if !(self.device_id >= 0x1000 && self.device_id <= 0x107F) && !(self.device_id >= 1 && self.device_id <= 0x3F) {
+        if !(self.device_id >= 0x1000 && self.device_id <= 0x107F)
+            && !(self.device_id >= 1 && self.device_id <= 0x3F)
+        {
             return Err(VirtioError::InvalidDevice);
         }
         Ok(())
@@ -129,9 +131,20 @@ mod tests {
 
     #[test]
     fn pci_identity_is_fail_closed() {
-        assert!(VirtioDevice::new(2, VIRTIO_PCI_VENDOR_ID, VIRTIO_F_VERSION_1).validate_pci_identity().is_ok());
-        assert_eq!(VirtioDevice::new(2, 0x1234, VIRTIO_F_VERSION_1).validate_pci_identity(), Err(VirtioError::InvalidVendor));
-        assert_eq!(VirtioDevice::new(0x10FF, VIRTIO_PCI_VENDOR_ID, VIRTIO_F_VERSION_1).validate_pci_identity(), Err(VirtioError::InvalidDevice));
+        assert!(
+            VirtioDevice::new(2, VIRTIO_PCI_VENDOR_ID, VIRTIO_F_VERSION_1)
+                .validate_pci_identity()
+                .is_ok()
+        );
+        assert_eq!(
+            VirtioDevice::new(2, 0x1234, VIRTIO_F_VERSION_1).validate_pci_identity(),
+            Err(VirtioError::InvalidVendor)
+        );
+        assert_eq!(
+            VirtioDevice::new(0x10FF, VIRTIO_PCI_VENDOR_ID, VIRTIO_F_VERSION_1)
+                .validate_pci_identity(),
+            Err(VirtioError::InvalidDevice)
+        );
     }
 
     #[test]
@@ -155,9 +168,17 @@ mod tests {
 
     #[test]
     fn queue_pending_rejects_corrupt_distance() {
-        let queue = VirtioQueue { size: 8, used_index: 0, avail_index: 9 };
+        let queue = VirtioQueue {
+            size: 8,
+            used_index: 0,
+            avail_index: 9,
+        };
         assert_eq!(queue.pending(), Err(VirtioError::QueueOverflow));
-        let queue = VirtioQueue { size: 8, used_index: 10, avail_index: 17 };
+        let queue = VirtioQueue {
+            size: 8,
+            used_index: 10,
+            avail_index: 17,
+        };
         assert_eq!(queue.pending(), Ok(7));
     }
 }

@@ -165,12 +165,27 @@ mod tests {
         let id = DriverId(7);
         register(&mut supervisor, id.0);
 
-        assert_eq!(supervisor.command(id, DriverCommand::Probe), Ok(DriverState::Starting));
-        assert_eq!(supervisor.command(id, DriverCommand::Start), Ok(DriverState::Running));
-        assert_eq!(supervisor.command(id, DriverCommand::Reset), Ok(DriverState::Starting));
+        assert_eq!(
+            supervisor.command(id, DriverCommand::Probe),
+            Ok(DriverState::Starting)
+        );
+        assert_eq!(
+            supervisor.command(id, DriverCommand::Start),
+            Ok(DriverState::Running)
+        );
+        assert_eq!(
+            supervisor.command(id, DriverCommand::Reset),
+            Ok(DriverState::Starting)
+        );
         assert_eq!(supervisor.restart_count_for(id), 1);
-        assert_eq!(supervisor.command(id, DriverCommand::Start), Ok(DriverState::Running));
-        assert_eq!(supervisor.command(id, DriverCommand::Reset), Ok(DriverState::Starting));
+        assert_eq!(
+            supervisor.command(id, DriverCommand::Start),
+            Ok(DriverState::Running)
+        );
+        assert_eq!(
+            supervisor.command(id, DriverCommand::Reset),
+            Ok(DriverState::Starting)
+        );
         assert_eq!(supervisor.restart_count_for(id), 2);
         assert_eq!(
             supervisor.command(id, DriverCommand::Reset),
@@ -184,7 +199,10 @@ mod tests {
         let id = DriverId(8);
         register(&mut supervisor, id.0);
         assert_eq!(supervisor.fault(id), Ok(()));
-        assert_eq!(supervisor.registry().find(id).unwrap().state, DriverState::Failed);
+        assert_eq!(
+            supervisor.registry().find(id).unwrap().state,
+            DriverState::Failed
+        );
         assert_eq!(
             supervisor.command(id, DriverCommand::Quarantine),
             Ok(DriverState::Quarantined)

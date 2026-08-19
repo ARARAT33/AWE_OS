@@ -20,12 +20,18 @@ pub struct ExecutionCore<const N: usize> {
 }
 
 impl<const N: usize> Default for ExecutionCore<N> {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<const N: usize> ExecutionCore<N> {
     pub const fn new() -> Self {
-        Self { scheduler: Scheduler::new(), processes: [None; N], next_id: 1 }
+        Self {
+            scheduler: Scheduler::new(),
+            processes: [None; N],
+            next_id: 1,
+        }
     }
 
     pub fn create_process(&mut self, budget: ResourceBudget) -> Result<ProcessId, CoreError> {
@@ -34,8 +40,14 @@ impl<const N: usize> ExecutionCore<N> {
             if self.processes[slot].is_none() {
                 let id = ProcessId(self.next_id);
                 self.next_id = self.next_id.saturating_add(1);
-                let mut descriptor = ProcessDescriptor { id, state: ProcessState::Created, budget };
-                descriptor.transition(ProcessState::Runnable).map_err(|_| CoreError::InvalidTransition)?;
+                let mut descriptor = ProcessDescriptor {
+                    id,
+                    state: ProcessState::Created,
+                    budget,
+                };
+                descriptor
+                    .transition(ProcessState::Runnable)
+                    .map_err(|_| CoreError::InvalidTransition)?;
                 self.processes[slot] = Some(descriptor);
                 if !self.scheduler.enqueue(id) {
                     self.processes[slot] = None;
@@ -71,10 +83,14 @@ impl<const N: usize> ExecutionCore<N> {
 
     pub fn exit(&mut self, id: ProcessId) -> Result<(), CoreError> {
         let process = self.find_mut(id).ok_or(CoreError::InvalidTransition)?;
-        process.transition(ProcessState::Exited).map_err(|_| CoreError::InvalidTransition)
+        process
+            .transition(ProcessState::Exited)
+            .map_err(|_| CoreError::InvalidTransition)
     }
 
-    pub const fn current(&self) -> Option<ProcessId> { self.scheduler.current() }
+    pub const fn current(&self) -> Option<ProcessId> {
+        self.scheduler.current()
+    }
 
     fn set_running(&mut self, id: ProcessId) {
         let mut i = 0;
@@ -107,7 +123,11 @@ mod tests {
     use super::*;
 
     fn budget() -> ResourceBudget {
-        ResourceBudget { cpu_ticks: 4, memory_bytes: 4096, ipc_messages: 2 }
+        ResourceBudget {
+            cpu_ticks: 4,
+            memory_bytes: 4096,
+            ipc_messages: 2,
+        }
     }
 
     #[test]
@@ -125,7 +145,10 @@ mod tests {
     fn capacity_and_budget_fail_closed() {
         let mut core: ExecutionCore<1> = ExecutionCore::new();
         let id = core.create_process(budget()).unwrap();
-        assert_eq!(core.create_process(budget()), Err(CoreError::ProcessTableFull));
+        assert_eq!(
+            core.create_process(budget()),
+            Err(CoreError::ProcessTableFull)
+        );
         assert!(core.consume_cpu(id, 4).is_ok());
         assert_eq!(core.consume_cpu(id, 1), Err(CoreError::BudgetExceeded));
     }

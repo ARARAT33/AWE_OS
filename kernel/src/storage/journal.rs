@@ -29,7 +29,11 @@ impl JournalTxn {
     pub const MAX_RECORDS: u16 = 1024;
 
     pub const fn new(id: u64) -> Self {
-        Self { id, state: JournalState::Empty, records: 0 }
+        Self {
+            id,
+            state: JournalState::Empty,
+            records: 0,
+        }
     }
 
     pub fn append(&mut self) -> Result<(), JournalError> {
@@ -84,8 +88,14 @@ pub struct RecoveryDecision {
 
 pub const fn decide_recovery(txn: JournalTxn) -> RecoveryDecision {
     match txn.recover_after_crash() {
-        JournalState::NeedsRecovery => RecoveryDecision { state: JournalState::NeedsRecovery, replay: true },
-        state => RecoveryDecision { state, replay: false },
+        JournalState::NeedsRecovery => RecoveryDecision {
+            state: JournalState::NeedsRecovery,
+            replay: true,
+        },
+        state => RecoveryDecision {
+            state,
+            replay: false,
+        },
     }
 }
 
@@ -108,7 +118,9 @@ mod tests {
     fn record_capacity_and_illegal_transitions_fail_closed() {
         let mut txn = JournalTxn::new(1);
         assert_eq!(txn.begin_commit(), Err(JournalError::InvalidTransition));
-        for _ in 0..JournalTxn::MAX_RECORDS { txn.append().unwrap(); }
+        for _ in 0..JournalTxn::MAX_RECORDS {
+            txn.append().unwrap();
+        }
         assert_eq!(txn.append(), Err(JournalError::SequenceOverflow));
     }
 }

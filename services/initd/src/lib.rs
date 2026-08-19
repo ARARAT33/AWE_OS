@@ -5,9 +5,9 @@
 
 mod core;
 pub use core::{
-    recovery_action, start_core_manager, validate_user_image, BoundedPath, CoreError,
-    CoreManager, CoreManagerKind, CoreManagerRegistry, CrashRecord, LogLevel, LogRecord,
-    RecoveryAction, SecurityPolicy, UserImage, MAX_CORE_MANAGERS, MAX_LOG_MESSAGE, MAX_PATH,
+    BoundedPath, CoreError, CoreManager, CoreManagerKind, CoreManagerRegistry, CrashRecord,
+    LogLevel, LogRecord, MAX_CORE_MANAGERS, MAX_LOG_MESSAGE, MAX_PATH, RecoveryAction,
+    SecurityPolicy, UserImage, recovery_action, start_core_manager, validate_user_image,
 };
 
 pub const INIT_ABI_MAJOR: u16 = 1;
