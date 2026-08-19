@@ -96,11 +96,9 @@ impl DriverSupervisor {
 
         if matches!(command, DriverCommand::Reset)
             && matches!(current, DriverState::Running | DriverState::Failed)
+            && self.restart_count(id) >= self.max_restarts
         {
-            if self.restart_count(id) >= self.max_restarts {
-                return Err(SupervisorError::RestartBudgetExhausted);
-            }
-            self.record_restart(id)?;
+            return Err(SupervisorError::RestartBudgetExhausted);
         }
 
         let next = match (current, command) {
@@ -108,10 +106,23 @@ impl DriverSupervisor {
             (DriverState::Starting, DriverCommand::Start) => DriverState::Running,
             (DriverState::Running, DriverCommand::Stop) => DriverState::Stopping,
             (DriverState::Stopping, DriverCommand::Stop) => DriverState::Discovered,
-            (DriverState::Running, DriverCommand::Reset) => DriverState::Starting,
+            (DriverState::Running, DriverCommand::Reset) => {
+                self.record_restart(id)?;
+                DriverState::Starting
+            }
             (_, DriverCommand::Quarantine) => DriverState::Quarantined,
             (DriverState::Running, DriverCommand::HealthCheck) => DriverState::Running,
-            (DriverState::Failed, DriverCommand::Reset) => DriverState::Starting,
+            (DriverState::Failed, DriverCommand::Reset) => {
+                self.record_restart(id)?;
+                DriverState::Starting
+            }
+            (DriverState::Starting, DriverCommand::Reset) => {
+                if self.restart_count(id) >= self.max_restarts {
+                    return Err(SupervisorError::RestartBudgetExhausted);
+                }
+                self.record_restart(id)?;
+                DriverState::Starting
+            }
             _ => return Err(SupervisorError::InvalidTransition),
         };
         self.registry

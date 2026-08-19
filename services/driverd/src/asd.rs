@@ -53,6 +53,8 @@ pub const fn package_transition(from: PackageState, to: PackageState) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    extern crate std;
+    use std::vec::Vec;
     fn header(manifest: u32, payload: u32, sig: u16) -> Vec<u8> {
         let mut b = Vec::with_capacity(ASD_HEADER_LEN + manifest as usize + payload as usize + sig as usize);
         b.extend_from_slice(&ASD_MAGIC); b.extend_from_slice(&ASD_VERSION.to_le_bytes()); b.extend_from_slice(&ASD_ARCH_X86_64.to_le_bytes());

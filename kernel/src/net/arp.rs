@@ -170,6 +170,7 @@ mod tests {
         let mut bytes = [0u8; ArpPacket::WIRE_LEN];
         packet().encode(&mut bytes).expect("encode");
         bytes[0] = 0;
+        bytes[1] = 2;
         assert_eq!(ArpPacket::parse(&bytes), Err(ArpError::UnsupportedHardware));
     }
 

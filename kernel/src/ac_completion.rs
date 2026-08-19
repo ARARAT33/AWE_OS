@@ -89,20 +89,11 @@ impl BringupGate {
     }
 
     pub const fn advance(self, next: BringupPhase) -> Result<Self, BringupError> {
-        let expected = match self.phase {
-            BringupPhase::Reset => BringupPhase::BootInfoValidated,
-            BringupPhase::BootInfoValidated => BringupPhase::GdtTssReady,
-            BringupPhase::GdtTssReady => BringupPhase::IdtReady,
-            BringupPhase::IdtReady => BringupPhase::InterruptsReady,
-            BringupPhase::InterruptsReady => BringupPhase::ApicReady,
-            BringupPhase::ApicReady => BringupPhase::MemoryReady,
-            BringupPhase::MemoryReady => BringupPhase::PagingReady,
-            BringupPhase::PagingReady => BringupPhase::HeapReady,
-            BringupPhase::HeapReady => BringupPhase::SmpReady,
-            BringupPhase::SmpReady => BringupPhase::KernelReady,
-            BringupPhase::KernelReady => BringupPhase::KernelReady,
+        let is_valid = match (self.phase, next) {
+            (p1, p2) if p1 as u8 == p2 as u8 => p1 as u8 == BringupPhase::KernelReady as u8,
+            (p1, p2) => (p1 as u8 + 1) == p2 as u8,
         };
-        if next == expected || (self.phase == BringupPhase::KernelReady && next == BringupPhase::KernelReady) {
+        if is_valid {
             Ok(Self { phase: next })
         } else {
             Err(BringupError::InvalidTransition)
@@ -143,9 +134,13 @@ pub struct SyscallBoundary {
 
 impl SyscallBoundary {
     pub const fn validate(self) -> bool {
+        let ptr_ok = match self.user_pointer {
+            Some(p) => p != 0,
+            None => true,
+        };
         self.arg_count <= self.max_args
             && self.max_args <= 6
-            && self.user_pointer.map_or(true, |p| p != 0)
+            && ptr_ok
     }
 }
 
