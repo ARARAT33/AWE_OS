@@ -35,6 +35,7 @@ pub fn validate_awos(bytes: &[u8]) -> Result<AwosHeader, AwosError> {
     Ok(header)
 }
 
+#[allow(dead_code)]
 pub fn package_parts<'a>(bytes: &'a [u8], header: AwosHeader) -> Result<(&'a [u8], &'a [u8], &'a [u8], &'a [u8]), AwosError> {
     let manifest_start = AWOS_HEADER_LEN;
     let code_start = manifest_start.checked_add(header.manifest_len as usize).ok_or(AwosError::InvalidLength)?;

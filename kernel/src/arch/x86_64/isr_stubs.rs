@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(bad_asm_style)]
 use core::arch::global_asm;
 use core::sync::atomic::{AtomicU64, Ordering};
 static TIMER_IRQ_COUNT: AtomicU64 = AtomicU64::new(0);

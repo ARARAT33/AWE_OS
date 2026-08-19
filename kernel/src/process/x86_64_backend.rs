@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(bad_asm_style)]
 
 use super::context_switch::SwitchFrame;
 
