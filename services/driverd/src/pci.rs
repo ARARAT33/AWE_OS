@@ -74,7 +74,7 @@ pub fn decode_bar(
         if size == 0 || !size.is_power_of_two() {
             return Err(PciBarError::InvalidSize);
         }
-        if base % size != 0 {
+        if !base.is_multiple_of(size) {
             return Err(PciBarError::MisalignedBase);
         }
         return Ok(PciBar {
@@ -111,7 +111,7 @@ pub fn decode_bar(
     if size == 0 || !size.is_power_of_two() {
         return Err(PciBarError::InvalidSize);
     }
-    if base % size != 0 {
+    if !base.is_multiple_of(size) {
         return Err(PciBarError::MisalignedBase);
     }
     base.checked_add(size - 1).ok_or(PciBarError::Overflow)?;
@@ -155,6 +155,10 @@ impl<const N: usize> PciDeviceTable<N> {
 
     pub const fn len(&self) -> usize {
         self.len
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
     }
 
     pub fn push(&mut self, device: PciDevice) -> Result<(), PciError> {

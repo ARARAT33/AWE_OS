@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(clippy::collapsible_if)]
 
 use crate::execution_core::{CoreError, ExecutionCore};
 use crate::process::{ProcessId, ResourceBudget};

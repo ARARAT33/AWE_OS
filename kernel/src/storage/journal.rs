@@ -109,9 +109,9 @@ mod tests {
         txn.append().unwrap();
         txn.begin_commit().unwrap();
         assert_eq!(txn.state, JournalState::Committing);
-        assert_eq!(decide_recovery(txn).replay, true);
+        assert!(decide_recovery(txn).replay);
         txn.durable_commit().unwrap();
-        assert_eq!(decide_recovery(txn).replay, false);
+        assert!(!decide_recovery(txn).replay);
     }
 
     #[test]

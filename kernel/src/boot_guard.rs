@@ -30,7 +30,7 @@ impl BootGuard {
         if stack_top == 0 {
             return Err(BootGuardError::EmptyStack);
         }
-        if stack_top % Self::STACK_ALIGNMENT != 0 {
+        if !stack_top.is_multiple_of(Self::STACK_ALIGNMENT) {
             return Err(BootGuardError::UnalignedStack);
         }
         if first_vector >= 256 {

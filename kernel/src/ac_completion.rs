@@ -60,7 +60,7 @@ impl MemoryRange {
     }
 
     pub const fn page_aligned(self, page_size: u64) -> bool {
-        page_size != 0 && self.start % page_size == 0 && self.len % page_size == 0
+        page_size != 0 && self.start.is_multiple_of(page_size) && self.len.is_multiple_of(page_size)
     }
 
     pub const fn validate(self, page_size: u64) -> Result<(), BringupError> {

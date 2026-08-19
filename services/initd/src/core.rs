@@ -42,6 +42,10 @@ impl BoundedPath {
         self.len as usize
     }
 
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes[..self.len as usize]
     }
@@ -96,6 +100,10 @@ impl CoreManagerRegistry {
 
     pub const fn len(&self) -> usize {
         self.len
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
     }
 
     pub fn register(&mut self, manager: CoreManager) -> Result<(), CoreError> {

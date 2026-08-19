@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(clippy::new_without_default)]
 
 pub const ABI_MAJOR: u16 = 1;
 pub const MAX_DEVICES: usize = 32;
@@ -273,6 +274,9 @@ impl Logger {
         } else {
             MAX_LOGS
         }
+    }
+    pub const fn is_empty(&self) -> bool {
+        self.next == 0
     }
 }
 

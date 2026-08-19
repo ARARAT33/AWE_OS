@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(clippy::new_without_default, clippy::should_implement_trait)]
 
 //! Deterministic A-C product-core primitives.
 //! These are executable contracts, not mocks: all state transitions are bounded,
