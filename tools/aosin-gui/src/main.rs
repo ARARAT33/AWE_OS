@@ -99,7 +99,6 @@ impl AosinGuiApp {
         match self.selected_mode {
             InstallationMode::VirtualMachine => {
                 self.status_message = "Launching AWEOS Virtual Machine in QEMU...";
-                // Attempt to launch QEMU with generated AWEOS ISO or image if present
                 let _ = Command::new("qemu-system-x86_64")
                     .args([
                         "-M",
@@ -117,7 +116,6 @@ impl AosinGuiApp {
             }
             InstallationMode::DualBoot => {
                 self.status_message = "Configuring Dual-Boot loader & partitions...";
-                // Configure bootloader entry
                 #[cfg(target_os = "windows")]
                 let _ = Command::new("bcdedit")
                     .args([
@@ -193,9 +191,8 @@ impl AosinGuiApp {
             },
         );
 
-        // Render Mode Selection Cards
+        // Mode Selection Cards
         if self.current_page == InstallerPage::ModeSelection {
-            // Card 1: Virtual Machine
             let vm_color = if self.selected_mode == InstallationMode::VirtualMachine {
                 Color {
                     r: 0,
@@ -221,7 +218,6 @@ impl AosinGuiApp {
                 vm_color,
             );
 
-            // Card 2: Dual Boot
             let db_color = if self.selected_mode == InstallationMode::DualBoot {
                 Color {
                     r: 0,
@@ -247,7 +243,6 @@ impl AosinGuiApp {
                 db_color,
             );
 
-            // Card 3: Full Migration
             let mig_color = if self.selected_mode == InstallationMode::FullMigration {
                 Color {
                     r: 0,
@@ -317,40 +312,317 @@ impl Default for AosinGuiApp {
     }
 }
 
-fn main() {
-    let mut app = AosinGuiApp::new();
-    let mut compositor = Compositor::new();
-    let win_id = compositor
-        .create_window(Rect {
-            x: 0,
-            y: 0,
-            width: 1024,
-            height: 768,
-        })
-        .expect("Failed to create AOSIN GUI window");
+// Win32 Zero-Dependency Native Window Implementation
+#[cfg(target_os = "windows")]
+mod win32_host {
+    use super::*;
+    use std::ffi::c_void;
+    use std::ptr::null_mut;
 
-    compositor.focus(win_id).unwrap();
+    type HWND = *mut c_void;
+    type HDC = *mut c_void;
+    type HINSTANCE = *mut c_void;
+    type HMENU = *mut c_void;
+    type HICON = *mut c_void;
+    type HCURSOR = *mut c_void;
+    type HBRUSH = *mut c_void;
+    type LPCWSTR = *const u16;
+    type LRESULT = isize;
+    type WPARAM = usize;
+    type LPARAM = isize;
+    type UINT = u32;
+    type DWORD = u32;
+    type WORD = u16;
+    type LONG = i32;
 
-    let mut frame_buf = vec![0u8; 1024 * 768 * 4];
+    #[repr(C)]
+    struct WNDCLASSEXW {
+        cb_size: UINT,
+        style: UINT,
+        lpfn_wnd_proc: unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT,
+        cb_cls_extra: i32,
+        cb_wnd_extra: i32,
+        h_instance: HINSTANCE,
+        h_icon: HICON,
+        h_cursor: HCURSOR,
+        hbr_background: HBRUSH,
+        lpsz_menu_name: LPCWSTR,
+        lpsz_class_name: LPCWSTR,
+        h_icon_sm: HICON,
+    }
 
-    // Simulate double-click execution flow with interactive clicks
-    compositor
-        .push_input(InputEvent::Pointer {
-            x: 750,
-            y: 680,
-            buttons: 1,
-        })
-        .ok();
+    #[repr(C)]
+    struct BITMAPINFOHEADER {
+        bi_size: DWORD,
+        bi_width: LONG,
+        bi_height: LONG,
+        bi_planes: WORD,
+        bi_bit_count: WORD,
+        bi_compression: DWORD,
+        bi_size_image: DWORD,
+        bi_x_pels_per_meter: LONG,
+        bi_y_pels_per_meter: LONG,
+        bi_clr_used: DWORD,
+        bi_clr_important: DWORD,
+    }
 
-    while let Some(evt) = compositor.pop_input() {
-        if let InputEvent::Pointer { x, y, buttons } = evt
-            && buttons == 1
-        {
-            app.handle_click(x, y);
+    #[repr(C)]
+    struct BITMAPINFO {
+        bmi_header: BITMAPINFOHEADER,
+        bmi_colors: [u32; 1],
+    }
+
+    #[repr(C)]
+    struct POINT {
+        x: LONG,
+        y: LONG,
+    }
+
+    #[repr(C)]
+    struct MSG {
+        hwnd: HWND,
+        message: UINT,
+        w_param: WPARAM,
+        l_param: LPARAM,
+        time: DWORD,
+        pt: POINT,
+    }
+
+    #[repr(C)]
+    struct PAINTSTRUCT {
+        hdc: HDC,
+        f_erase: i32,
+        rc_paint: [i32; 4],
+        f_restore: i32,
+        f_inc_update: i32,
+        rgb_reserved: [u8; 32],
+    }
+
+    extern "system" {
+        fn GetModuleHandleW(lp_module_name: LPCWSTR) -> HINSTANCE;
+        fn RegisterClassExW(lp_wcx: *const WNDCLASSEXW) -> WORD;
+        fn CreateWindowExW(
+            dw_ex_style: DWORD,
+            lp_class_name: LPCWSTR,
+            lp_window_name: LPCWSTR,
+            dw_style: DWORD,
+            x: i32,
+            y: i32,
+            n_width: i32,
+            n_height: i32,
+            h_wnd_parent: HWND,
+            h_menu: HMENU,
+            h_instance: HINSTANCE,
+            lp_param: *mut c_void,
+        ) -> HWND;
+        fn ShowWindow(h_wnd: HWND, n_cmd_show: i32) -> i32;
+        fn GetMessageW(
+            lp_msg: *mut MSG,
+            h_wnd: HWND,
+            w_msg_filter_min: UINT,
+            w_msg_filter_max: UINT,
+        ) -> i32;
+        fn TranslateMessage(lp_msg: *const MSG) -> i32;
+        fn DispatchMessageW(lp_msg: *const MSG) -> LRESULT;
+        fn PostQuitMessage(n_exit_code: i32);
+        fn DefWindowProcW(h_wnd: HWND, msg: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT;
+        fn BeginPaint(h_wnd: HWND, lp_paint: *mut PAINTSTRUCT) -> HDC;
+        fn EndPaint(h_wnd: HWND, lp_paint: *const PAINTSTRUCT) -> i32;
+        fn StretchDIBits(
+            hdc: HDC,
+            x_dest: i32,
+            y_dest: i32,
+            dest_width: i32,
+            dest_height: i32,
+            x_src: i32,
+            y_src: i32,
+            src_width: i32,
+            src_height: i32,
+            lp_bits: *const c_void,
+            lpbmi: *const BITMAPINFO,
+            i_usage: UINT,
+            rop: DWORD,
+        ) -> i32;
+        fn InvalidateRect(h_wnd: HWND, lp_rect: *const c_void, b_erase: i32) -> i32;
+    }
+
+    static mut APP_INSTANCE: Option<AosinGuiApp> = None;
+
+    unsafe extern "system" fn wnd_proc(
+        h_wnd: HWND,
+        msg: UINT,
+        w_param: WPARAM,
+        l_param: LPARAM,
+    ) -> LRESULT {
+        const WM_DESTROY: UINT = 0x0002;
+        const WM_PAINT: UINT = 0x000F;
+        const WM_LBUTTONDOWN: UINT = 0x0201;
+
+        match msg {
+            WM_LBUTTONDOWN => {
+                let x = (l_param & 0xFFFF) as i32;
+                let y = ((l_param >> 16) & 0xFFFF) as i32;
+                if let Some(app) = unsafe { APP_INSTANCE.as_mut() } {
+                    app.handle_click(x, y);
+                    unsafe { InvalidateRect(h_wnd, null_mut(), 0) };
+                }
+                0
+            }
+            WM_PAINT => {
+                let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
+                let hdc = unsafe { BeginPaint(h_wnd, &mut ps) };
+
+                if let Some(app) = unsafe { APP_INSTANCE.as_ref() } {
+                    let mut frame_buf = vec![0u8; 1024 * 768 * 4];
+                    app.render_frame(&mut frame_buf, 1024, 768);
+
+                    let bmi = BITMAPINFO {
+                        bmi_header: BITMAPINFOHEADER {
+                            bi_size: std::mem::size_of::<BITMAPINFOHEADER>() as DWORD,
+                            bi_width: 1024,
+                            bi_height: -768, // Top-down
+                            bi_planes: 1,
+                            bi_bit_count: 32,
+                            bi_compression: 0,
+                            bi_size_image: (1024 * 768 * 4) as DWORD,
+                            bi_x_pels_per_meter: 0,
+                            bi_y_pels_per_meter: 0,
+                            bi_clr_used: 0,
+                            bi_clr_important: 0,
+                        },
+                        bmi_colors: [0; 1],
+                    };
+
+                    unsafe {
+                        StretchDIBits(
+                            hdc,
+                            0,
+                            0,
+                            1024,
+                            768,
+                            0,
+                            0,
+                            1024,
+                            768,
+                            frame_buf.as_ptr() as *const c_void,
+                            &bmi,
+                            0,
+                            0x00CC0020, // SRCCOPY
+                        );
+                    }
+                }
+
+                unsafe { EndPaint(h_wnd, &ps) };
+                0
+            }
+            WM_DESTROY => {
+                unsafe { PostQuitMessage(0) };
+                0
+            }
+            _ => unsafe { DefWindowProcW(h_wnd, msg, w_param, l_param) },
         }
     }
 
-    app.render_frame(&mut frame_buf, 1024, 768);
+    pub fn run_win32_app(app: AosinGuiApp) {
+        unsafe { APP_INSTANCE = Some(app) };
+
+        let class_name: Vec<u16> = "AOSIN_GUI_CLASS\0".encode_utf16().collect();
+        let window_title: Vec<u16> = "AOSIN — Universal AWEOS Installer & Migration Engine\0"
+            .encode_utf16()
+            .collect();
+
+        let h_instance = unsafe { GetModuleHandleW(null_mut()) };
+
+        let wcx = WNDCLASSEXW {
+            cb_size: std::mem::size_of::<WNDCLASSEXW>() as UINT,
+            style: 0x0003, // CS_HREDRAW | CS_VREDRAW
+            lpfn_wnd_proc: wnd_proc,
+            cb_cls_extra: 0,
+            cb_wnd_extra: 0,
+            h_instance,
+            h_icon: null_mut(),
+            h_cursor: null_mut(),
+            hbr_background: null_mut(),
+            lpsz_menu_name: null_mut(),
+            lpsz_class_name: class_name.as_ptr(),
+            h_icon_sm: null_mut(),
+        };
+
+        unsafe { RegisterClassExW(&wcx) };
+
+        let hwnd = unsafe {
+            CreateWindowExW(
+                0,
+                class_name.as_ptr(),
+                window_title.as_ptr(),
+                0x00CF0000, // WS_OVERLAPPEDWINDOW
+                100,
+                100,
+                1024,
+                768,
+                null_mut(),
+                null_mut(),
+                h_instance,
+                null_mut(),
+            )
+        };
+
+        if !hwnd.is_null() {
+            unsafe {
+                ShowWindow(hwnd, 5); // SW_SHOW
+                let mut msg: MSG = std::mem::zeroed();
+                while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
+                    TranslateMessage(&msg);
+                    DispatchMessageW(&msg);
+                }
+            }
+        }
+    }
+}
+
+fn main() {
+    let app = AosinGuiApp::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        win32_host::run_win32_app(app);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mut app = app;
+        let mut compositor = Compositor::new();
+        let win_id = compositor
+            .create_window(Rect {
+                x: 0,
+                y: 0,
+                width: 1024,
+                height: 768,
+            })
+            .expect("Failed to create AOSIN GUI window");
+
+        compositor.focus(win_id).unwrap();
+
+        let mut frame_buf = vec![0u8; 1024 * 768 * 4];
+
+        compositor
+            .push_input(InputEvent::Pointer {
+                x: 750,
+                y: 680,
+                buttons: 1,
+            })
+            .ok();
+
+        while let Some(evt) = compositor.pop_input() {
+            if let InputEvent::Pointer { x, y, buttons } = evt
+                && buttons == 1
+            {
+                app.handle_click(x, y);
+            }
+        }
+
+        app.render_frame(&mut frame_buf, 1024, 768);
+    }
 }
 
 #[cfg(test)]

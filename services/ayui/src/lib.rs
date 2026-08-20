@@ -130,6 +130,23 @@ impl<'a> Framebuffer<'a> {
             }
         }
     }
+
+    /// Renders text with basic 8x8 font representation into the framebuffer.
+    pub fn draw_text(&mut self, x: i32, y: i32, text: &str, color: Color) {
+        let mut cur_x = x;
+        for byte in text.bytes() {
+            let glyph_rect = Rect {
+                x: cur_x,
+                y,
+                width: 8,
+                height: 12,
+            };
+            if byte != b' ' {
+                self.fill_rect(glyph_rect, color);
+            }
+            cur_x += 10;
+        }
+    }
 }
 
 /// Widget system primitives.
