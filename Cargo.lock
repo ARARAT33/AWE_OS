@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "aosin-gui"
+version = "0.1.0"
+dependencies = [
+ "awe-ayui",
+]
+
+[[package]]
 name = "awe-appd"
 version = "0.1.0"
 

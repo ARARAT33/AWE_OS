@@ -25,7 +25,7 @@ fn main() {
             let status = Command::new("cargo")
                 .args(["check", "--workspace"])
                 .status();
-            if status.map_or(false, |s| s.success()) {
+            if status.is_ok_and(|s| s.success()) {
                 println!("[awe] Workspace build check PASSED.");
             } else {
                 println!("[awe] Workspace build FAILED.");
@@ -34,7 +34,7 @@ fn main() {
         "image" => {
             println!("[awe] Generating bootable ISO and IMG artifacts...");
             let status = Command::new("./scripts/build-images.sh").status();
-            if status.map_or(false, |s| s.success()) {
+            if status.is_ok_and(|s| s.success()) {
                 println!("[awe] Artifact generation COMPLETED.");
             } else {
                 println!("[awe] Artifact generation FAILED.");
