@@ -19,6 +19,7 @@ members = [
     "tools/awescript",
     "tools/awe-cli",
     "tools/aweosa-builder",
+    "tools/aosin-gui",
     "tests/product-core",
 ]
 resolver = "2"
