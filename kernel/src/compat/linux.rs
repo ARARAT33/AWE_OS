@@ -224,6 +224,12 @@ impl LinuxFdTable {
     }
 }
 
+impl Default for LinuxFdTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Linux POSIX Syscall Dispatcher.
 #[derive(Debug)]
 pub struct LinuxSyscallDispatcher {
@@ -282,6 +288,12 @@ impl LinuxSyscallDispatcher {
         }
         self.fd_table.fds[fd as usize] = None;
         Ok(0)
+    }
+}
+
+impl Default for LinuxSyscallDispatcher {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

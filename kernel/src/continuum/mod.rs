@@ -92,12 +92,10 @@ impl ContinuumMesh {
         state: ContinuumState,
     ) -> Result<(), &'static str> {
         let mut authenticated = false;
-        for slot in self.nodes.iter() {
-            if let Some(node) = slot {
-                if node.device_id == node_id && node.is_authenticated {
-                    authenticated = true;
-                    break;
-                }
+        for node in self.nodes.iter().flatten() {
+            if node.device_id == node_id && node.is_authenticated {
+                authenticated = true;
+                break;
             }
         }
 
@@ -110,6 +108,12 @@ impl ContinuumMesh {
         }
 
         Ok(())
+    }
+}
+
+impl Default for ContinuumMesh {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -106,6 +106,12 @@ impl MessageRing {
     }
 }
 
+impl Default for MessageRing {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Pub/Sub topic definition.
 #[derive(Debug, Clone, Copy)]
 pub struct PubSubTopic {
@@ -256,6 +262,12 @@ impl NexusRouter {
         }
 
         Ok(delivered)
+    }
+}
+
+impl Default for NexusRouter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

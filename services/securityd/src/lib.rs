@@ -103,14 +103,12 @@ impl SecurityDaemon {
     }
 
     pub fn get_key(&self, key_id: u32, requester_pid: u32) -> Result<[u8; 32], &'static str> {
-        for slot in self.keys.iter() {
-            if let Some(key) = slot {
-                if key.key_id == key_id {
-                    if key.owner_pid != requester_pid {
-                        return Err("Access denied: key ownership mismatch");
-                    }
-                    return Ok(key.key_data);
+        for key in self.keys.iter().flatten() {
+            if key.key_id == key_id {
+                if key.owner_pid != requester_pid {
+                    return Err("Access denied: key ownership mismatch");
                 }
+                return Ok(key.key_data);
             }
         }
         Err("Key not found")
@@ -160,11 +158,9 @@ impl SecurityDaemon {
         required_cap: u64,
         now: u64,
     ) -> bool {
-        for slot in self.tokens.iter() {
-            if let Some(t) = slot {
-                if t.token_id == token_id && t.subject_pid == subject_pid {
-                    return t.is_valid_at(now, required_cap);
-                }
+        for t in self.tokens.iter().flatten() {
+            if t.token_id == token_id && t.subject_pid == subject_pid {
+                return t.is_valid_at(now, required_cap);
             }
         }
         false

@@ -5,7 +5,7 @@
 
 #![no_std]
 
-pub const MODEL_MAGIC: [u8; 4] = [b'A', b'W', b'A', b'I']; // "AWAI"
+pub const MODEL_MAGIC: [u8; 4] = *b"AWAI";
 pub const MAX_TENSOR_BUFFERS: usize = 16;
 pub const MAX_GRAPH_NODES: usize = 32;
 
@@ -133,12 +133,10 @@ impl AiInferenceEngine {
         input_buf_id: u32,
     ) -> Result<u32, &'static str> {
         let mut found = false;
-        for slot in self.tensor_buffers.iter() {
-            if let Some(buf) = slot {
-                if buf.buffer_id == input_buf_id {
-                    found = true;
-                    break;
-                }
+        for buf in self.tensor_buffers.iter().flatten() {
+            if buf.buffer_id == input_buf_id {
+                found = true;
+                break;
             }
         }
 

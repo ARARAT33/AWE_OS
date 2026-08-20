@@ -12,12 +12,13 @@ pub const MAX_HANDLES: usize = 128;
 pub const MAX_SECTIONS: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
 pub enum NtStatus {
-    Success = 0x00000000,
-    InvalidHandle = 0xC0000008,
-    AccessDenied = 0xC0000022,
-    InvalidParameter = 0xC000000D,
-    NotImplemented = 0xC0000002,
+    Success = 0x0000_0000,
+    InvalidHandle = 0xC000_0008,
+    AccessDenied = 0xC000_0022,
+    InvalidParameter = 0xC000_000D,
+    NotImplemented = 0xC000_0002,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -139,7 +140,7 @@ impl PeImage {
         let sec_offset = opt_offset + opt_size;
         let sec_count = num_sections.min(MAX_SECTIONS);
 
-        for i in 0..sec_count {
+        for (i, slot) in sections.iter_mut().enumerate().take(sec_count) {
             let offset = sec_offset + i * 40;
             if offset + 40 > data.len() {
                 break;
@@ -178,7 +179,7 @@ impl PeImage {
                 data[offset + 39],
             ]);
 
-            sections[i] = Some(SectionHeader {
+            *slot = Some(SectionHeader {
                 name,
                 virtual_size: virt_size,
                 virtual_address: virt_addr,
@@ -253,14 +254,18 @@ impl Win32HandleTable {
     }
 
     pub fn lookup(&self, handle_id: u32) -> Result<HandleEntry, NtStatus> {
-        for slot in self.handles.iter() {
-            if let Some(entry) = slot {
-                if entry.handle_id == handle_id {
-                    return Ok(*entry);
-                }
+        for entry in self.handles.iter().flatten() {
+            if entry.handle_id == handle_id {
+                return Ok(*entry);
             }
         }
         Err(NtStatus::InvalidHandle)
+    }
+}
+
+impl Default for Win32HandleTable {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -294,6 +299,12 @@ impl Win32SyscallDispatcher {
             Ok(_) => NtStatus::Success,
             Err(status) => status,
         }
+    }
+}
+
+impl Default for Win32SyscallDispatcher {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

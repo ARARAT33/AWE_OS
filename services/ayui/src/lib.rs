@@ -1,7 +1,7 @@
-#![no_std]
-
 //! Bounded AYUI desktop compositor, software rendering engine, widget system,
 //! desktop shell, terminal emulator backend, and notification daemon.
+
+#![no_std]
 
 pub const MAX_WINDOWS: usize = 64;
 pub const MAX_EVENTS: usize = 128;
@@ -199,6 +199,12 @@ impl TerminalBackend {
     }
 }
 
+impl Default for TerminalBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Notification Item.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Notification {
@@ -238,6 +244,12 @@ impl NotificationDaemon {
             }
         }
         Err(UiError::Full)
+    }
+}
+
+impl Default for NotificationDaemon {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

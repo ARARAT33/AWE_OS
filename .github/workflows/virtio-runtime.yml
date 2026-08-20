@@ -122,11 +122,17 @@ jobs:
 
           parsed = json.loads(data)
           devices = [d for bus in parsed.get("return", []) for d in bus.get("devices", [])]
-          virtio = [
-              d for d in devices
-              if int(d.get("vendor_id", -1)) == 0x1AF4
-              and int(d.get("device_id", -1)) in range(0x1000, 0x1080)
-          ]
+          virtio = []
+          for d in devices:
+              vendor = d.get("vendor_id")
+              if vendor is None and "id" in d and isinstance(d["id"], dict):
+                  vendor = d["id"].get("vendor")
+              device = d.get("device_id")
+              if device is None and "id" in d and isinstance(d["id"], dict):
+                  device = d["id"].get("device")
+              if vendor == 0x1AF4 and device is not None and device in range(0x1000, 0x1080):
+                  virtio.append(d)
+
           evidence = {
               "qmp_socket_present": True,
               "qmp_greeting_present": bool(greeting),
