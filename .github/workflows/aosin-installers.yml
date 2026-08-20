@@ -15,7 +15,7 @@ env:
 
 jobs:
   build-installers:
-    name: Build AOSIN Installers (Windows & Linux)
+    name: Build AOSIN Installers (Native OS Runners)
     strategy:
       matrix:
         include:
@@ -24,8 +24,8 @@ jobs:
             artifact_name: aosin-gui-installer-linux
             package: aosin-gui
             binary_name: aosin-gui
-          - os: ubuntu-latest
-            target: x86_64-pc-windows-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
             artifact_name: aosin-gui-installer-windows.exe
             package: aosin-gui
             binary_name: aosin-gui.exe
@@ -34,8 +34,8 @@ jobs:
             artifact_name: aosin-cli-installer-linux
             package: awe-cli
             binary_name: awe
-          - os: ubuntu-latest
-            target: x86_64-pc-windows-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
             artifact_name: aosin-cli-installer-windows.exe
             package: awe-cli
             binary_name: awe.exe
@@ -48,14 +48,11 @@ jobs:
         run: |
           rustup target add ${{ matrix.target }}
 
-      - name: Install MinGW GCC for Windows target (if GNU)
-        if: matrix.target == 'x86_64-pc-windows-gnu'
-        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
-
       - name: Build AOSIN Installer Binary
         run: cargo build --release -p ${{ matrix.package }} --target ${{ matrix.target }}
 
       - name: Package Installer
+        shell: bash
         run: |
           mkdir -p dist/installers
           cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} dist/installers/${{ matrix.artifact_name }}
