@@ -76,7 +76,13 @@ impl StorageDaemon {
         }
     }
 
-    pub fn register_volume(&mut self, vol_type: VolumeType, block_count: u64, start_lba: u64, read_only: bool) -> Result<u32, &'static str> {
+    pub fn register_volume(
+        &mut self,
+        vol_type: VolumeType,
+        block_count: u64,
+        start_lba: u64,
+        read_only: bool,
+    ) -> Result<u32, &'static str> {
         let vid = self.volume_counter;
         for slot in self.volumes.iter_mut() {
             if slot.is_none() {
@@ -96,12 +102,10 @@ impl StorageDaemon {
 
     pub fn mount_volume(&mut self, volume_id: u32, path_hash: u64) -> Result<u32, &'static str> {
         let mut found = false;
-        for vol in self.volumes.iter() {
-            if let Some(v) = vol {
-                if v.volume_id == volume_id {
-                    found = true;
-                    break;
-                }
+        for v in self.volumes.iter().flatten() {
+            if v.volume_id == volume_id {
+                found = true;
+                break;
             }
         }
         if !found {
@@ -142,25 +146,26 @@ impl StorageDaemon {
     }
 
     pub fn cache_read(&self, volume_id: u32, lba: u64) -> Option<&[u8; BLOCK_SIZE]> {
-        for slot in self.cache.iter() {
-            if let Some(block) = slot {
-                if block.volume_id == volume_id && block.lba == lba {
-                    return Some(&block.data);
-                }
+        for block in self.cache.iter().flatten() {
+            if block.volume_id == volume_id && block.lba == lba {
+                return Some(&block.data);
             }
         }
         None
     }
 
-    pub fn cache_write(&mut self, volume_id: u32, lba: u64, data: &[u8; BLOCK_SIZE]) -> Result<(), &'static str> {
+    pub fn cache_write(
+        &mut self,
+        volume_id: u32,
+        lba: u64,
+        data: &[u8; BLOCK_SIZE],
+    ) -> Result<(), &'static str> {
         // Update existing cache block if present
-        for slot in self.cache.iter_mut() {
-            if let Some(block) = slot {
-                if block.volume_id == volume_id && block.lba == lba {
-                    block.data = *data;
-                    block.dirty = true;
-                    return Ok(());
-                }
+        for block in self.cache.iter_mut().flatten() {
+            if block.volume_id == volume_id && block.lba == lba {
+                block.data = *data;
+                block.dirty = true;
+                return Ok(());
             }
         }
         // Insert into free slot
@@ -179,6 +184,12 @@ impl StorageDaemon {
     }
 }
 
+impl Default for StorageDaemon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,7 +197,9 @@ mod tests {
     #[test]
     fn test_storaged_lifecycle() {
         let mut storaged = StorageDaemon::new();
-        let vid = storaged.register_volume(VolumeType::Ramdisk, 2048, 0, false).unwrap();
+        let vid = storaged
+            .register_volume(VolumeType::Ramdisk, 2048, 0, false)
+            .unwrap();
         assert_eq!(vid, 1);
 
         let mid = storaged.mount_volume(vid, 0x1234_5678).unwrap();
@@ -198,7 +211,9 @@ mod tests {
         let block_data = [0xAB; BLOCK_SIZE];
         storaged.cache_write(vid, 42, &block_data).unwrap();
 
-        let cached = storaged.cache_read(vid, 42).expect("Should hit block cache");
+        let cached = storaged
+            .cache_read(vid, 42)
+            .expect("Should hit block cache");
         assert_eq!(cached[0], 0xAB);
     }
 }

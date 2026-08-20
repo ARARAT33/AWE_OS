@@ -65,12 +65,19 @@ impl SecurityDaemon {
         }
     }
 
-    pub fn extend_pcr(&mut self, pcr_index: usize, event_digest: &[u8; SHA256_DIGEST_LEN]) -> Result<(), &'static str> {
+    pub fn extend_pcr(
+        &mut self,
+        pcr_index: usize,
+        event_digest: &[u8; SHA256_DIGEST_LEN],
+    ) -> Result<(), &'static str> {
         if pcr_index >= MAX_PCR_REGISTERS {
             return Err("PCR index out of bounds");
         }
-        for i in 0..SHA256_DIGEST_LEN {
-            self.pcr_banks[pcr_index][i] ^= event_digest[i];
+        for (byte, &evt) in self.pcr_banks[pcr_index]
+            .iter_mut()
+            .zip(event_digest.iter())
+        {
+            *byte ^= evt;
         }
         Ok(())
     }
@@ -99,20 +106,24 @@ impl SecurityDaemon {
     }
 
     pub fn get_key(&self, key_id: u32, requester_pid: u32) -> Result<[u8; 32], &'static str> {
-        for slot in self.keys.iter() {
-            if let Some(key) = slot {
-                if key.key_id == key_id {
-                    if key.owner_pid != requester_pid {
-                        return Err("Access denied: key ownership mismatch");
-                    }
-                    return Ok(key.key_data);
+        for key in self.keys.iter().flatten() {
+            if key.key_id == key_id {
+                if key.owner_pid != requester_pid {
+                    return Err("Access denied: key ownership mismatch");
                 }
+                return Ok(key.key_data);
             }
         }
         Err("Key not found")
     }
 
-    pub fn issue_token(&mut self, subject_pid: u32, capabilities: u64, now: u64, ttl: u64) -> Result<SecurityToken, &'static str> {
+    pub fn issue_token(
+        &mut self,
+        subject_pid: u32,
+        capabilities: u64,
+        now: u64,
+        ttl: u64,
+    ) -> Result<SecurityToken, &'static str> {
         let tid = self.token_counter;
         let expires_at = now + ttl;
 
@@ -120,8 +131,8 @@ impl SecurityDaemon {
         let bytes_pid = subject_pid.to_le_bytes();
         let bytes_cap = capabilities.to_le_bytes();
 
-        for i in 0..16 {
-            hmac[i] = self.secret_salt[i] ^ bytes_pid[i % 4] ^ bytes_cap[i % 8];
+        for (i, slot) in hmac.iter_mut().enumerate() {
+            *slot = self.secret_salt[i] ^ bytes_pid[i % 4] ^ bytes_cap[i % 8];
         }
 
         let token = SecurityToken {
@@ -143,15 +154,25 @@ impl SecurityDaemon {
         Err("Capability token vault full")
     }
 
-    pub fn validate_token(&self, token_id: u64, subject_pid: u32, required_cap: u64, now: u64) -> bool {
-        for slot in self.tokens.iter() {
-            if let Some(t) = slot {
-                if t.token_id == token_id && t.subject_pid == subject_pid {
-                    return t.is_valid_at(now, required_cap);
-                }
+    pub fn validate_token(
+        &self,
+        token_id: u64,
+        subject_pid: u32,
+        required_cap: u64,
+        now: u64,
+    ) -> bool {
+        for t in self.tokens.iter().flatten() {
+            if t.token_id == token_id && t.subject_pid == subject_pid {
+                return t.is_valid_at(now, required_cap);
             }
         }
         false
+    }
+}
+
+impl Default for SecurityDaemon {
+    fn default() -> Self {
+        Self::new([0u8; 16])
     }
 }
 

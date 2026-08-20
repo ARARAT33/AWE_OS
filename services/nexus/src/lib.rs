@@ -106,6 +106,12 @@ impl MessageRing {
     }
 }
 
+impl Default for MessageRing {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Pub/Sub topic definition.
 #[derive(Debug, Clone, Copy)]
 pub struct PubSubTopic {
@@ -189,7 +195,9 @@ impl NexusRouter {
         let sender_ep = self.endpoints[sender_idx].ok_or("Sender not registered")?;
         let _recv_ep = self.endpoints[recv_idx].ok_or("Receiver not registered")?;
 
-        if (sender_ep.capability_mask & msg.header.required_capability) != msg.header.required_capability {
+        if (sender_ep.capability_mask & msg.header.required_capability)
+            != msg.header.required_capability
+        {
             return Err("Sender lacks required capability bit for message dispatch");
         }
 
@@ -206,7 +214,11 @@ impl NexusRouter {
         self.queues[idx].dequeue()
     }
 
-    pub fn create_topic(&mut self, topic_id: u32, required_capability: u64) -> Result<(), &'static str> {
+    pub fn create_topic(
+        &mut self,
+        topic_id: u32,
+        required_capability: u64,
+    ) -> Result<(), &'static str> {
         let idx = topic_id as usize;
         if idx >= MAX_TOPICS {
             return Err("Topic ID out of bounds");
@@ -218,7 +230,12 @@ impl NexusRouter {
         Ok(())
     }
 
-    pub fn publish_event(&mut self, sender_id: u32, topic_id: u32, data: &[u8]) -> Result<usize, &'static str> {
+    pub fn publish_event(
+        &mut self,
+        sender_id: u32,
+        topic_id: u32,
+        data: &[u8],
+    ) -> Result<usize, &'static str> {
         let topic_idx = topic_id as usize;
         if topic_idx >= MAX_TOPICS {
             return Err("Topic ID out of bounds");
@@ -245,6 +262,12 @@ impl NexusRouter {
         }
 
         Ok(delivered)
+    }
+}
+
+impl Default for NexusRouter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

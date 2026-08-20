@@ -6,8 +6,6 @@ pub mod aarch64;
 pub mod arm;
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub mod riscv;
-#[cfg(target_arch = "x86")]
-pub mod x86;
 #[cfg(target_arch = "x86_64")]
 pub mod x86_64;
 

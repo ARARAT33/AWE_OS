@@ -93,10 +93,10 @@ pub struct FirewallRule {
 
 impl FirewallRule {
     pub fn matches(&self, protocol: SocketProtocol, port: u16) -> bool {
-        if let Some(p) = self.protocol {
-            if p != protocol {
-                return false;
-            }
+        if let Some(p) = self.protocol
+            && p != protocol
+        {
+            return false;
         }
         port >= self.port_range_start && port <= self.port_range_end
     }
@@ -133,7 +133,11 @@ impl NetworkDaemon {
         Err("No free interface slots")
     }
 
-    pub fn create_socket(&mut self, protocol: SocketProtocol, owner_pid: u32) -> Result<u32, &'static str> {
+    pub fn create_socket(
+        &mut self,
+        protocol: SocketProtocol,
+        owner_pid: u32,
+    ) -> Result<u32, &'static str> {
         let sid = self.socket_counter;
         for slot in self.sockets.iter_mut() {
             if slot.is_none() {
@@ -145,7 +149,13 @@ impl NetworkDaemon {
         Err("Socket table full")
     }
 
-    pub fn add_firewall_rule(&mut self, protocol: Option<SocketProtocol>, port_start: u16, port_end: u16, action: FirewallAction) -> Result<u32, &'static str> {
+    pub fn add_firewall_rule(
+        &mut self,
+        protocol: Option<SocketProtocol>,
+        port_start: u16,
+        port_end: u16,
+        action: FirewallAction,
+    ) -> Result<u32, &'static str> {
         let rid = self.rule_counter;
         for slot in self.firewall_rules.iter_mut() {
             if slot.is_none() {
@@ -164,14 +174,18 @@ impl NetworkDaemon {
     }
 
     pub fn evaluate_packet(&self, protocol: SocketProtocol, dst_port: u16) -> FirewallAction {
-        for slot in self.firewall_rules.iter() {
-            if let Some(rule) = slot {
-                if rule.matches(protocol, dst_port) {
-                    return rule.action;
-                }
+        for rule in self.firewall_rules.iter().flatten() {
+            if rule.matches(protocol, dst_port) {
+                return rule.action;
             }
         }
         FirewallAction::Deny // Fail-closed by default
+    }
+}
+
+impl Default for NetworkDaemon {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -182,16 +196,24 @@ mod tests {
     #[test]
     fn test_netd_socket_and_firewall() {
         let mut netd = NetworkDaemon::new();
-        netd.add_interface(MacAddress([0x02, 0x00, 0x00, 0x00, 0x00, 0x01])).unwrap();
+        netd.add_interface(MacAddress([0x02, 0x00, 0x00, 0x00, 0x00, 0x01]))
+            .unwrap();
 
         let sock_id = netd.create_socket(SocketProtocol::Udp, 100).unwrap();
         assert_eq!(sock_id, 1);
 
         // Deny by default
-        assert_eq!(netd.evaluate_packet(SocketProtocol::Udp, 80), FirewallAction::Deny);
+        assert_eq!(
+            netd.evaluate_packet(SocketProtocol::Udp, 80),
+            FirewallAction::Deny
+        );
 
         // Add rule to allow HTTP (port 80)
-        netd.add_firewall_rule(Some(SocketProtocol::Udp), 80, 80, FirewallAction::Allow).unwrap();
-        assert_eq!(netd.evaluate_packet(SocketProtocol::Udp, 80), FirewallAction::Allow);
+        netd.add_firewall_rule(Some(SocketProtocol::Udp), 80, 80, FirewallAction::Allow)
+            .unwrap();
+        assert_eq!(
+            netd.evaluate_packet(SocketProtocol::Udp, 80),
+            FirewallAction::Allow
+        );
     }
 }

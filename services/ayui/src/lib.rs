@@ -1,7 +1,7 @@
-#![no_std]
-
 //! Bounded AYUI desktop compositor, software rendering engine, widget system,
 //! desktop shell, terminal emulator backend, and notification daemon.
+
+#![no_std]
 
 pub const MAX_WINDOWS: usize = 64;
 pub const MAX_EVENTS: usize = 128;
@@ -25,7 +25,10 @@ impl Rect {
     }
 
     pub fn contains(&self, px: i32, py: i32) -> bool {
-        px >= self.x && px < self.x + (self.width as i32) && py >= self.y && py < self.y + (self.height as i32)
+        px >= self.x
+            && px < self.x + (self.width as i32)
+            && py >= self.y
+            && py < self.y + (self.height as i32)
     }
 }
 
@@ -38,11 +41,36 @@ pub struct Color {
 }
 
 impl Color {
-    pub const BLACK: Self = Self { r: 0, g: 0, b: 0, a: 255 };
-    pub const WHITE: Self = Self { r: 255, g: 255, b: 255, a: 255 };
-    pub const RED: Self = Self { r: 255, g: 0, b: 0, a: 255 };
-    pub const BLUE: Self = Self { r: 0, g: 120, b: 215, a: 255 };
-    pub const DARK_GRAY: Self = Self { r: 32, g: 32, b: 32, a: 255 };
+    pub const BLACK: Self = Self {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 255,
+    };
+    pub const WHITE: Self = Self {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 255,
+    };
+    pub const RED: Self = Self {
+        r: 255,
+        g: 0,
+        b: 0,
+        a: 255,
+    };
+    pub const BLUE: Self = Self {
+        r: 0,
+        g: 120,
+        b: 215,
+        a: 255,
+    };
+    pub const DARK_GRAY: Self = Self {
+        r: 32,
+        g: 32,
+        b: 32,
+        a: 255,
+    };
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -171,6 +199,12 @@ impl TerminalBackend {
     }
 }
 
+impl Default for TerminalBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Notification Item.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Notification {
@@ -210,6 +244,12 @@ impl NotificationDaemon {
             }
         }
         Err(UiError::Full)
+    }
+}
+
+impl Default for NotificationDaemon {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -297,12 +337,24 @@ impl Compositor {
 
     pub fn render_to_framebuffer(&self, fb: &mut Framebuffer) {
         // Render desktop background
-        fb.fill_rect(Rect { x: 0, y: 0, width: fb.width, height: fb.height }, Color::BLUE);
+        fb.fill_rect(
+            Rect {
+                x: 0,
+                y: 0,
+                width: fb.width,
+                height: fb.height,
+            },
+            Color::BLUE,
+        );
 
         // Render visible windows
         for win in self.windows.iter().flatten() {
             if win.visible {
-                let color = if win.focused { Color::WHITE } else { win.bg_color };
+                let color = if win.focused {
+                    Color::WHITE
+                } else {
+                    win.bg_color
+                };
                 fb.fill_rect(win.bounds, color);
             }
         }

@@ -46,7 +46,12 @@ impl WlinBridge {
         }
     }
 
-    pub fn map_cross_runtime_resource(&mut self, win32_handle: u32, linux_fd: i32, capacity: usize) -> Result<u32, &'static str> {
+    pub fn map_cross_runtime_resource(
+        &mut self,
+        win32_handle: u32,
+        linux_fd: i32,
+        capacity: usize,
+    ) -> Result<u32, &'static str> {
         let rid = self.counter;
         for slot in self.shared_handles.iter_mut() {
             if slot.is_none() {
@@ -69,14 +74,18 @@ impl WlinBridge {
     }
 
     pub fn lookup_linux_fd(&self, win32_handle: u32) -> Option<i32> {
-        for slot in self.shared_handles.iter() {
-            if let Some(h) = slot {
-                if h.win32_handle == win32_handle {
-                    return Some(h.linux_fd);
-                }
+        for h in self.shared_handles.iter().flatten() {
+            if h.win32_handle == win32_handle {
+                return Some(h.linux_fd);
             }
         }
         None
+    }
+}
+
+impl Default for WlinBridge {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

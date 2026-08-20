@@ -58,13 +58,11 @@ impl Elf64Image {
         }
 
         let entry_point = u64::from_le_bytes([
-            data[24], data[25], data[26], data[27],
-            data[28], data[29], data[30], data[31],
+            data[24], data[25], data[26], data[27], data[28], data[29], data[30], data[31],
         ]);
 
         let ph_offset = u64::from_le_bytes([
-            data[32], data[33], data[34], data[35],
-            data[36], data[37], data[38], data[39],
+            data[32], data[33], data[34], data[35], data[36], data[37], data[38], data[39],
         ]) as usize;
 
         let ph_entsize = u16::from_le_bytes([data[54], data[55]]) as usize;
@@ -79,25 +77,59 @@ impl Elf64Image {
 
         for i in 0..ph_num {
             let offset = ph_offset + (i * ph_entsize);
-            let p_type = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+            let p_type = u32::from_le_bytes([
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ]);
 
             if p_type == PT_LOAD {
-                let p_flags = u32::from_le_bytes([data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]]);
+                let p_flags = u32::from_le_bytes([
+                    data[offset + 4],
+                    data[offset + 5],
+                    data[offset + 6],
+                    data[offset + 7],
+                ]);
                 let p_off = u64::from_le_bytes([
-                    data[offset + 8], data[offset + 9], data[offset + 10], data[offset + 11],
-                    data[offset + 12], data[offset + 13], data[offset + 14], data[offset + 15],
+                    data[offset + 8],
+                    data[offset + 9],
+                    data[offset + 10],
+                    data[offset + 11],
+                    data[offset + 12],
+                    data[offset + 13],
+                    data[offset + 14],
+                    data[offset + 15],
                 ]);
                 let p_vaddr = u64::from_le_bytes([
-                    data[offset + 16], data[offset + 17], data[offset + 18], data[offset + 19],
-                    data[offset + 20], data[offset + 21], data[offset + 22], data[offset + 23],
+                    data[offset + 16],
+                    data[offset + 17],
+                    data[offset + 18],
+                    data[offset + 19],
+                    data[offset + 20],
+                    data[offset + 21],
+                    data[offset + 22],
+                    data[offset + 23],
                 ]);
                 let p_filesz = u64::from_le_bytes([
-                    data[offset + 32], data[offset + 33], data[offset + 34], data[offset + 35],
-                    data[offset + 36], data[offset + 37], data[offset + 38], data[offset + 39],
+                    data[offset + 32],
+                    data[offset + 33],
+                    data[offset + 34],
+                    data[offset + 35],
+                    data[offset + 36],
+                    data[offset + 37],
+                    data[offset + 38],
+                    data[offset + 39],
                 ]);
                 let p_memsz = u64::from_le_bytes([
-                    data[offset + 40], data[offset + 41], data[offset + 42], data[offset + 43],
-                    data[offset + 44], data[offset + 45], data[offset + 46], data[offset + 47],
+                    data[offset + 40],
+                    data[offset + 41],
+                    data[offset + 42],
+                    data[offset + 43],
+                    data[offset + 44],
+                    data[offset + 45],
+                    data[offset + 46],
+                    data[offset + 47],
                 ]);
 
                 if count < MAX_LOAD_SEGMENTS {
@@ -143,13 +175,33 @@ impl LinuxFdTable {
     pub const fn new() -> Self {
         let mut fds: [Option<LinuxFdEntry>; MAX_FD] = [None; MAX_FD];
         // Standard streams: 0=stdin, 1=stdout, 2=stderr
-        fds[0] = Some(LinuxFdEntry { fd: 0, path_hash: 0, is_readable: true, is_writable: false });
-        fds[1] = Some(LinuxFdEntry { fd: 1, path_hash: 0, is_readable: false, is_writable: true });
-        fds[2] = Some(LinuxFdEntry { fd: 2, path_hash: 0, is_readable: false, is_writable: true });
+        fds[0] = Some(LinuxFdEntry {
+            fd: 0,
+            path_hash: 0,
+            is_readable: true,
+            is_writable: false,
+        });
+        fds[1] = Some(LinuxFdEntry {
+            fd: 1,
+            path_hash: 0,
+            is_readable: false,
+            is_writable: true,
+        });
+        fds[2] = Some(LinuxFdEntry {
+            fd: 2,
+            path_hash: 0,
+            is_readable: false,
+            is_writable: true,
+        });
         Self { fds }
     }
 
-    pub fn allocate_fd(&mut self, path_hash: u64, read: bool, write: bool) -> Result<i32, LinuxErrno> {
+    pub fn allocate_fd(
+        &mut self,
+        path_hash: u64,
+        read: bool,
+        write: bool,
+    ) -> Result<i32, LinuxErrno> {
         for fd in 3..MAX_FD {
             if self.fds[fd].is_none() {
                 self.fds[fd] = Some(LinuxFdEntry {
@@ -172,6 +224,12 @@ impl LinuxFdTable {
     }
 }
 
+impl Default for LinuxFdTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Linux POSIX Syscall Dispatcher.
 #[derive(Debug)]
 pub struct LinuxSyscallDispatcher {
@@ -185,14 +243,20 @@ impl LinuxSyscallDispatcher {
         }
     }
 
-    pub fn dispatch(&mut self, sys_nr: u64, arg1: u64, _arg2: u64, _arg3: u64) -> Result<u64, LinuxErrno> {
+    pub fn dispatch(
+        &mut self,
+        sys_nr: u64,
+        arg1: u64,
+        _arg2: u64,
+        _arg3: u64,
+    ) -> Result<u64, LinuxErrno> {
         match sys_nr {
-            0 => self.sys_read(arg1 as i32),   // sys_read
-            1 => self.sys_write(arg1 as i32),  // sys_write
-            2 => self.sys_open(arg1),          // sys_open
-            3 => self.sys_close(arg1 as i32),  // sys_close
-            9 => Ok(0x7FFFF7FF0000),           // sys_mmap
-            60 => Ok(0),                        // sys_exit
+            0 => self.sys_read(arg1 as i32),  // sys_read
+            1 => self.sys_write(arg1 as i32), // sys_write
+            2 => self.sys_open(arg1),         // sys_open
+            3 => self.sys_close(arg1 as i32), // sys_close
+            9 => Ok(0x7FFFF7FF0000),          // sys_mmap
+            60 => Ok(0),                      // sys_exit
             _ => Err(LinuxErrno::ENOSYS),
         }
     }
@@ -224,6 +288,12 @@ impl LinuxSyscallDispatcher {
         }
         self.fd_table.fds[fd as usize] = None;
         Ok(0)
+    }
+}
+
+impl Default for LinuxSyscallDispatcher {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

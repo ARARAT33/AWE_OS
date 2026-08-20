@@ -5,7 +5,7 @@
 
 #![no_std]
 
-pub const DEX_MAGIC: [u8; 4] = [b'd', b'e', b'x', b'\n'];
+pub const DEX_MAGIC: [u8; 4] = *b"dex\n";
 pub const APK_ZIP_MAGIC: [u8; 4] = [0x50, 0x4B, 0x03, 0x04]; // "PK\x03\x04"
 pub const MAX_BINDER_CHANNELS: usize = 32;
 pub const MAX_TRANSACTION_PAYLOAD: usize = 512;
@@ -112,18 +112,20 @@ impl AndroidBinderEmulator {
         Err(AndroidError::BinderChannelFull)
     }
 
-    pub fn transact(&self, header: BinderTransactionHeader, payload: &[u8]) -> Result<u32, AndroidError> {
+    pub fn transact(
+        &self,
+        header: BinderTransactionHeader,
+        payload: &[u8],
+    ) -> Result<u32, AndroidError> {
         if payload.len() > MAX_TRANSACTION_PAYLOAD {
             return Err(AndroidError::InvalidTransaction);
         }
 
         let mut found = false;
-        for slot in self.channels.iter() {
-            if let Some(ch) = slot {
-                if ch.handle == header.target_handle && ch.active {
-                    found = true;
-                    break;
-                }
+        for ch in self.channels.iter().flatten() {
+            if ch.handle == header.target_handle && ch.active {
+                found = true;
+                break;
             }
         }
 
@@ -132,6 +134,12 @@ impl AndroidBinderEmulator {
         }
 
         Ok(header.payload_len)
+    }
+}
+
+impl Default for AndroidBinderEmulator {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
