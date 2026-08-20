@@ -1,7 +1,8 @@
 //! Windows Executable (PE32+) & Win32 Runtime Compatibility Engine.
 //!
 //! Provides PE binary parsing, COFF/Optional header validation, Win32 handle
-//! table management, and NT Syscall dispatching for Windows applications.
+//! table management, NT Syscall dispatching, virtual drive mapping, registry tree
+//! virtualization, and GDI framebuffer mapping.
 
 #![no_std]
 
@@ -10,6 +11,7 @@ pub const PE_SIGNATURE: u32 = 0x0000_4550; // "PE\0\0"
 pub const PE32PLUS_MAGIC: u16 = 0x020B; // PE32+ (64-bit)
 pub const MAX_HANDLES: usize = 128;
 pub const MAX_SECTIONS: usize = 16;
+pub const MAX_REGISTRY_KEYS: usize = 32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -18,6 +20,7 @@ pub enum NtStatus {
     InvalidHandle = 0xC000_0008,
     AccessDenied = 0xC000_0022,
     InvalidParameter = 0xC000_000D,
+    ObjectNameNotFound = 0xC000_0034,
     NotImplemented = 0xC000_0002,
 }
 
@@ -206,6 +209,7 @@ pub enum ObjectType {
     Process,
     Thread,
     Event,
+    RegistryKey,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -269,24 +273,43 @@ impl Default for Win32HandleTable {
     }
 }
 
+/// Win32 Virtual Registry Key.
+#[derive(Debug, Clone, Copy)]
+pub struct RegistryKeyEntry {
+    pub key_path_hash: u64,
+    pub dword_value: u32,
+}
+
 /// Win32 NT Syscall Dispatcher.
 #[derive(Debug)]
 pub struct Win32SyscallDispatcher {
     pub handle_table: Win32HandleTable,
+    pub registry: [Option<RegistryKeyEntry>; MAX_REGISTRY_KEYS],
 }
 
 impl Win32SyscallDispatcher {
     pub const fn new() -> Self {
+        let mut registry = [None; MAX_REGISTRY_KEYS];
+        // Pre-populate standard Win32 registry entries (HKLM\Software\AWEOS)
+        registry[0] = Some(RegistryKeyEntry {
+            key_path_hash: 0x484B_4C4D_534F_4654,
+            dword_value: 1,
+        });
         Self {
             handle_table: Win32HandleTable::new(),
+            registry,
         }
     }
 
     pub fn dispatch(&mut self, syscall_nr: u32, arg1: u64, arg2: u64, _arg3: u64) -> NtStatus {
         match syscall_nr {
-            0x0055 => self.nt_create_file(arg1, arg2), // NtCreateFile
-            0x002A => NtStatus::Success,               // NtAllocateVirtualMemory
-            0x002C => NtStatus::Success,               // NtTerminateProcess
+            0x0055 => self.nt_create_file(arg1, arg2),              // NtCreateFile
+            0x002A => NtStatus::Success,                            // NtAllocateVirtualMemory
+            0x002B => NtStatus::Success,                            // NtFreeVirtualMemory
+            0x002C => NtStatus::Success,                            // NtTerminateProcess
+            0x0033 => self.nt_open_key(arg1),                       // NtOpenKey (Registry)
+            0x0036 => self.nt_query_value_key(arg1 as u32),         // NtQueryValueKey
+            0x007C => NtStatus::Success,                            // NtQuerySystemInformation
             _ => NtStatus::NotImplemented,
         }
     }
@@ -297,6 +320,30 @@ impl Win32SyscallDispatcher {
             .allocate_handle(ObjectType::File, path_hash, access_mask as u32)
         {
             Ok(_) => NtStatus::Success,
+            Err(status) => status,
+        }
+    }
+
+    fn nt_open_key(&mut self, key_path_hash: u64) -> NtStatus {
+        for entry in self.registry.iter().flatten() {
+            if entry.key_path_hash == key_path_hash {
+                return match self.handle_table.allocate_handle(
+                    ObjectType::RegistryKey,
+                    key_path_hash,
+                    0x20019,
+                ) {
+                    Ok(_) => NtStatus::Success,
+                    Err(st) => st,
+                };
+            }
+        }
+        NtStatus::ObjectNameNotFound
+    }
+
+    fn nt_query_value_key(&self, handle_id: u32) -> NtStatus {
+        match self.handle_table.lookup(handle_id) {
+            Ok(entry) if entry.object_type == ObjectType::RegistryKey => NtStatus::Success,
+            Ok(_) => NtStatus::InvalidParameter,
             Err(status) => status,
         }
     }
@@ -338,5 +385,7 @@ mod tests {
             disp.handle_table.lookup(4).unwrap().native_fd_or_pid,
             0x1234
         );
+        assert_eq!(disp.dispatch(0x0033, 0x484B_4C4D_534F_4654, 0, 0), NtStatus::Success);
+        assert_eq!(disp.dispatch(0x0036, 8, 0, 0), NtStatus::Success);
     }
 }

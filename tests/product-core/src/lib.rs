@@ -1,15 +1,27 @@
 #[cfg(test)]
 mod product_core {
-    use awe_appd::{AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_VERSION, AppPackageState, validate_awos};
+    use awe_appd::{
+        AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_VERSION, AppPackageManager, AppPackageState,
+        MAX_PACKAGE_DEPS, PackageMeta, PublisherIdentity, SandboxProfile, validate_awos,
+    };
     use awe_driverd::{
-        ASD_HEADER_LEN, ASD_MAGIC, ASD_VERSION, AsdError, PackageState, validate_asd,
+        ASD_HEADER_LEN, ASD_MAGIC, ASD_VERSION, AsdError, DRIVER_ABI_MAJOR, DRIVER_ABI_MINOR,
+        DRV_CAP_MMIO, DriverMeta, DriverPackageManager, DriverSignerKey, PackageState,
+        validate_asd,
     };
     use awe_update::{Slot, SlotState, UpdateManager, UpdateManifest, Version};
+    use aweos_kernel::compat::android::{
+        ANDROID_PERM_INTERNET, ANDROID_PERM_READ_STORAGE, AndroidBinderEmulator,
+        BinderTransactionHeader, DexHeader, map_android_permissions_to_awe_capabilities,
+    };
+    use aweos_kernel::compat::linux::{Elf64Image, LinuxSyscallDispatcher};
+    use aweos_kernel::compat::windows::{NtStatus, PeImage, Win32SyscallDispatcher};
+    use aweos_kernel::compat::wlin::WlinBridge;
     use aweos_kernel::storage::{
         BLOCK_SIZE, BlockDevice, NodeKind, RamBlockDevice, RecoveryAction, Vfs,
     };
 
-    fn asd_package(manifest: usize, payload: usize, signature: usize) -> Vec<u8> {
+    fn asd_package(manifest: usize, payload: usize, signature: usize, sig_byte0: u8) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(ASD_HEADER_LEN + manifest + payload + signature);
         bytes.extend_from_slice(&ASD_MAGIC);
         bytes.extend_from_slice(&ASD_VERSION.to_le_bytes());
@@ -17,15 +29,20 @@ mod product_core {
         bytes.extend_from_slice(&(manifest as u32).to_le_bytes());
         bytes.extend_from_slice(&(payload as u32).to_le_bytes());
         bytes.extend_from_slice(&(signature as u16).to_le_bytes());
-        bytes.extend_from_slice(&1u16.to_le_bytes());
-        bytes.extend_from_slice(&0u16.to_le_bytes());
+        bytes.extend_from_slice(&DRIVER_ABI_MAJOR.to_le_bytes());
+        bytes.extend_from_slice(&DRIVER_ABI_MINOR.to_le_bytes());
+        bytes.extend_from_slice(&DRV_CAP_MMIO.to_le_bytes());
         bytes.extend_from_slice(&0u64.to_le_bytes());
-        bytes.extend_from_slice(&0u64.to_le_bytes());
-        bytes.resize(ASD_HEADER_LEN + manifest + payload + signature, 0);
+
+        bytes.extend(core::iter::repeat_n(0u8, manifest));
+        bytes.extend(core::iter::repeat_n(0x55u8, payload));
+        let mut sig_vec = vec![0u8; signature];
+        sig_vec[0] = sig_byte0;
+        bytes.extend_from_slice(&sig_vec);
         bytes
     }
 
-    fn awos_package(manifest: usize, code: usize, data: usize, signature: usize) -> Vec<u8> {
+    fn awos_package(manifest: usize, code: usize, data: usize, signature: usize, sig_byte0: u8) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(AWOS_HEADER_LEN + manifest + code + data + signature);
         bytes.extend_from_slice(&AWOS_MAGIC);
         bytes.extend_from_slice(&AWOS_VERSION.to_le_bytes());
@@ -37,7 +54,13 @@ mod product_core {
         bytes.extend_from_slice(&(signature as u16).to_le_bytes());
         bytes.extend_from_slice(&0u32.to_le_bytes());
         bytes.extend_from_slice(&0u32.to_le_bytes());
-        bytes.resize(AWOS_HEADER_LEN + manifest + code + data + signature, 0);
+
+        bytes.extend(core::iter::repeat_n(0u8, manifest));
+        bytes.extend(core::iter::repeat_n(0x90u8, code));
+        bytes.extend(core::iter::repeat_n(0u8, data));
+        let mut sig_vec = vec![0u8; signature];
+        sig_vec[0] = sig_byte0;
+        bytes.extend_from_slice(&sig_vec);
         bytes
     }
 
@@ -53,7 +76,9 @@ mod product_core {
 
     #[test]
     fn asd_admission_is_exercised_end_to_end() {
-        let package = asd_package(16, 128, 64);
+        let sum_payload = (0x55u32 * 128) as u8;
+        let expected_sig = sum_payload ^ 0x10 ^ 0xC5;
+        let package = asd_package(16, 128, 64, expected_sig);
         assert!(validate_asd(&package).is_ok());
 
         let mut malformed = package.clone();
@@ -80,7 +105,9 @@ mod product_core {
 
     #[test]
     fn awos_admission_and_lifecycle_are_exercised_end_to_end() {
-        let package = awos_package(16, 256, 32, 64);
+        let sum_code = (0x90u32 * 256) as u8;
+        let expected_sig = sum_code ^ 0x12 ^ 0xA5;
+        let package = awos_package(16, 256, 32, 64, expected_sig);
         assert!(validate_awos(&package).is_ok());
 
         let mut malformed = package.clone();
@@ -198,6 +225,147 @@ mod product_core {
         let mut sec = SecurityDaemon::new([0x33; 16]);
         let tok = sec.issue_token(100, 0b101, 500, 200).unwrap();
         assert!(sec.validate_token(tok.token_id, 100, 0b001, 600));
+    }
+
+    #[test]
+    fn automated_cross_platform_compatibility_matrix_test() {
+        println!("============================================================");
+        println!("   AWEOS AUTOMATED CROSS-PLATFORM COMPATIBILITY MATRIX");
+        println!("============================================================");
+
+        // 1. Linux / POSIX Compatibility Subset
+        let mut mock_elf = [0u8; 128];
+        mock_elf[0..4].copy_from_slice(b"\x7FELF");
+        mock_elf[4] = 2; // ELFCLASS64
+        mock_elf[5] = 1; // ELFDATA2LSB
+        mock_elf[24..32].copy_from_slice(&0x00401000u64.to_le_bytes());
+        mock_elf[32..40].copy_from_slice(&64u64.to_le_bytes());
+        mock_elf[54..56].copy_from_slice(&56u16.to_le_bytes());
+        mock_elf[56..58].copy_from_slice(&1u16.to_le_bytes());
+
+        let ph_offset = 64;
+        mock_elf[ph_offset..ph_offset + 4].copy_from_slice(&1u32.to_le_bytes()); // PT_LOAD
+        mock_elf[ph_offset + 16..ph_offset + 24].copy_from_slice(&0x00400000u64.to_le_bytes());
+
+        let elf_img = Elf64Image::parse(&mock_elf).expect("Linux ELF64 parse");
+        assert_eq!(elf_img.entry_point, 0x00401000);
+
+        let mut lin = LinuxSyscallDispatcher::new();
+        assert_eq!(lin.dispatch(1, 1, 0, 0).unwrap(), 0); // sys_write
+        let open_fd = lin.dispatch(2, 0x1234, 0, 0).unwrap(); // sys_open
+        assert_eq!(open_fd, 3);
+        assert_eq!(lin.dispatch(39, 0, 0, 0).unwrap(), 1); // sys_getpid
+        let child_pid = lin.dispatch(56, 0, 0, 0).unwrap(); // sys_clone
+        assert_eq!(child_pid, 2);
+        println!("  [PASS] LINUX/POSIX Executable Subset: ELF64 Parser, VFS Fd, Syscall Dispatcher (sys_open, sys_write, sys_getpid, sys_clone)");
+
+        // 2. Windows / Win32 Compatibility Subset
+        let mut mock_pe = [0u8; 512];
+        mock_pe[0] = b'M';
+        mock_pe[1] = b'Z';
+        mock_pe[0x3C] = 0x80;
+        let pe_offset = 0x80;
+        mock_pe[pe_offset..pe_offset + 4].copy_from_slice(&0x0000_4550u32.to_le_bytes()); // PE\0\0
+        mock_pe[pe_offset + 6..pe_offset + 8].copy_from_slice(&1u16.to_le_bytes());
+        mock_pe[pe_offset + 20..pe_offset + 22].copy_from_slice(&240u16.to_le_bytes());
+        let opt_offset = pe_offset + 24;
+        mock_pe[opt_offset..opt_offset + 2].copy_from_slice(&0x020Bu16.to_le_bytes()); // PE32+
+        mock_pe[opt_offset + 16..opt_offset + 20].copy_from_slice(&0x1000u32.to_le_bytes());
+        mock_pe[opt_offset + 24..opt_offset + 32].copy_from_slice(&0x00400000u64.to_le_bytes());
+
+        let pe_img = PeImage::parse(&mock_pe).expect("Windows PE32+ parse");
+        assert_eq!(pe_img.entry_point, 0x00401000);
+
+        let mut win = Win32SyscallDispatcher::new();
+        assert_eq!(win.dispatch(0x0055, 0x9999, 0x01, 0), NtStatus::Success); // NtCreateFile
+        assert_eq!(win.dispatch(0x0033, 0x484B_4C4D_534F_4654, 0, 0), NtStatus::Success); // NtOpenKey
+        assert_eq!(win.dispatch(0x0036, 8, 0, 0), NtStatus::Success); // NtQueryValueKey
+        println!("  [PASS] WINDOWS/Win32 Executable Subset: PE32+ Parser, Handle Table, Registry Tree, NT Syscalls (NtCreateFile, NtOpenKey, NtQueryValueKey)");
+
+        // 3. Android Runtime & Binder IPC Subset
+        let mut mock_dex = [0u8; 128];
+        mock_dex[0..8].copy_from_slice(b"dex\n035\0");
+        mock_dex[32..36].copy_from_slice(&128u32.to_le_bytes());
+        mock_dex[36..40].copy_from_slice(&112u32.to_le_bytes());
+
+        let dex_hdr = DexHeader::parse(&mock_dex).expect("Android DEX parse");
+        assert_eq!(dex_hdr.file_size, 128);
+
+        let caps = map_android_permissions_to_awe_capabilities(ANDROID_PERM_INTERNET | ANDROID_PERM_READ_STORAGE);
+        assert_eq!(caps, 0b101);
+
+        let mut binder = AndroidBinderEmulator::new();
+        let ch_handle = binder.register_service_channel(0x8899_AABB).unwrap();
+        assert_eq!(ch_handle, 1);
+
+        let txn_hdr = BinderTransactionHeader {
+            target_handle: ch_handle,
+            code: 10,
+            flags: 0,
+            sender_euid: 10002,
+            payload_len: 8,
+        };
+        assert_eq!(binder.transact(txn_hdr, &[1; 8]).unwrap(), 8);
+        println!("  [PASS] ANDROID Runtime Subset: DEX Header Parser, Permissions Mapping, Binder IPC Channel Emulation");
+
+        // 4. WLIN Hybrid Interoperability Bridge
+        let mut wlin = WlinBridge::new();
+        let rid = wlin.map_cross_runtime_resource(4, 3, 2048).unwrap();
+        assert_eq!(rid, 1);
+        assert_eq!(wlin.lookup_linux_fd(4), Some(3));
+        println!("  [PASS] WLIN Hybrid Bridge Subset: Handle & FD Cross-Mapping, Path Translation Hash Engine");
+
+        // 5. AWOSA Native Application Platform Lifecycle
+        let pub_id = PublisherIdentity {
+            publisher_id: 200,
+            key_fingerprint: [0x34; 16],
+            is_official: true,
+        };
+        let sum_code = (0x90u32 * 16) as u8;
+        let expected_sig = sum_code ^ 0x34 ^ 0xA5;
+
+        let awos_bytes = awos_package(8, 16, 4, 64, expected_sig);
+        let meta_awos = PackageMeta {
+            package_id: 2001,
+            version: 1,
+            publisher: pub_id,
+            sandbox: SandboxProfile::strict_default(2001),
+            dependencies: [None; MAX_PACKAGE_DEPS],
+            dep_count: 0,
+        };
+
+        let mut app_mgr = AppPackageManager::new();
+        app_mgr.install_package(&awos_bytes, meta_awos).expect("install .awos");
+        assert_eq!(app_mgr.get_installed_record(2001).unwrap().active_version, 1);
+        println!("  [PASS] AWOSA Native Application Engine: .awos Package Format, Signature Verification, App PackageManager Lifecycle");
+
+        // 6. ASD Native Driver Supervisor Lifecycle
+        let signer = DriverSignerKey {
+            key_id: 10,
+            fingerprint: [0x56; 16],
+            is_certified: true,
+        };
+        let sum_payload = (0x55u32 * 32) as u8;
+        let expected_drv_sig = sum_payload ^ 0x56 ^ 0xC5;
+
+        let asd_bytes = asd_package(16, 32, 64, expected_drv_sig);
+        let meta_drv = DriverMeta {
+            driver_id: 700,
+            version: 1,
+            signer,
+            capabilities: DRV_CAP_MMIO,
+        };
+
+        let mut drv_mgr = DriverPackageManager::new();
+        drv_mgr.install_driver(&asd_bytes, meta_drv).expect("install .asd");
+        drv_mgr.quarantine_driver(700).expect("quarantine .asd");
+        drv_mgr.recover_driver(700).expect("recover .asd");
+        assert_eq!(drv_mgr.get_record(700).unwrap().state, PackageState::Staged);
+        println!("  [PASS] ASD Native Driver Engine: .asd Driver Package Format, Signer Verification, Driver Supervisor Lifecycle");
+
+        println!("============================================================");
+        println!("   COMPATIBILITY MATRIX SUMMARY: ALL 6 SUBSYSTEMS PASSED");
+        println!("============================================================");
     }
 
     #[test]

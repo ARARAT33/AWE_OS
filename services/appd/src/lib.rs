@@ -4,11 +4,14 @@
 //! CellKernel and every untrusted field is validated before admission.
 
 mod awos;
+pub mod catalog;
 
 pub use awos::{
     AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_MAX_CODE, AWOS_MAX_DATA, AWOS_MAX_MANIFEST,
-    AWOS_MIN_SIGNATURE, AWOS_VERSION, AppPackageState, AwosError, AwosHeader, package_transition,
-    validate_awos,
+    AWOS_MIN_SIGNATURE, AWOS_VERSION, AppPackageManager, AppPackageState, AwosError, AwosHeader,
+    InstalledAppRecord, MAX_INDEX_ENTRIES, MAX_INSTALLED_PACKAGES, MAX_PACKAGE_DEPS,
+    PackageDependency, PackageMeta, PublisherIdentity, RepositoryIndex, SandboxProfile,
+    package_parts, package_transition, validate_awos,
 };
 
 pub const AWE_APP_ABI_MAJOR: u16 = 1;
