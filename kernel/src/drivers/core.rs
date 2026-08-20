@@ -68,12 +68,8 @@ impl DriverIdentity {
 
 pub trait HardwareAbstraction {
     fn mmio_read32(&self, hw: &HardwareInfo, offset: u64) -> Result<u32, CoreError>;
-    fn mmio_write32(
-        &mut self,
-        hw: &HardwareInfo,
-        offset: u64,
-        value: u32,
-    ) -> Result<(), CoreError>;
+    fn mmio_write32(&mut self, hw: &HardwareInfo, offset: u64, value: u32)
+    -> Result<(), CoreError>;
     fn irq_ack(&mut self, hw: &HardwareInfo) -> Result<(), CoreError>;
     fn dma_submit(&mut self, hw: &HardwareInfo, bytes: u64) -> Result<(), CoreError>;
 }
@@ -122,9 +118,7 @@ impl<A: DriverAdapter> DriverSlot<A> {
                 if self.state != AdapterState::New && self.state != AdapterState::Stopped {
                     return Err(CoreError::InvalidLifecycle);
                 }
-                self.adapter
-                    .probe(hw)
-                    .map_err(|_| CoreError::ProbeFailed)?;
+                self.adapter.probe(hw).map_err(|_| CoreError::ProbeFailed)?;
                 self.state = AdapterState::Probed;
                 Ok(())
             }
@@ -132,9 +126,7 @@ impl<A: DriverAdapter> DriverSlot<A> {
                 if self.state != AdapterState::Probed && self.state != AdapterState::Stopped {
                     return Err(CoreError::InvalidLifecycle);
                 }
-                self.adapter
-                    .start(hw)
-                    .map_err(|_| CoreError::StartFailed)?;
+                self.adapter.start(hw).map_err(|_| CoreError::StartFailed)?;
                 self.state = AdapterState::Running;
                 Ok(())
             }

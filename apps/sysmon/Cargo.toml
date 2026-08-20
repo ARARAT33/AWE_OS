@@ -1,0 +1,8 @@
+[package]
+name = "awe-app-sysmon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+awe-ayui = { path = "../../services/ayui" }
+awe-nexus = { path = "../../services/nexus" }

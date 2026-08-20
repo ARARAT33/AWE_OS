@@ -21,6 +21,7 @@ impl AweCalculatorApp {
             height,
             stride: width,
             buffer,
+            gpu_accel: false,
         };
 
         fb.fill_rect(

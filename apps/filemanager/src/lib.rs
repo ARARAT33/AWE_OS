@@ -27,6 +27,7 @@ impl AweFileManagerApp {
             height,
             stride: width,
             buffer,
+            gpu_accel: false,
         };
 
         // Sidebar background

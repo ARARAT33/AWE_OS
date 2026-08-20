@@ -1,6 +1,8 @@
 #![no_std]
 
-use super::virtio::{VirtioDescriptor, VirtioError, VirtioMmioRegisters, VirtioSplitQueue, VirtioTransportState};
+use super::virtio::{
+    VirtioDescriptor, VirtioError, VirtioMmioRegisters, VirtioSplitQueue, VirtioTransportState,
+};
 
 pub const SECTOR_SIZE: u64 = 512;
 pub const MAX_REQUEST_SECTORS: u32 = 128;
@@ -11,7 +13,11 @@ pub const VIRTIO_BLK_S_UNSUPP: u8 = 2;
 pub const VIRTIO_BLK_HEADER_BYTES: u32 = 16;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum BlockOp { Read, Write, Flush }
+pub enum BlockOp {
+    Read,
+    Write,
+    Flush,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct BlockRequest {
@@ -35,7 +41,9 @@ pub enum BlockError {
 }
 
 impl From<VirtioError> for BlockError {
-    fn from(value: VirtioError) -> Self { Self::Queue(value) }
+    fn from(value: VirtioError) -> Self {
+        Self::Queue(value)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -57,8 +65,12 @@ impl VirtioBlockConfig {
 
     pub fn validate_request(&self, request: BlockRequest) -> Result<u64, BlockError> {
         self.validate()?;
-        if request.sectors == 0 { return Err(BlockError::ZeroLength); }
-        if request.sectors > MAX_REQUEST_SECTORS { return Err(BlockError::TooLarge); }
+        if request.sectors == 0 {
+            return Err(BlockError::ZeroLength);
+        }
+        if request.sectors > MAX_REQUEST_SECTORS {
+            return Err(BlockError::TooLarge);
+        }
         if matches!(request.op, BlockOp::Flush) && request.sectors != 1 {
             return Err(BlockError::InvalidCompletion);
         }
@@ -66,13 +78,23 @@ impl VirtioBlockConfig {
             Some(value) => value,
             None => return Err(BlockError::ArithmeticOverflow),
         };
-        if end > self.capacity_sectors { return Err(BlockError::OutOfRange); }
-        request.sectors.checked_mul(SECTOR_SIZE as u32).map(|v| v as u64).ok_or(BlockError::ArithmeticOverflow)
+        if end > self.capacity_sectors {
+            return Err(BlockError::OutOfRange);
+        }
+        request
+            .sectors
+            .checked_mul(SECTOR_SIZE as u32)
+            .map(|v| v as u64)
+            .ok_or(BlockError::ArithmeticOverflow)
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct BlockCompletion { pub request_id: u16, pub status: u8, pub bytes: u32 }
+pub struct BlockCompletion {
+    pub request_id: u16,
+    pub status: u8,
+    pub bytes: u32,
+}
 
 impl BlockCompletion {
     pub const fn result(self) -> Result<u32, BlockError> {
@@ -108,12 +130,19 @@ impl<const N: usize> VirtioBlockQueue<N> {
         transport: &mut VirtioTransportState,
         mmio: &mut VirtioMmioRegisters,
     ) -> Result<(), BlockError> {
-        if request_id as usize >= N { return Err(BlockError::Queue(VirtioError::InvalidQueueIndex)); }
+        if request_id as usize >= N {
+            return Err(BlockError::Queue(VirtioError::InvalidQueueIndex));
+        }
         config.validate()?;
-        if descriptor.len < VIRTIO_BLK_HEADER_BYTES || descriptor.len as u64 > MAX_REQUEST_BYTES.saturating_add(VIRTIO_BLK_HEADER_BYTES as u64) {
+        if descriptor.len < VIRTIO_BLK_HEADER_BYTES
+            || descriptor.len as u64
+                > MAX_REQUEST_BYTES.saturating_add(VIRTIO_BLK_HEADER_BYTES as u64)
+        {
             return Err(BlockError::InvalidDescriptor);
         }
-        if self.pending_status[request_id as usize].is_some() || self.pending_bytes[request_id as usize].is_some() {
+        if self.pending_status[request_id as usize].is_some()
+            || self.pending_bytes[request_id as usize].is_some()
+        {
             return Err(BlockError::Queue(VirtioError::QueueFull));
         }
         self.queue.submit_and_notify_checked(
@@ -125,16 +154,30 @@ impl<const N: usize> VirtioBlockQueue<N> {
             mmio,
         )?;
         self.pending_status[request_id as usize] = None;
-        self.pending_bytes[request_id as usize] = Some(descriptor.len.saturating_sub(VIRTIO_BLK_HEADER_BYTES));
+        self.pending_bytes[request_id as usize] =
+            Some(descriptor.len.saturating_sub(VIRTIO_BLK_HEADER_BYTES));
         Ok(())
     }
 
-    pub fn complete(&mut self, request_id: u16, bytes: u32, status: u8, mmio: &mut VirtioMmioRegisters) -> Result<(), BlockError> {
-        if request_id as usize >= N { return Err(BlockError::Queue(VirtioError::InvalidQueueIndex)); }
+    pub fn complete(
+        &mut self,
+        request_id: u16,
+        bytes: u32,
+        status: u8,
+        mmio: &mut VirtioMmioRegisters,
+    ) -> Result<(), BlockError> {
+        if request_id as usize >= N {
+            return Err(BlockError::Queue(VirtioError::InvalidQueueIndex));
+        }
         let index = request_id as usize;
         let submitted = self.pending_bytes[index].ok_or(BlockError::InvalidCompletion)?;
-        if bytes as u64 > MAX_REQUEST_BYTES || bytes > submitted { return Err(BlockError::InvalidCompletion); }
-        if !matches!(status, VIRTIO_BLK_S_OK | VIRTIO_BLK_S_IOERR | VIRTIO_BLK_S_UNSUPP) {
+        if bytes as u64 > MAX_REQUEST_BYTES || bytes > submitted {
+            return Err(BlockError::InvalidCompletion);
+        }
+        if !matches!(
+            status,
+            VIRTIO_BLK_S_OK | VIRTIO_BLK_S_IOERR | VIRTIO_BLK_S_UNSUPP
+        ) {
             return Err(BlockError::InvalidCompletion);
         }
         self.queue.complete(request_id, bytes, mmio)?;
@@ -143,12 +186,22 @@ impl<const N: usize> VirtioBlockQueue<N> {
     }
 
     pub fn poll_completion(&mut self) -> Result<Option<BlockCompletion>, BlockError> {
-        let Some(entry) = self.queue.pop_completion()? else { return Ok(None); };
+        let Some(entry) = self.queue.pop_completion()? else {
+            return Ok(None);
+        };
         let index = entry.id as usize;
-        if index >= N { return Err(BlockError::Queue(VirtioError::InvalidQueueIndex)); }
-        let status = self.pending_status[index].take().ok_or(BlockError::InvalidCompletion)?;
+        if index >= N {
+            return Err(BlockError::Queue(VirtioError::InvalidQueueIndex));
+        }
+        let status = self.pending_status[index]
+            .take()
+            .ok_or(BlockError::InvalidCompletion)?;
         self.pending_bytes[index] = None;
-        Ok(Some(BlockCompletion { request_id: entry.id, status, bytes: entry.len }))
+        Ok(Some(BlockCompletion {
+            request_id: entry.id,
+            status,
+            bytes: entry.len,
+        }))
     }
 }
 
@@ -157,17 +210,41 @@ mod tests {
     use super::*;
     use crate::drivers::virtio::{VirtioFeatures, VirtioMmioRegisters, VirtioTransportState};
 
-    const CFG: VirtioBlockConfig = VirtioBlockConfig { capacity_sectors: 4096, logical_block_size: 512 };
+    const CFG: VirtioBlockConfig = VirtioBlockConfig {
+        capacity_sectors: 4096,
+        logical_block_size: 512,
+    };
 
     #[test]
     fn accepts_bounded_request() {
-        assert_eq!(CFG.validate_request(BlockRequest { op: BlockOp::Read, sector: 8, sectors: 2 }), Ok(1024));
+        assert_eq!(
+            CFG.validate_request(BlockRequest {
+                op: BlockOp::Read,
+                sector: 8,
+                sectors: 2
+            }),
+            Ok(1024)
+        );
     }
 
     #[test]
     fn rejects_end_overflow_and_capacity_escape() {
-        assert_eq!(CFG.validate_request(BlockRequest { op: BlockOp::Read, sector: u64::MAX, sectors: 1 }), Err(BlockError::ArithmeticOverflow));
-        assert_eq!(CFG.validate_request(BlockRequest { op: BlockOp::Read, sector: 4095, sectors: 2 }), Err(BlockError::OutOfRange));
+        assert_eq!(
+            CFG.validate_request(BlockRequest {
+                op: BlockOp::Read,
+                sector: u64::MAX,
+                sectors: 1
+            }),
+            Err(BlockError::ArithmeticOverflow)
+        );
+        assert_eq!(
+            CFG.validate_request(BlockRequest {
+                op: BlockOp::Read,
+                sector: 4095,
+                sectors: 2
+            }),
+            Err(BlockError::OutOfRange)
+        );
     }
 
     #[test]
@@ -180,10 +257,48 @@ mod tests {
         transport.configure_queues(1).unwrap();
         transport.driver_ok().unwrap();
         let mut queue: VirtioBlockQueue<1> = VirtioBlockQueue::new();
-        assert_eq!(queue.submit::<32>(0, VirtioDescriptor { addr: 0x1000, len: 0, flags: 0, next: 0 }, CFG, &mut transport, &mut mmio), Err(BlockError::InvalidDescriptor));
-        assert_eq!(queue.complete(0, (MAX_REQUEST_BYTES + 1) as u32, VIRTIO_BLK_S_OK, &mut mmio), Err(BlockError::InvalidCompletion));
-        assert_eq!(BlockCompletion { request_id: 0, status: VIRTIO_BLK_S_IOERR, bytes: 0 }.result(), Err(BlockError::DeviceIoError));
-        assert_eq!(BlockCompletion { request_id: 0, status: VIRTIO_BLK_S_UNSUPP, bytes: 0 }.result(), Err(BlockError::DeviceUnsupported));
+        assert_eq!(
+            queue.submit::<32>(
+                0,
+                VirtioDescriptor {
+                    addr: 0x1000,
+                    len: 0,
+                    flags: 0,
+                    next: 0
+                },
+                CFG,
+                &mut transport,
+                &mut mmio
+            ),
+            Err(BlockError::InvalidDescriptor)
+        );
+        assert_eq!(
+            queue.complete(
+                0,
+                (MAX_REQUEST_BYTES + 1) as u32,
+                VIRTIO_BLK_S_OK,
+                &mut mmio
+            ),
+            Err(BlockError::InvalidCompletion)
+        );
+        assert_eq!(
+            BlockCompletion {
+                request_id: 0,
+                status: VIRTIO_BLK_S_IOERR,
+                bytes: 0
+            }
+            .result(),
+            Err(BlockError::DeviceIoError)
+        );
+        assert_eq!(
+            BlockCompletion {
+                request_id: 0,
+                status: VIRTIO_BLK_S_UNSUPP,
+                bytes: 0
+            }
+            .result(),
+            Err(BlockError::DeviceUnsupported)
+        );
     }
 
     #[test]
@@ -196,9 +311,29 @@ mod tests {
         transport.configure_queues(1).unwrap();
         transport.driver_ok().unwrap();
         let mut queue: VirtioBlockQueue<1> = VirtioBlockQueue::new();
-        queue.submit::<32>(0, VirtioDescriptor { addr: 0x1000, len: 528, flags: 0, next: 0 }, CFG, &mut transport, &mut mmio).unwrap();
+        queue
+            .submit::<32>(
+                0,
+                VirtioDescriptor {
+                    addr: 0x1000,
+                    len: 528,
+                    flags: 0,
+                    next: 0,
+                },
+                CFG,
+                &mut transport,
+                &mut mmio,
+            )
+            .unwrap();
         queue.complete(0, 0, VIRTIO_BLK_S_IOERR, &mut mmio).unwrap();
-        assert_eq!(queue.poll_completion().unwrap(), Some(BlockCompletion { request_id: 0, status: VIRTIO_BLK_S_IOERR, bytes: 0 }));
+        assert_eq!(
+            queue.poll_completion().unwrap(),
+            Some(BlockCompletion {
+                request_id: 0,
+                status: VIRTIO_BLK_S_IOERR,
+                bytes: 0
+            })
+        );
     }
 
     #[test]
@@ -211,9 +346,28 @@ mod tests {
         transport.configure_queues(1).unwrap();
         transport.driver_ok().unwrap();
         let mut queue: VirtioBlockQueue<1> = VirtioBlockQueue::new();
-        queue.submit::<32>(0, VirtioDescriptor { addr: 0x1000, len: 528, flags: 0, next: 0 }, CFG, &mut transport, &mut mmio).unwrap();
-        assert_eq!(queue.complete(513, 0, VIRTIO_BLK_S_OK, &mut mmio), Err(BlockError::Queue(VirtioError::InvalidQueueIndex)));
-        assert_eq!(queue.complete(0, 513, VIRTIO_BLK_S_OK, &mut mmio), Err(BlockError::InvalidCompletion));
+        queue
+            .submit::<32>(
+                0,
+                VirtioDescriptor {
+                    addr: 0x1000,
+                    len: 528,
+                    flags: 0,
+                    next: 0,
+                },
+                CFG,
+                &mut transport,
+                &mut mmio,
+            )
+            .unwrap();
+        assert_eq!(
+            queue.complete(513, 0, VIRTIO_BLK_S_OK, &mut mmio),
+            Err(BlockError::Queue(VirtioError::InvalidQueueIndex))
+        );
+        assert_eq!(
+            queue.complete(0, 513, VIRTIO_BLK_S_OK, &mut mmio),
+            Err(BlockError::InvalidCompletion)
+        );
         queue.complete(0, 512, VIRTIO_BLK_S_OK, &mut mmio).unwrap();
     }
 
@@ -227,9 +381,29 @@ mod tests {
         transport.configure_queues(1).unwrap();
         transport.driver_ok().unwrap();
         let mut queue: VirtioBlockQueue<1> = VirtioBlockQueue::new();
-        queue.submit::<32>(0, VirtioDescriptor { addr: 0x1000, len: 528, flags: 0, next: 0 }, CFG, &mut transport, &mut mmio).unwrap();
+        queue
+            .submit::<32>(
+                0,
+                VirtioDescriptor {
+                    addr: 0x1000,
+                    len: 528,
+                    flags: 0,
+                    next: 0,
+                },
+                CFG,
+                &mut transport,
+                &mut mmio,
+            )
+            .unwrap();
         assert_eq!(mmio.queue_notify, 0);
         queue.complete(0, 512, VIRTIO_BLK_S_OK, &mut mmio).unwrap();
-        assert_eq!(queue.poll_completion().unwrap(), Some(BlockCompletion { request_id: 0, status: VIRTIO_BLK_S_OK, bytes: 512 }));
+        assert_eq!(
+            queue.poll_completion().unwrap(),
+            Some(BlockCompletion {
+                request_id: 0,
+                status: VIRTIO_BLK_S_OK,
+                bytes: 512
+            })
+        );
     }
 }
