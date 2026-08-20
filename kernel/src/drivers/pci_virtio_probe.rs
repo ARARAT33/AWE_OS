@@ -79,7 +79,7 @@ impl VirtioPciProbe {
         Ok((kind, transport))
     }
 
-    const fn bar_from_pci(raw: u32, size: u64) -> Result<Bar, ProbeError> {
+    fn bar_from_pci(raw: u32, size: u64) -> Result<Bar, ProbeError> {
         if size == 0 {
             return Err(ProbeError::InvalidBar);
         }

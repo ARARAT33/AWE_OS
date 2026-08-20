@@ -22,6 +22,7 @@ pub mod boot_state;
 pub mod compat;
 pub mod continuum;
 pub mod device;
+pub mod drivers;
 pub mod engineering_contracts;
 pub mod entry;
 pub mod execution_core;

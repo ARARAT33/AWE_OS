@@ -2,6 +2,7 @@
 
 pub mod boot;
 pub mod entry;
+pub mod gdt;
 pub mod idt;
 pub mod interrupts;
 pub mod isr;
@@ -17,6 +18,35 @@ pub unsafe fn read_cr3() -> u64 {
         let value: u64;
         core::arch::asm!("mov {}, cr3", out(reg) value, options(nomem, nostack, preserves_flags));
         value
+    }
+}
+
+#[inline(always)]
+pub unsafe fn io_out32(port: u16, value: u32) {
+    unsafe {
+        core::arch::asm!("out dx, eax", in("dx") port, in("eax") value, options(nomem, nostack, preserves_flags));
+    }
+}
+
+#[inline(always)]
+pub unsafe fn io_in32(port: u16) -> u32 {
+    unsafe {
+        let value: u32;
+        core::arch::asm!("in eax, dx", in("dx") port, out("eax") value, options(nomem, nostack, preserves_flags));
+        value
+    }
+}
+
+pub fn serial_write_byte(byte: u8) {
+    unsafe {
+        while (io_in8(0x3FD) & 0x20) == 0 {}
+        io_out8(0x3F8, byte);
+    }
+}
+
+pub fn serial_write_str(s: &str) {
+    for b in s.bytes() {
+        serial_write_byte(b);
     }
 }
 

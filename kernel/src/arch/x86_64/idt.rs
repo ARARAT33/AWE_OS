@@ -50,6 +50,8 @@ impl Default for Idt {
     }
 }
 
+pub static mut IDT: Idt = Idt::new();
+
 impl Idt {
     pub const fn new() -> Self {
         Self {

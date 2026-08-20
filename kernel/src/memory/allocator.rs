@@ -81,6 +81,20 @@ unsafe impl GlobalAlloc for BumpAllocator {
     }
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {}
 }
+
+#[cfg(all(not(test), target_os = "none"))]
+#[global_allocator]
+pub static HEAP_ALLOCATOR: BumpAllocator = BumpAllocator::new();
+
+#[cfg(all(not(test), target_os = "none"))]
+static mut HEAP_MEM: [u8; 1024 * 1024] = [0; 1024 * 1024];
+
+pub fn init_kernel_heap() {
+    #[cfg(all(not(test), target_os = "none"))]
+    unsafe {
+        HEAP_ALLOCATOR.init(core::ptr::addr_of_mut!(HEAP_MEM) as usize, 1024 * 1024);
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

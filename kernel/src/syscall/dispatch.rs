@@ -41,9 +41,24 @@ impl<'a> SyscallContext<'a> {
                 ok(args[0])
             }
             Syscall::Unmap => ok(args[0]),
-            Syscall::Read | Syscall::Write => {
+            Syscall::Read => {
                 if args[1] == 0 {
                     return err(ERR_INVALID_ARGUMENT);
+                }
+                ok(args[1])
+            }
+            Syscall::Write => {
+                if args[1] == 0 {
+                    return err(ERR_INVALID_ARGUMENT);
+                }
+                let ptr = args[0] as *const u8;
+                let len = (args[1] as usize).min(4096);
+                if !ptr.is_null() {
+                    for i in 0..len {
+                        let byte = unsafe { core::ptr::read_volatile(ptr.add(i)) };
+                        #[cfg(target_arch = "x86_64")]
+                        crate::arch::x86_64::serial_write_byte(byte);
+                    }
                 }
                 ok(args[1])
             }

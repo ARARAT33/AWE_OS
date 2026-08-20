@@ -34,7 +34,7 @@ impl PciConfigAddress {
     /// The returned value is suitable for the 0xCF8/0xCFC access contract;
     /// this layer intentionally does not perform port I/O itself.
     pub const fn new(bus: u8, device: u8, function: u8, offset: u8) -> Result<Self, PciError> {
-        if device >= 32 || function >= 8 || offset & 0x03 != 0 || offset >= 0x100 {
+        if device >= 32 || function >= 8 || offset & 0x03 != 0 {
             return Err(PciError::InvalidFunction);
         }
         let raw = 0x8000_0000u32
@@ -61,6 +61,19 @@ pub enum PciError {
 /// Minimal, testable PCI config-space access contract.
 pub trait ConfigSpace {
     fn read32(&mut self, bus: u8, device: u8, function: u8, offset: u8) -> Result<u32, PciError>;
+}
+
+pub struct PortConfigSpace;
+
+impl ConfigSpace for PortConfigSpace {
+    fn read32(&mut self, bus: u8, device: u8, function: u8, offset: u8) -> Result<u32, PciError> {
+        let addr = PciConfigAddress::new(bus, device, function, offset)?;
+        unsafe {
+            use crate::arch::x86_64::{io_in32, io_out32};
+            io_out32(CONFIG_ADDRESS_PORT, addr.raw);
+            Ok(io_in32(CONFIG_DATA_PORT))
+        }
+    }
 }
 
 pub struct Enumerator<C> {
@@ -220,7 +233,6 @@ mod tests {
         assert_eq!(PciConfigAddress::new(0, 0, 0, 0x02), Err(PciError::InvalidFunction));
         assert_eq!(PciConfigAddress::new(0, 32, 0, 0), Err(PciError::InvalidFunction));
         assert_eq!(PciConfigAddress::new(0, 0, 8, 0), Err(PciError::InvalidFunction));
-        assert_eq!(PciConfigAddress::new(0, 0, 0, 0x100), Err(PciError::InvalidFunction));
     }
 
     #[test]
