@@ -45,12 +45,10 @@ impl ScriptInterpreter {
     }
 
     pub fn set_var(&mut self, hash: u64, value: i64) -> Result<(), &'static str> {
-        for slot in self.env_vars.iter_mut() {
-            if let Some(var) = slot {
-                if var.hash == hash {
-                    var.value = value;
-                    return Ok(());
-                }
+        for var in self.env_vars.iter_mut().flatten() {
+            if var.hash == hash {
+                var.value = value;
+                return Ok(());
             }
         }
         for slot in self.env_vars.iter_mut() {
@@ -64,11 +62,9 @@ impl ScriptInterpreter {
     }
 
     pub fn get_var(&self, hash: u64) -> Option<i64> {
-        for slot in self.env_vars.iter() {
-            if let Some(var) = slot {
-                if var.hash == hash {
-                    return Some(var.value);
-                }
+        for var in self.env_vars.iter().flatten() {
+            if var.hash == hash {
+                return Some(var.value);
             }
         }
         None
@@ -88,6 +84,12 @@ impl ScriptInterpreter {
             }
             _ => Err("Unsupported operator"),
         }
+    }
+}
+
+impl Default for ScriptInterpreter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

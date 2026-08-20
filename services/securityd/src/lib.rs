@@ -73,8 +73,11 @@ impl SecurityDaemon {
         if pcr_index >= MAX_PCR_REGISTERS {
             return Err("PCR index out of bounds");
         }
-        for i in 0..SHA256_DIGEST_LEN {
-            self.pcr_banks[pcr_index][i] ^= event_digest[i];
+        for (byte, &evt) in self.pcr_banks[pcr_index]
+            .iter_mut()
+            .zip(event_digest.iter())
+        {
+            *byte ^= evt;
         }
         Ok(())
     }
@@ -128,8 +131,8 @@ impl SecurityDaemon {
         let bytes_pid = subject_pid.to_le_bytes();
         let bytes_cap = capabilities.to_le_bytes();
 
-        for i in 0..16 {
-            hmac[i] = self.secret_salt[i] ^ bytes_pid[i % 4] ^ bytes_cap[i % 8];
+        for (i, slot) in hmac.iter_mut().enumerate() {
+            *slot = self.secret_salt[i] ^ bytes_pid[i % 4] ^ bytes_cap[i % 8];
         }
 
         let token = SecurityToken {
@@ -164,6 +167,12 @@ impl SecurityDaemon {
             }
         }
         false
+    }
+}
+
+impl Default for SecurityDaemon {
+    fn default() -> Self {
+        Self::new([0u8; 16])
     }
 }
 

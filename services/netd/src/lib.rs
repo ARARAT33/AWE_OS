@@ -93,10 +93,10 @@ pub struct FirewallRule {
 
 impl FirewallRule {
     pub fn matches(&self, protocol: SocketProtocol, port: u16) -> bool {
-        if let Some(p) = self.protocol {
-            if p != protocol {
-                return false;
-            }
+        if let Some(p) = self.protocol
+            && p != protocol
+        {
+            return false;
         }
         port >= self.port_range_start && port <= self.port_range_end
     }
@@ -174,14 +174,18 @@ impl NetworkDaemon {
     }
 
     pub fn evaluate_packet(&self, protocol: SocketProtocol, dst_port: u16) -> FirewallAction {
-        for slot in self.firewall_rules.iter() {
-            if let Some(rule) = slot {
-                if rule.matches(protocol, dst_port) {
-                    return rule.action;
-                }
+        for rule in self.firewall_rules.iter().flatten() {
+            if rule.matches(protocol, dst_port) {
+                return rule.action;
             }
         }
         FirewallAction::Deny // Fail-closed by default
+    }
+}
+
+impl Default for NetworkDaemon {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

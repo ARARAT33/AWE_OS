@@ -102,12 +102,10 @@ impl StorageDaemon {
 
     pub fn mount_volume(&mut self, volume_id: u32, path_hash: u64) -> Result<u32, &'static str> {
         let mut found = false;
-        for vol in self.volumes.iter() {
-            if let Some(v) = vol {
-                if v.volume_id == volume_id {
-                    found = true;
-                    break;
-                }
+        for v in self.volumes.iter().flatten() {
+            if v.volume_id == volume_id {
+                found = true;
+                break;
             }
         }
         if !found {
@@ -148,11 +146,9 @@ impl StorageDaemon {
     }
 
     pub fn cache_read(&self, volume_id: u32, lba: u64) -> Option<&[u8; BLOCK_SIZE]> {
-        for slot in self.cache.iter() {
-            if let Some(block) = slot {
-                if block.volume_id == volume_id && block.lba == lba {
-                    return Some(&block.data);
-                }
+        for block in self.cache.iter().flatten() {
+            if block.volume_id == volume_id && block.lba == lba {
+                return Some(&block.data);
             }
         }
         None
@@ -165,13 +161,11 @@ impl StorageDaemon {
         data: &[u8; BLOCK_SIZE],
     ) -> Result<(), &'static str> {
         // Update existing cache block if present
-        for slot in self.cache.iter_mut() {
-            if let Some(block) = slot {
-                if block.volume_id == volume_id && block.lba == lba {
-                    block.data = *data;
-                    block.dirty = true;
-                    return Ok(());
-                }
+        for block in self.cache.iter_mut().flatten() {
+            if block.volume_id == volume_id && block.lba == lba {
+                block.data = *data;
+                block.dirty = true;
+                return Ok(());
             }
         }
         // Insert into free slot
@@ -187,6 +181,12 @@ impl StorageDaemon {
             }
         }
         Err("Block cache full")
+    }
+}
+
+impl Default for StorageDaemon {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
