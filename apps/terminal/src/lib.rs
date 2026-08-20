@@ -21,6 +21,7 @@ impl AweTerminalApp {
             height,
             stride: width,
             buffer,
+            gpu_accel: false,
         };
 
         // Dark background

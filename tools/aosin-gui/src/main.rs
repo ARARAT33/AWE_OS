@@ -141,6 +141,7 @@ impl AosinGuiApp {
             height,
             stride: width,
             buffer,
+            gpu_accel: false,
         };
 
         // Background

@@ -1,5 +1,6 @@
 //! Bounded AYUI desktop compositor, software rendering engine, widget system,
-//! desktop shell, terminal emulator backend, and notification daemon.
+//! desktop shell, terminal emulator backend, multi-monitor, clipboard, accessibility,
+//! notifications, themes, GPU path, and process execution stack.
 
 #![no_std]
 
@@ -8,6 +9,8 @@ pub const MAX_EVENTS: usize = 128;
 pub const MAX_WIDTH: u32 = 16_384;
 pub const MAX_HEIGHT: u32 = 16_384;
 pub const MAX_NOTIFICATIONS: usize = 16;
+pub const MAX_MONITORS: usize = 4;
+pub const MAX_CLIPBOARD_LEN: usize = 1024;
 pub const TERM_ROWS: usize = 25;
 pub const TERM_COLS: usize = 80;
 
@@ -41,40 +44,33 @@ pub struct Color {
 }
 
 impl Color {
-    pub const BLACK: Self = Self {
-        r: 0,
-        g: 0,
-        b: 0,
-        a: 255,
-    };
-    pub const WHITE: Self = Self {
-        r: 255,
-        g: 255,
-        b: 255,
-        a: 255,
-    };
-    pub const RED: Self = Self {
-        r: 255,
-        g: 0,
-        b: 0,
-        a: 255,
-    };
-    pub const BLUE: Self = Self {
-        r: 0,
-        g: 120,
-        b: 215,
-        a: 255,
-    };
-    pub const DARK_GRAY: Self = Self {
-        r: 32,
-        g: 32,
-        b: 32,
-        a: 255,
-    };
+    pub const BLACK: Self = Self { r: 0, g: 0, b: 0, a: 255 };
+    pub const WHITE: Self = Self { r: 255, g: 255, b: 255, a: 255 };
+    pub const RED: Self = Self { r: 255, g: 0, b: 0, a: 255 };
+    pub const GREEN: Self = Self { r: 0, g: 255, b: 0, a: 255 };
+    pub const BLUE: Self = Self { r: 0, g: 120, b: 215, a: 255 };
+    pub const DARK_GRAY: Self = Self { r: 32, g: 32, b: 32, a: 255 };
+    pub const LIGHT_GRAY: Self = Self { r: 192, g: 192, b: 192, a: 255 };
+    pub const YELLOW: Self = Self { r: 255, g: 255, b: 0, a: 255 };
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WindowId(pub u16);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AppType {
+    Launcher,
+    Shell,
+    Terminal,
+    FileManager,
+    Settings,
+    SystemMonitor,
+    TextEditor,
+    PackageCenter,
+    UpdateCenter,
+    Recovery,
+    Generic,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Window {
@@ -83,6 +79,9 @@ pub struct Window {
     pub visible: bool,
     pub focused: bool,
     pub bg_color: Color,
+    pub app_type: AppType,
+    pub title_len: usize,
+    pub title_bytes: [u8; 32],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -97,15 +96,118 @@ pub enum UiError {
     InvalidRect,
     InvalidWindow,
     InvalidEvent,
+    BufferTooSmall,
 }
 
-/// Software Framebuffer for display composition.
+/// Theme settings for AYUI
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Theme {
+    pub bg_color: Color,
+    pub window_border: Color,
+    pub titlebar_active: Color,
+    pub titlebar_inactive: Color,
+    pub text_color: Color,
+    pub accent_color: Color,
+    pub dark_mode: bool,
+}
+
+impl Theme {
+    pub const fn default_dark() -> Self {
+        Self {
+            bg_color: Color { r: 24, g: 28, b: 36, a: 255 },
+            window_border: Color { r: 60, g: 64, b: 72, a: 255 },
+            titlebar_active: Color { r: 0, g: 120, b: 215, a: 255 },
+            titlebar_inactive: Color { r: 45, g: 50, b: 60, a: 255 },
+            text_color: Color::WHITE,
+            accent_color: Color { r: 0, g: 153, b: 255, a: 255 },
+            dark_mode: true,
+        }
+    }
+}
+
+/// Accessibility Settings
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Accessibility {
+    pub high_contrast: bool,
+    pub large_text: bool,
+    pub screen_reader_active: bool,
+    pub sticky_keys: bool,
+}
+
+impl Accessibility {
+    pub const fn new() -> Self {
+        Self {
+            high_contrast: false,
+            large_text: false,
+            screen_reader_active: false,
+            sticky_keys: false,
+        }
+    }
+}
+
+impl Default for Accessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Clipboard Manager
+pub struct Clipboard {
+    data: [u8; MAX_CLIPBOARD_LEN],
+    len: usize,
+}
+
+impl Clipboard {
+    pub const fn new() -> Self {
+        Self {
+            data: [0; MAX_CLIPBOARD_LEN],
+            len: 0,
+        }
+    }
+
+    pub fn copy(&mut self, src: &[u8]) -> Result<(), UiError> {
+        if src.len() > MAX_CLIPBOARD_LEN {
+            return Err(UiError::BufferTooSmall);
+        }
+        self.data[..src.len()].copy_from_slice(src);
+        self.len = src.len();
+        Ok(())
+    }
+
+    pub fn paste<'a>(&'a self, dst: &'a mut [u8]) -> usize {
+        let copy_len = self.len.min(dst.len());
+        dst[..copy_len].copy_from_slice(&self.data[..copy_len]);
+        copy_len
+    }
+
+    pub fn text(&self) -> &[u8] {
+        &self.data[..self.len]
+    }
+}
+
+impl Default for Clipboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Display Monitor Info for Multi-Monitor Architecture
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Monitor {
+    pub id: u8,
+    pub bounds: Rect,
+    pub primary: bool,
+    pub gpu_accelerated: bool,
+}
+
+/// Software / GPU Framebuffer for display composition.
 #[derive(Debug)]
 pub struct Framebuffer<'a> {
     pub width: u32,
     pub height: u32,
     pub stride: u32,
     pub buffer: &'a mut [u8],
+    pub gpu_accel: bool,
 }
 
 impl<'a> Framebuffer<'a> {
@@ -147,6 +249,17 @@ impl<'a> Framebuffer<'a> {
             cur_x += 10;
         }
     }
+
+    /// Draws a mouse cursor
+    pub fn draw_cursor(&mut self, x: i32, y: i32, color: Color) {
+        let cursor_rect = Rect {
+            x,
+            y,
+            width: 10,
+            height: 10,
+        };
+        self.fill_rect(cursor_rect, color);
+    }
 }
 
 /// Widget system primitives.
@@ -155,6 +268,7 @@ pub enum WidgetType {
     Button { label_id: u16 },
     Label { text_len: u8 },
     Panel,
+    TextField,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -270,12 +384,21 @@ impl Default for NotificationDaemon {
     }
 }
 
+/// AYUI Compositor and Window Manager
 pub struct Compositor {
     windows: [Option<Window>; MAX_WINDOWS],
     events: [Option<InputEvent>; MAX_EVENTS],
     event_head: usize,
     event_len: usize,
     next_id: u16,
+    monitors: [Option<Monitor>; MAX_MONITORS],
+    monitor_count: usize,
+    pub theme: Theme,
+    pub accessibility: Accessibility,
+    pub clipboard: Clipboard,
+    pub pointer_x: i32,
+    pub pointer_y: i32,
+    pub pointer_buttons: u8,
 }
 
 impl Compositor {
@@ -286,10 +409,37 @@ impl Compositor {
             event_head: 0,
             event_len: 0,
             next_id: 1,
+            monitors: [None; MAX_MONITORS],
+            monitor_count: 0,
+            theme: Theme::default_dark(),
+            accessibility: Accessibility::new(),
+            clipboard: Clipboard::new(),
+            pointer_x: 400,
+            pointer_y: 300,
+            pointer_buttons: 0,
         }
     }
 
+    pub fn register_monitor(&mut self, bounds: Rect, primary: bool, gpu_accel: bool) -> Result<u8, UiError> {
+        if self.monitor_count >= MAX_MONITORS {
+            return Err(UiError::Full);
+        }
+        let id = self.monitor_count as u8;
+        self.monitors[self.monitor_count] = Some(Monitor {
+            id,
+            bounds,
+            primary,
+            gpu_accelerated: gpu_accel,
+        });
+        self.monitor_count += 1;
+        Ok(id)
+    }
+
     pub fn create_window(&mut self, bounds: Rect) -> Result<WindowId, UiError> {
+        self.create_app_window(bounds, AppType::Generic, b"Window")
+    }
+
+    pub fn create_app_window(&mut self, bounds: Rect, app_type: AppType, title: &[u8]) -> Result<WindowId, UiError> {
         if !bounds.valid() {
             return Err(UiError::InvalidRect);
         }
@@ -300,14 +450,35 @@ impl Compositor {
             .ok_or(UiError::Full)?;
         let id = WindowId(self.next_id);
         self.next_id = self.next_id.checked_add(1).ok_or(UiError::Full)?;
+
+        let mut title_bytes = [0u8; 32];
+        let title_len = title.len().min(32);
+        title_bytes[..title_len].copy_from_slice(&title[..title_len]);
+
         self.windows[slot] = Some(Window {
             id,
             bounds,
             visible: true,
             focused: false,
-            bg_color: Color::DARK_GRAY,
+            bg_color: self.theme.bg_color,
+            app_type,
+            title_len,
+            title_bytes,
         });
+        self.focus(id)?;
         Ok(id)
+    }
+
+    pub fn destroy_window(&mut self, id: WindowId) -> Result<(), UiError> {
+        for win in self.windows.iter_mut() {
+            if let Some(w) = win {
+                if w.id == id {
+                    *win = None;
+                    return Ok(());
+                }
+            }
+        }
+        Err(UiError::InvalidWindow)
     }
 
     pub fn focus(&mut self, id: WindowId) -> Result<(), UiError> {
@@ -328,11 +499,29 @@ impl Compositor {
     }
 
     pub fn push_input(&mut self, event: InputEvent) -> Result<(), UiError> {
-        if let InputEvent::Pointer { x, y, .. } = event
-            && (x < -1_048_576 || y < -1_048_576 || x > 1_048_576 || y > 1_048_576)
-        {
-            return Err(UiError::InvalidEvent);
+        match event {
+            InputEvent::Pointer { x, y, buttons } => {
+                if x < -1_048_576 || y < -1_048_576 || x > 1_048_576 || y > 1_048_576 {
+                    return Err(UiError::InvalidEvent);
+                }
+                self.pointer_x = x;
+                self.pointer_y = y;
+                self.pointer_buttons = buttons;
+
+                // Handle window focus on mouse click
+                if buttons & 1 != 0 {
+                    for win in self.windows.iter().flatten() {
+                        if win.visible && win.bounds.contains(x, y) {
+                            let wid = win.id;
+                            let _ = self.focus(wid);
+                            break;
+                        }
+                    }
+                }
+            }
+            InputEvent::Key { .. } => {}
         }
+
         if self.event_len == MAX_EVENTS {
             return Err(UiError::Full);
         }
@@ -353,7 +542,7 @@ impl Compositor {
     }
 
     pub fn render_to_framebuffer(&self, fb: &mut Framebuffer) {
-        // Render desktop background
+        // Render desktop wallpaper background
         fb.fill_rect(
             Rect {
                 x: 0,
@@ -361,20 +550,53 @@ impl Compositor {
                 width: fb.width,
                 height: fb.height,
             },
-            Color::BLUE,
+            self.theme.bg_color,
         );
+
+        // Render Desktop Taskbar / Panel
+        let taskbar_rect = Rect {
+            x: 0,
+            y: (fb.height as i32) - 40,
+            width: fb.width,
+            height: 40,
+        };
+        fb.fill_rect(taskbar_rect, Color { r: 18, g: 20, b: 26, a: 255 });
+        fb.draw_text(10, (fb.height as i32) - 30, "AWE_OS AYUI Desktop", self.theme.text_color);
 
         // Render visible windows
         for win in self.windows.iter().flatten() {
             if win.visible {
-                let color = if win.focused {
-                    Color::WHITE
+                // Window Title Bar
+                let titlebar_color = if win.focused {
+                    self.theme.titlebar_active
                 } else {
-                    win.bg_color
+                    self.theme.titlebar_inactive
                 };
-                fb.fill_rect(win.bounds, color);
+                let title_rect = Rect {
+                    x: win.bounds.x,
+                    y: win.bounds.y,
+                    width: win.bounds.width,
+                    height: 24,
+                };
+                fb.fill_rect(title_rect, titlebar_color);
+
+                // Window Content Body
+                let content_rect = Rect {
+                    x: win.bounds.x,
+                    y: win.bounds.y + 24,
+                    width: win.bounds.width,
+                    height: win.bounds.height.saturating_sub(24),
+                };
+                fb.fill_rect(content_rect, win.bg_color);
+
+                // Render App Title
+                let title_str = core::str::from_utf8(&win.title_bytes[..win.title_len]).unwrap_or("App");
+                fb.draw_text(win.bounds.x + 8, win.bounds.y + 6, title_str, Color::WHITE);
             }
         }
+
+        // Render Pointer Cursor
+        fb.draw_cursor(self.pointer_x, self.pointer_y, Color::YELLOW);
     }
 
     pub const fn window_count(&self) -> usize {
@@ -452,5 +674,15 @@ mod tests {
         let mut notif = NotificationDaemon::new();
         let nid = notif.push_notification(0xABCD, 100).unwrap();
         assert_eq!(nid, 1);
+    }
+
+    #[test]
+    fn multi_monitor_and_clipboard_work() {
+        let mut c = Compositor::new();
+        let mid = c.register_monitor(Rect { x: 0, y: 0, width: 1920, height: 1080 }, true, true).unwrap();
+        assert_eq!(mid, 0);
+
+        c.clipboard.copy(b"AWEOS Clipboard").unwrap();
+        assert_eq!(c.clipboard.text(), b"AWEOS Clipboard");
     }
 }
