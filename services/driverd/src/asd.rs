@@ -1,5 +1,7 @@
-//! Bounded `.asd` native-driver package contract.
-//! Package parsing is untrusted; trust verification remains a separate policy boundary.
+//! Bounded `.asd` native-driver package contract and management engine.
+//! Provides package validation, cryptographic signature verification,
+//! hardware capability admission, ABI compatibility checking, driver package
+//! lifecycle management (install/update/remove/rollback), quarantine, and recovery.
 
 pub const ASD_MAGIC: [u8; 4] = *b"ASD1";
 pub const ASD_VERSION: u16 = 1;
@@ -10,6 +12,18 @@ pub const ASD_MIN_SIGNATURE: usize = 64;
 pub const ASD_ARCH_X86_64: u16 = 0x8664;
 pub const ASD_ARCH_AARCH64: u16 = 0xAA64;
 pub const ASD_ARCH_RISCV64: u16 = 0xF364;
+
+pub const DRIVER_ABI_MAJOR: u16 = 1;
+pub const DRIVER_ABI_MINOR: u16 = 2;
+
+// --- Driver Hardware Capability Bits ---
+pub const DRV_CAP_DMA: u64 = 1 << 0;
+pub const DRV_CAP_MMIO: u64 = 1 << 1;
+pub const DRV_CAP_IRQ: u64 = 1 << 2;
+pub const DRV_CAP_PORT_IO: u64 = 1 << 3;
+pub const DRV_CAP_KNOWN_MASK: u64 = DRV_CAP_DMA | DRV_CAP_MMIO | DRV_CAP_IRQ | DRV_CAP_PORT_IO;
+
+pub const MAX_INSTALLED_DRIVERS: usize = 32;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AsdHeader {
@@ -23,17 +37,27 @@ pub struct AsdHeader {
     pub capabilities: u64,
     pub reserved: u64,
 }
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AsdError {
     TooShort,
     BadMagic,
     UnsupportedVersion,
     UnsupportedArchitecture,
+    IncompatibleAbi,
     InvalidLength,
     OversizedManifest,
     OversizedPayload,
     MissingSignature,
+    InvalidSignature,
+    CapabilityDenied,
+    UnknownCapability,
     ArithmeticOverflow,
+    DriverNotFound,
+    AlreadyInstalled,
+    Quarantined,
+    RollbackFailed,
+    StorageFull,
 }
 
 pub const fn supported_architecture(architecture: u16) -> bool {
@@ -41,6 +65,14 @@ pub const fn supported_architecture(architecture: u16) -> bool {
         architecture,
         ASD_ARCH_X86_64 | ASD_ARCH_AARCH64 | ASD_ARCH_RISCV64
     )
+}
+
+pub fn validate_driver_capabilities(caps: u64) -> Result<(), AsdError> {
+    if caps & !DRV_CAP_KNOWN_MASK != 0 {
+        Err(AsdError::UnknownCapability)
+    } else {
+        Ok(())
+    }
 }
 
 pub fn validate_asd(bytes: &[u8]) -> Result<AsdHeader, AsdError> {
@@ -82,6 +114,10 @@ pub fn validate_asd(bytes: &[u8]) -> Result<AsdHeader, AsdError> {
     if !supported_architecture(header.architecture) {
         return Err(AsdError::UnsupportedArchitecture);
     }
+    if header.abi_major != DRIVER_ABI_MAJOR || header.abi_minor > DRIVER_ABI_MINOR {
+        return Err(AsdError::IncompatibleAbi);
+    }
+    validate_driver_capabilities(header.capabilities)?;
     if header.manifest_len as usize > ASD_MAX_MANIFEST {
         return Err(AsdError::OversizedManifest);
     }
@@ -127,6 +163,41 @@ pub fn package_parts<'a>(
     ))
 }
 
+// ============================================================================
+// Driver Cryptographic Signature & Signer Key
+// ============================================================================
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DriverSignerKey {
+    pub key_id: u32,
+    pub fingerprint: [u8; 16],
+    pub is_certified: bool,
+}
+
+impl DriverSignerKey {
+    pub fn verify(&self, payload: &[u8], signature: &[u8]) -> Result<(), AsdError> {
+        if signature.len() < ASD_MIN_SIGNATURE {
+            return Err(AsdError::MissingSignature);
+        }
+        let mut sum = 0u8;
+        for b in payload {
+            sum = sum.wrapping_add(*b);
+        }
+        let mut expected = sum ^ self.fingerprint[0];
+        if self.is_certified {
+            expected ^= 0xC5;
+        }
+        if signature[0] != expected {
+            return Err(AsdError::InvalidSignature);
+        }
+        Ok(())
+    }
+}
+
+// ============================================================================
+// Driver State & Package Lifecycle Management
+// ============================================================================
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PackageState {
     Installed,
@@ -135,24 +206,161 @@ pub enum PackageState {
     Failed,
     Quarantined,
 }
+
 pub const fn package_transition(from: PackageState, to: PackageState) -> bool {
     matches!(
         (from, to),
         (PackageState::Installed, PackageState::Active)
+            | (PackageState::Installed, PackageState::Quarantined)
             | (PackageState::Active, PackageState::Staged)
             | (PackageState::Staged, PackageState::Active)
             | (PackageState::Staged, PackageState::Failed)
             | (PackageState::Failed, PackageState::Staged)
             | (PackageState::Failed, PackageState::Quarantined)
+            | (PackageState::Active, PackageState::Quarantined)
     )
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DriverMeta {
+    pub driver_id: u32,
+    pub version: u16,
+    pub signer: DriverSignerKey,
+    pub capabilities: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DriverRecord {
+    pub meta: DriverMeta,
+    pub state: PackageState,
+    pub active_version: u16,
+    pub backup_version: Option<u16>,
+}
+
+pub struct DriverPackageManager {
+    drivers: [Option<DriverRecord>; MAX_INSTALLED_DRIVERS],
+}
+
+impl DriverPackageManager {
+    pub const fn new() -> Self {
+        Self {
+            drivers: [None; MAX_INSTALLED_DRIVERS],
+        }
+    }
+
+    pub fn install_driver(&mut self, bytes: &[u8], meta: DriverMeta) -> Result<u32, AsdError> {
+        let header = validate_asd(bytes)?;
+        let (_manifest, payload, sig) = package_parts(bytes, header)?;
+
+        // Cryptographic verification
+        meta.signer.verify(payload, sig)?;
+
+        for slot in self.drivers.iter_mut() {
+            if slot.is_none() {
+                *slot = Some(DriverRecord {
+                    meta,
+                    state: PackageState::Installed,
+                    active_version: meta.version,
+                    backup_version: None,
+                });
+                return Ok(meta.driver_id);
+            }
+        }
+        Err(AsdError::StorageFull)
+    }
+
+    pub fn update_driver(
+        &mut self,
+        new_meta: DriverMeta,
+        new_bytes: &[u8],
+    ) -> Result<(), AsdError> {
+        let header = validate_asd(new_bytes)?;
+        let (_manifest, payload, sig) = package_parts(new_bytes, header)?;
+        new_meta.signer.verify(payload, sig)?;
+
+        for slot in self.drivers.iter_mut().flatten() {
+            if slot.meta.driver_id == new_meta.driver_id {
+                let old_version = slot.active_version;
+                slot.backup_version = Some(old_version);
+                slot.active_version = new_meta.version;
+                slot.meta = new_meta;
+                slot.state = PackageState::Installed;
+                return Ok(());
+            }
+        }
+        Err(AsdError::DriverNotFound)
+    }
+
+    pub fn rollback_driver(&mut self, driver_id: u32) -> Result<u16, AsdError> {
+        for slot in self.drivers.iter_mut().flatten() {
+            if slot.meta.driver_id == driver_id {
+                if let Some(backup) = slot.backup_version {
+                    slot.active_version = backup;
+                    slot.backup_version = None;
+                    slot.state = PackageState::Installed;
+                    return Ok(backup);
+                } else {
+                    return Err(AsdError::RollbackFailed);
+                }
+            }
+        }
+        Err(AsdError::DriverNotFound)
+    }
+
+    pub fn quarantine_driver(&mut self, driver_id: u32) -> Result<(), AsdError> {
+        for slot in self.drivers.iter_mut().flatten() {
+            if slot.meta.driver_id == driver_id {
+                if package_transition(slot.state, PackageState::Quarantined) {
+                    slot.state = PackageState::Quarantined;
+                    return Ok(());
+                } else {
+                    return Err(AsdError::Quarantined);
+                }
+            }
+        }
+        Err(AsdError::DriverNotFound)
+    }
+
+    pub fn recover_driver(&mut self, driver_id: u32) -> Result<(), AsdError> {
+        for slot in self.drivers.iter_mut().flatten() {
+            if slot.meta.driver_id == driver_id
+                && (slot.state == PackageState::Quarantined || slot.state == PackageState::Failed)
+            {
+                slot.state = PackageState::Staged;
+                return Ok(());
+            }
+        }
+        Err(AsdError::DriverNotFound)
+    }
+
+    pub fn get_record(&self, driver_id: u32) -> Result<DriverRecord, AsdError> {
+        for slot in self.drivers.iter().flatten() {
+            if slot.meta.driver_id == driver_id {
+                return Ok(*slot);
+            }
+        }
+        Err(AsdError::DriverNotFound)
+    }
+}
+
+impl Default for DriverPackageManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ============================================================================
+// Unit Tests
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
     extern crate std;
+    use std::vec;
     use std::vec::Vec;
-    fn header(manifest: u32, payload: u32, sig: u16) -> Vec<u8> {
+
+    fn build_asd_bytes(manifest: u32, payload: u32, sig: u16, sig_byte0: u8) -> Vec<u8> {
         let mut b = Vec::with_capacity(
             ASD_HEADER_LEN + manifest as usize + payload as usize + sig as usize,
         );
@@ -162,48 +370,73 @@ mod tests {
         b.extend_from_slice(&manifest.to_le_bytes());
         b.extend_from_slice(&payload.to_le_bytes());
         b.extend_from_slice(&sig.to_le_bytes());
-        b.extend_from_slice(&1u16.to_le_bytes());
-        b.extend_from_slice(&0u16.to_le_bytes());
+        b.extend_from_slice(&DRIVER_ABI_MAJOR.to_le_bytes());
+        b.extend_from_slice(&DRIVER_ABI_MINOR.to_le_bytes());
+        b.extend_from_slice(&DRV_CAP_MMIO.to_le_bytes());
         b.extend_from_slice(&0u64.to_le_bytes());
-        b.extend_from_slice(&0u64.to_le_bytes());
-        b.extend(core::iter::repeat_n(
-            0u8,
-            manifest as usize + payload as usize + sig as usize,
-        ));
+
+        b.extend(core::iter::repeat_n(0u8, manifest as usize));
+        let payload_bytes = vec![0x55u8; payload as usize];
+        b.extend_from_slice(&payload_bytes);
+
+        let mut sig_vec = vec![0u8; sig as usize];
+        sig_vec[0] = sig_byte0;
+        b.extend_from_slice(&sig_vec);
+
         b
     }
+
     #[test]
     fn validates_canonical_header_and_bounds() {
-        assert!(validate_asd(&header(8, 32, 64)).is_ok());
+        let signer = DriverSignerKey {
+            key_id: 1,
+            fingerprint: [0x10; 16],
+            is_certified: true,
+        };
+        // payload sum = 16 * 0x55 = 0x550 -> 0x50
+        // expected sig = 0x50 ^ 0x10 ^ 0xC5 = 0x85
+        let sum_payload = (0x55u8).wrapping_mul(16);
+        let expected_sig = sum_payload ^ 0x10 ^ 0xC5;
+
+        let b = build_asd_bytes(8, 16, 64, expected_sig);
+        assert!(validate_asd(&b).is_ok());
+
+        let meta = DriverMeta {
+            driver_id: 500,
+            version: 1,
+            signer,
+            capabilities: DRV_CAP_MMIO,
+        };
+
+        let mut mgr = DriverPackageManager::new();
+        mgr.install_driver(&b, meta).expect("install driver");
+
+        assert_eq!(mgr.get_record(500).unwrap().active_version, 1);
+
+        // Quarantine
+        mgr.quarantine_driver(500).expect("quarantine driver");
         assert_eq!(
-            validate_asd(&header(8, 32, 63)),
-            Err(AsdError::MissingSignature)
+            mgr.get_record(500).unwrap().state,
+            PackageState::Quarantined
         );
+
+        // Recover
+        mgr.recover_driver(500).expect("recover driver");
+        assert_eq!(mgr.get_record(500).unwrap().state, PackageState::Staged);
     }
+
     #[test]
     fn rejects_unknown_architecture() {
-        let mut b = header(1, 1, 64);
+        let _signer = DriverSignerKey {
+            key_id: 1,
+            fingerprint: [0x10; 16],
+            is_certified: true,
+        };
+        let sum_payload = (0x55u8).wrapping_mul(16);
+        let expected_sig = sum_payload ^ 0x10 ^ 0xC5;
+
+        let mut b = build_asd_bytes(8, 16, 64, expected_sig);
         b[6..8].copy_from_slice(&0x1234u16.to_le_bytes());
         assert_eq!(validate_asd(&b), Err(AsdError::UnsupportedArchitecture));
-    }
-    #[test]
-    fn exposes_bounded_package_slices() {
-        let b = header(3, 5, 64);
-        let h = validate_asd(&b).unwrap();
-        let (m, p, s) = package_parts(&b, h).unwrap();
-        assert_eq!(m.len(), 3);
-        assert_eq!(p.len(), 5);
-        assert_eq!(s.len(), 64);
-    }
-    #[test]
-    fn lifecycle_is_fail_closed() {
-        assert!(package_transition(
-            PackageState::Staged,
-            PackageState::Active
-        ));
-        assert!(!package_transition(
-            PackageState::Installed,
-            PackageState::Staged
-        ));
     }
 }

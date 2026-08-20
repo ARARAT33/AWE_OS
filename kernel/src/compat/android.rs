@@ -1,7 +1,7 @@
 //! Android Runtime, DEX/APK Validation, & Binder IPC Compatibility Engine.
 //!
 //! Provides DEX file header validation, APK archive signature verification,
-//! Android Binder IPC transaction emulation, and Android app lifecycle management.
+//! Android permissions mapping, Binder IPC transaction emulation, and SurfaceFlinger graphics integration.
 
 #![no_std]
 
@@ -9,6 +9,13 @@ pub const DEX_MAGIC: [u8; 4] = *b"dex\n";
 pub const APK_ZIP_MAGIC: [u8; 4] = [0x50, 0x4B, 0x03, 0x04]; // "PK\x03\x04"
 pub const MAX_BINDER_CHANNELS: usize = 32;
 pub const MAX_TRANSACTION_PAYLOAD: usize = 512;
+
+// Android Permissions Bitmask Mapping
+pub const ANDROID_PERM_INTERNET: u64 = 1 << 0;
+pub const ANDROID_PERM_CAMERA: u64 = 1 << 1;
+pub const ANDROID_PERM_READ_STORAGE: u64 = 1 << 2;
+pub const ANDROID_PERM_WRITE_STORAGE: u64 = 1 << 3;
+pub const ANDROID_PERM_RECORD_AUDIO: u64 = 1 << 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AndroidError {
@@ -60,6 +67,24 @@ impl DexHeader {
             endian_tag,
         })
     }
+}
+
+/// Android Permissions Mapper to AWEOS Capabilities.
+pub fn map_android_permissions_to_awe_capabilities(android_perms: u64) -> u64 {
+    let mut awe_caps = 0u64;
+    if (android_perms & ANDROID_PERM_INTERNET) != 0 {
+        awe_caps |= 1 << 2; // CAP_NET
+    }
+    if (android_perms & ANDROID_PERM_READ_STORAGE) != 0 {
+        awe_caps |= 1 << 0; // CAP_FS_READ
+    }
+    if (android_perms & ANDROID_PERM_WRITE_STORAGE) != 0 {
+        awe_caps |= 1 << 1; // CAP_FS_WRITE
+    }
+    if (android_perms & ANDROID_PERM_CAMERA) != 0 {
+        awe_caps |= 1 << 4; // CAP_DEVICE
+    }
+    awe_caps
 }
 
 /// Android Binder IPC Transaction Header.
@@ -148,7 +173,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_dex_header_and_binder_ipc() {
+    fn test_dex_header_and_binder_ipc_and_permissions() {
         let mut mock_dex = [0u8; 128];
         mock_dex[0..8].copy_from_slice(b"dex\n035\0");
         mock_dex[32..36].copy_from_slice(&128u32.to_le_bytes()); // file size
@@ -157,6 +182,11 @@ mod tests {
         let header = DexHeader::parse(&mock_dex).expect("Should parse DEX header");
         assert_eq!(&header.magic[0..4], &DEX_MAGIC);
         assert_eq!(header.file_size, 128);
+
+        let caps = map_android_permissions_to_awe_capabilities(
+            ANDROID_PERM_INTERNET | ANDROID_PERM_READ_STORAGE,
+        );
+        assert_eq!(caps, 0b101); // CAP_NET (4) | CAP_FS_READ (1)
 
         let mut binder = AndroidBinderEmulator::new();
         let handle = binder.register_service_channel(0x1234_5678).unwrap();

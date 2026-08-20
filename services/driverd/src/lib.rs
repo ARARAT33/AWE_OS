@@ -36,8 +36,12 @@ pub use acpi::{
 pub use acpi_root::{RsdpError, RsdpInfo, parse_pointer_table, validate_rsdp};
 pub use apic::{ApicError, IoApic, IrqRoute, LocalApic};
 pub use asd::{
-    ASD_HEADER_LEN, ASD_MAGIC, ASD_MAX_MANIFEST, ASD_MAX_PAYLOAD, ASD_MIN_SIGNATURE, ASD_VERSION,
-    AsdError, AsdHeader, PackageState, package_transition, validate_asd,
+    ASD_ARCH_AARCH64, ASD_ARCH_RISCV64, ASD_ARCH_X86_64, ASD_HEADER_LEN, ASD_MAGIC,
+    ASD_MAX_MANIFEST, ASD_MAX_PAYLOAD, ASD_MIN_SIGNATURE, ASD_VERSION, AsdError, AsdHeader,
+    DRIVER_ABI_MAJOR, DRIVER_ABI_MINOR, DRV_CAP_DMA, DRV_CAP_IRQ, DRV_CAP_MMIO, DRV_CAP_PORT_IO,
+    DriverMeta, DriverPackageManager, DriverRecord, DriverSignerKey, MAX_INSTALLED_DRIVERS,
+    PackageState, package_parts, package_transition, supported_architecture, validate_asd,
+    validate_driver_capabilities,
 };
 pub use catalog::{BUILTIN_DRIVER_COUNT, BUILTIN_DRIVERS, BuiltinDriver, descriptors};
 pub use contract::{

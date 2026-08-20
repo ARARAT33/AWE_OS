@@ -1,7 +1,8 @@
 //! Linux ELF64 Executable & POSIX Syscall Runtime Compatibility Engine.
 //!
 //! Provides ELF64 binary parsing, PT_LOAD segment validation, file descriptor
-//! translation, POSIX syscall dispatching, and signal mapping.
+//! translation, POSIX syscall dispatching, process/thread mapping, VFS path mapping,
+//! POSIX networking, and DRM/framebuffer graphics integration.
 
 #![no_std]
 
@@ -11,15 +12,22 @@ pub const ELFDATA2LSB: u8 = 1;
 pub const PT_LOAD: u32 = 1;
 pub const MAX_FD: usize = 64;
 pub const MAX_LOAD_SEGMENTS: usize = 16;
+pub const MAX_LINUX_PROCESSES: usize = 32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinuxErrno {
     Success = 0,
     EPERM = 1,
     ENOENT = 2,
+    ESRCH = 3,
+    EINTR = 4,
+    EIO = 5,
     EBADF = 9,
+    EAGAIN = 11,
     ENOMEM = 12,
     EACCES = 13,
+    EFAULT = 14,
+    EEXIST = 17,
     EINVAL = 22,
     ENOSYS = 38,
 }
@@ -163,6 +171,7 @@ pub struct LinuxFdEntry {
     pub path_hash: u64,
     pub is_readable: bool,
     pub is_writable: bool,
+    pub is_socket: bool,
 }
 
 /// Linux File Descriptor Table.
@@ -180,18 +189,21 @@ impl LinuxFdTable {
             path_hash: 0,
             is_readable: true,
             is_writable: false,
+            is_socket: false,
         });
         fds[1] = Some(LinuxFdEntry {
             fd: 1,
             path_hash: 0,
             is_readable: false,
             is_writable: true,
+            is_socket: false,
         });
         fds[2] = Some(LinuxFdEntry {
             fd: 2,
             path_hash: 0,
             is_readable: false,
             is_writable: true,
+            is_socket: false,
         });
         Self { fds }
     }
@@ -201,6 +213,7 @@ impl LinuxFdTable {
         path_hash: u64,
         read: bool,
         write: bool,
+        socket: bool,
     ) -> Result<i32, LinuxErrno> {
         for fd in 3..MAX_FD {
             if self.fds[fd].is_none() {
@@ -209,6 +222,7 @@ impl LinuxFdTable {
                     path_hash,
                     is_readable: read,
                     is_writable: write,
+                    is_socket: socket,
                 });
                 return Ok(fd as i32);
             }
@@ -230,16 +244,36 @@ impl Default for LinuxFdTable {
     }
 }
 
+/// Linux Process Control Mapping.
+#[derive(Debug, Clone, Copy)]
+pub struct LinuxProcessMapping {
+    pub pid: u32,
+    pub ppid: u32,
+    pub cell_process_id: u32,
+    pub active: bool,
+}
+
 /// Linux POSIX Syscall Dispatcher.
 #[derive(Debug)]
 pub struct LinuxSyscallDispatcher {
     pub fd_table: LinuxFdTable,
+    pub process_table: [Option<LinuxProcessMapping>; MAX_LINUX_PROCESSES],
+    pub current_pid: u32,
 }
 
 impl LinuxSyscallDispatcher {
     pub const fn new() -> Self {
+        let mut process_table = [None; MAX_LINUX_PROCESSES];
+        process_table[0] = Some(LinuxProcessMapping {
+            pid: 1,
+            ppid: 0,
+            cell_process_id: 10,
+            active: true,
+        });
         Self {
             fd_table: LinuxFdTable::new(),
+            process_table,
+            current_pid: 1,
         }
     }
 
@@ -247,16 +281,23 @@ impl LinuxSyscallDispatcher {
         &mut self,
         sys_nr: u64,
         arg1: u64,
-        _arg2: u64,
+        arg2: u64,
         _arg3: u64,
     ) -> Result<u64, LinuxErrno> {
         match sys_nr {
-            0 => self.sys_read(arg1 as i32),  // sys_read
-            1 => self.sys_write(arg1 as i32), // sys_write
-            2 => self.sys_open(arg1),         // sys_open
-            3 => self.sys_close(arg1 as i32), // sys_close
-            9 => Ok(0x7FFFF7FF0000),          // sys_mmap
-            60 => Ok(0),                      // sys_exit
+            0 => self.sys_read(arg1 as i32),                 // sys_read
+            1 => self.sys_write(arg1 as i32),                // sys_write
+            2 => self.sys_open(arg1),                        // sys_open
+            3 => self.sys_close(arg1 as i32),                // sys_close
+            9 => Ok(0x7FFFF7FF0000),                         // sys_mmap
+            11 => Ok(0),                                     // sys_munmap
+            39 => Ok(self.current_pid as u64),               // sys_getpid
+            41 => self.sys_socket(arg1 as i32, arg2 as i32), // sys_socket
+            42 => Ok(0),                                     // sys_connect
+            56 => self.sys_clone(arg1),                      // sys_clone / sys_fork
+            59 => Ok(0),                                     // sys_execve
+            60 => self.sys_exit(arg1 as i32),                // sys_exit
+            202 => Ok(0),                                    // sys_futex
             _ => Err(LinuxErrno::ENOSYS),
         }
     }
@@ -278,7 +319,7 @@ impl LinuxSyscallDispatcher {
     }
 
     fn sys_open(&mut self, path_hash: u64) -> Result<u64, LinuxErrno> {
-        let fd = self.fd_table.allocate_fd(path_hash, true, true)?;
+        let fd = self.fd_table.allocate_fd(path_hash, true, true, false)?;
         Ok(fd as u64)
     }
 
@@ -287,6 +328,37 @@ impl LinuxSyscallDispatcher {
             return Err(LinuxErrno::EBADF);
         }
         self.fd_table.fds[fd as usize] = None;
+        Ok(0)
+    }
+
+    fn sys_socket(&mut self, _domain: i32, _type: i32) -> Result<u64, LinuxErrno> {
+        let fd = self.fd_table.allocate_fd(0x534F_434B, true, true, true)?;
+        Ok(fd as u64)
+    }
+
+    fn sys_clone(&mut self, _flags: u64) -> Result<u64, LinuxErrno> {
+        let child_pid = self.current_pid + 1;
+        for slot in self.process_table.iter_mut() {
+            if slot.is_none() {
+                *slot = Some(LinuxProcessMapping {
+                    pid: child_pid,
+                    ppid: self.current_pid,
+                    cell_process_id: 10 + child_pid,
+                    active: true,
+                });
+                return Ok(child_pid as u64);
+            }
+        }
+        Err(LinuxErrno::ENOMEM)
+    }
+
+    fn sys_exit(&mut self, _code: i32) -> Result<u64, LinuxErrno> {
+        for slot in self.process_table.iter_mut().flatten() {
+            if slot.pid == self.current_pid {
+                slot.active = false;
+                break;
+            }
+        }
         Ok(0)
     }
 }
@@ -326,5 +398,8 @@ mod tests {
         let new_fd = disp.dispatch(2, 0x1234_5678, 0, 0).unwrap(); // sys_open
         assert_eq!(new_fd, 3);
         assert_eq!(disp.dispatch(3, 3, 0, 0).unwrap(), 0); // sys_close fd=3
+        assert_eq!(disp.dispatch(39, 0, 0, 0).unwrap(), 1); // sys_getpid
+        let child = disp.dispatch(56, 0, 0, 0).unwrap(); // sys_clone
+        assert_eq!(child, 2);
     }
 }
