@@ -736,10 +736,7 @@ mod tests {
         assert_eq!(pm.get_info(pid).unwrap().state, ProcessState::Running);
 
         pm.terminate(pid, 0).unwrap();
-        assert_eq!(
-            pm.get_info(pid).unwrap().state,
-            ProcessState::Terminated(0)
-        );
+        assert_eq!(pm.get_info(pid).unwrap().state, ProcessState::Terminated(0));
 
         // Fail without spawn cap
         assert_eq!(
