@@ -1,7 +1,7 @@
 #![no_std]
 use super::contract::DeviceContract;
 use super::core::{
-    AdapterState, AndroidDriverAdapter, CoreError, DriverAdapter, DriverSlot, HardwareAbstraction,
+    AdapterState, AndroidDriverAdapter, CoreError, DriverSlot, HardwareAbstraction,
     HardwareInfo,
 };
 use super::universal::{DriverAbi, DriverOs};
@@ -31,7 +31,7 @@ impl<A: AndroidDriverAdapter> AndroidLayer<A> {
             return Err(CoreError::InvalidRequest);
         }
         let name = self.slot.adapter.android_interface_name();
-        if name.len() < 3 || !name.as_bytes().iter().any(|b| *b == b'/') {
+        if name.len() < 3 || !name.as_bytes().contains(&b'/') {
             return Err(CoreError::InvalidRequest);
         }
         if !id.matches(hw) || !hw.valid() || hw.irq == u32::MAX {
@@ -195,6 +195,7 @@ impl<A: AndroidDriverAdapter> AndroidLayer<A> {
         self.slot.dma_submit(hw, hal, dma_bytes, address_bits)?;
         Ok(read)
     }
+    #[allow(clippy::too_many_arguments)]
     pub fn io_cycle_contract<H: HardwareAbstraction, const M: usize>(
         &mut self,
         hw: &HardwareInfo,

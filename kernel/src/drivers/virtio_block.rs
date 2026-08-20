@@ -205,6 +205,12 @@ impl<const N: usize> VirtioBlockQueue<N> {
     }
 }
 
+impl<const N: usize> Default for VirtioBlockQueue<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

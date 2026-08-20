@@ -291,7 +291,7 @@ impl<A: DriverAdapter> DriverSlot<A> {
             return Err(CoreError::NotBound);
         }
         if bytes == 0
-            || bytes > u64::from(hw.mmio_length)
+            || bytes > hw.mmio_length
             || address_bits < 32
             || address_bits > hw.dma_bits
         {

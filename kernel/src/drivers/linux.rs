@@ -1,5 +1,5 @@
 #![no_std]
-use super::core::{CoreError, DriverAdapter, DriverSlot, HardwareInfo, LinuxDriverAdapter};
+use super::core::{CoreError, DriverSlot, HardwareInfo, LinuxDriverAdapter};
 use super::universal::{DriverAbi, DriverOs};
 pub struct LinuxLayer<A> {
     pub slot: DriverSlot<A>,
@@ -40,6 +40,7 @@ impl<A: LinuxDriverAdapter> LinuxLayer<A> {
 #[cfg(test)]
 mod tests {
     use super::super::bus::DeviceId;
+    use super::super::core::DriverAdapter;
     use super::*;
     struct Mock {
         identity_api: u32,

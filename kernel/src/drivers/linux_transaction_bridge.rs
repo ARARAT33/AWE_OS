@@ -196,3 +196,9 @@ impl<const N: usize> TransactionBridge<N> {
         Ok(())
     }
 }
+
+impl<const N: usize> Default for TransactionBridge<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

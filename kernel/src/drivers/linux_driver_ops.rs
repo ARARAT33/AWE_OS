@@ -37,14 +37,14 @@ impl DriverLifecycle {
         }
     }
     pub fn apply(&mut self, op: DriverOp, success: bool) -> Result<(), DriverOpError> {
-        let valid = match (self.state, op) {
-            (DriverState::New, DriverOp::Probe) => true,
-            (DriverState::Probed, DriverOp::Init) => true,
-            (DriverState::Initialized, DriverOp::Start) => true,
-            (DriverState::Running, DriverOp::Stop) => true,
-            (DriverState::Stopped, DriverOp::Remove) => true,
-            _ => false,
-        };
+        let valid = matches!(
+            (self.state, op),
+            (DriverState::New, DriverOp::Probe)
+                | (DriverState::Probed, DriverOp::Init)
+                | (DriverState::Initialized, DriverOp::Start)
+                | (DriverState::Running, DriverOp::Stop)
+                | (DriverState::Stopped, DriverOp::Remove)
+        );
         if !valid {
             return Err(DriverOpError::InvalidState);
         }
@@ -75,5 +75,11 @@ impl DriverLifecycle {
             DriverOp::Remove => DriverState::Stopped,
         };
         Ok(())
+    }
+}
+
+impl Default for DriverLifecycle {
+    fn default() -> Self {
+        Self::new()
     }
 }

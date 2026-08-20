@@ -107,3 +107,9 @@ impl<const N: usize> DriverSupervisor<N> {
         Err(RegistryError::NotFound)
     }
 }
+
+impl<const N: usize> Default for DriverSupervisor<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

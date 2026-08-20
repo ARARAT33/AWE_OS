@@ -79,3 +79,9 @@ impl<const N: usize, const M: usize> DriverBus<N, M> {
         self.len == N
     }
 }
+
+impl<const N: usize, const M: usize> Default for DriverBus<N, M> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

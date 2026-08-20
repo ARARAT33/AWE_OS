@@ -89,3 +89,9 @@ impl<const N: usize> DependencyMultiInstanceManager<N> {
         Ok(())
     }
 }
+
+impl<const N: usize> Default for DependencyMultiInstanceManager<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

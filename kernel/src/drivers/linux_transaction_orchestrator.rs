@@ -95,6 +95,12 @@ impl<const N: usize> ActivationOrchestrator<N> {
     }
 }
 
+impl<const N: usize> Default for ActivationOrchestrator<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

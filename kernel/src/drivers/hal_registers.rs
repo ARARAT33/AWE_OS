@@ -19,7 +19,7 @@ impl<const N: usize> RegisterBank<N> {
         }
     }
     fn index(&self, hw: &HardwareInfo, offset: u64) -> Result<usize, CoreError> {
-        if self.base != hw.mmio_base || offset % 4 != 0 || !hw.mmio_contains(offset, 4) {
+        if self.base != hw.mmio_base || !offset.is_multiple_of(4) || !hw.mmio_contains(offset, 4) {
             return Err(CoreError::MmioDenied);
         }
         let index = (offset / 4) as usize;

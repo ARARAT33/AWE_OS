@@ -82,13 +82,10 @@ impl VirtioPciCapabilities {
         }
         self.common_cfg.validate()?;
         self.notify_cfg.validate()?;
-        if self.device_cfg.is_some() {
+        if let Some(cfg) = self.device_cfg {
             // Device-specific config is optional, but when present it must be a
             // real MMIO/IO window just like the mandatory capabilities.
-            match self.device_cfg.unwrap().validate() {
-                Ok(()) => {}
-                Err(e) => return Err(e),
-            }
+            cfg.validate()?;
         }
         Ok(())
     }

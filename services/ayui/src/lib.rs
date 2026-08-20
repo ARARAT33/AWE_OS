@@ -546,11 +546,11 @@ impl Compositor {
 
     pub fn destroy_window(&mut self, id: WindowId) -> Result<(), UiError> {
         for win in self.windows.iter_mut() {
-            if let Some(w) = win {
-                if w.id == id {
-                    *win = None;
-                    return Ok(());
-                }
+            if let Some(w) = win
+                && w.id == id
+            {
+                *win = None;
+                return Ok(());
             }
         }
         Err(UiError::InvalidWindow)

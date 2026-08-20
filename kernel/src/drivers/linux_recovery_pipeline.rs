@@ -108,3 +108,9 @@ impl<const N: usize> RecoveryPipeline<N> {
         self.record_success(driver)
     }
 }
+
+impl<const N: usize> Default for RecoveryPipeline<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

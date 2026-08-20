@@ -55,6 +55,12 @@ impl DriverHealth {
         self.state = HealthState::Healthy
     }
 }
+
+impl Default for DriverHealth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct DriverHealthMonitor<const N: usize> {
     pub entries: [DriverHealth; N],
@@ -126,5 +132,11 @@ impl<const N: usize> DriverHealthMonitor<N> {
         manager
             .rollback_instance(instance)
             .map_err(|_| HealthError::InvalidIndex)
+    }
+}
+
+impl<const N: usize> Default for DriverHealthMonitor<N> {
+    fn default() -> Self {
+        Self::new()
     }
 }

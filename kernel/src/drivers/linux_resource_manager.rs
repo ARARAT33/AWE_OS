@@ -96,6 +96,12 @@ impl<const N: usize> ResourceManager<N> {
     }
 }
 
+impl<const N: usize> Default for ResourceManager<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

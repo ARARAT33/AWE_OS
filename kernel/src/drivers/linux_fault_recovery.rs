@@ -95,7 +95,7 @@ mod tests {
         r.probe_result(i, false).unwrap();
         r.recover(i, &mut m).unwrap();
         assert_eq!(r.health.entries[i].state, HealthState::Healthy);
-        assert_eq!(m.instance(0).unwrap().active, true);
+        assert!(m.instance(0).unwrap().active);
         assert_eq!(r.attempts[i], 1);
     }
 

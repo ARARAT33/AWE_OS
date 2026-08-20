@@ -152,10 +152,14 @@ impl<const N: usize> FaultImpact<N> {
         let mut i = 0;
         while i < self.affected_len / 2 {
             let j = self.affected_len - 1 - i;
-            let tmp = self.affected[i];
-            self.affected[i] = self.affected[j];
-            self.affected[j] = tmp;
+            self.affected.swap(i, j);
             i += 1
         }
+    }
+}
+
+impl<const N: usize> Default for FaultImpact<N> {
+    fn default() -> Self {
+        Self::new()
     }
 }
