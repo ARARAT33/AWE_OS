@@ -401,8 +401,8 @@ mod win32_host {
         rgb_reserved: [u8; 32],
     }
 
-    #[link(name = "user32")]
-    #[link(name = "gdi32")]
+    #[cfg_attr(target_os = "windows", link(name = "user32"))]
+    #[cfg_attr(target_os = "windows", link(name = "gdi32"))]
     unsafe extern "system" {
         fn GetModuleHandleW(lp_module_name: LPCWSTR) -> HINSTANCE;
         fn RegisterClassExW(lp_wcx: *const WNDCLASSEXW) -> WORD;

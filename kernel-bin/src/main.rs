@@ -67,7 +67,14 @@ static MULTIBOOT1_HEADER: [u32; 3] = [
 #[used]
 #[unsafe(link_section = ".multiboot2_header")]
 #[unsafe(no_mangle)]
-static MULTIBOOT2_HEADER: [u32; 4] = [0xE852_50D6, 0, 16, 0x17AD_AF1A];
+static MULTIBOOT2_HEADER: [u32; 6] = [
+    0xE852_50D6, // Magic
+    0,           // Architecture (i386/x86_64)
+    24,          // Header length
+    0x17AD_AF12, // Checksum (0 - (0xE85250D6 + 0 + 24))
+    0,           // End tag type (0), flags (0)
+    8,           // End tag size (8)
+];
 
 #[cfg(not(test))]
 #[unsafe(link_section = ".bss.boot")]

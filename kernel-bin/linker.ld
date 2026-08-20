@@ -9,10 +9,14 @@ SECTIONS
         KEEP(*(.note.Xen))
     }
 
+    .multiboot2_header : ALIGN(8)
+    {
+        KEEP(*(.multiboot2_header))
+    }
+
     .multiboot_header : ALIGN(8)
     {
         KEEP(*(.multiboot_header))
-        KEEP(*(.multiboot2_header))
     }
 
     .text : ALIGN(4K)
