@@ -35,7 +35,10 @@ pub struct TensorShape {
 
 impl TensorShape {
     pub const fn element_count(&self) -> usize {
-        (self.batch as usize) * (self.channels as usize) * (self.height as usize) * (self.width as usize)
+        (self.batch as usize)
+            * (self.channels as usize)
+            * (self.height as usize)
+            * (self.width as usize)
     }
 }
 
@@ -96,7 +99,11 @@ impl AiInferenceEngine {
         }
     }
 
-    pub fn allocate_tensor(&mut self, data_type: TensorDataType, shape: TensorShape) -> Result<u32, &'static str> {
+    pub fn allocate_tensor(
+        &mut self,
+        data_type: TensorDataType,
+        shape: TensorShape,
+    ) -> Result<u32, &'static str> {
         let element_size = match data_type {
             TensorDataType::Float32 | TensorDataType::Int32 => 4,
             TensorDataType::Float16 => 2,
@@ -120,7 +127,11 @@ impl AiInferenceEngine {
         Err("Tensor buffer pool capacity reached")
     }
 
-    pub fn execute_inference(&self, model: &ModelHeader, input_buf_id: u32) -> Result<u32, &'static str> {
+    pub fn execute_inference(
+        &self,
+        model: &ModelHeader,
+        input_buf_id: u32,
+    ) -> Result<u32, &'static str> {
         let mut found = false;
         for slot in self.tensor_buffers.iter() {
             if let Some(buf) = slot {
@@ -158,8 +169,15 @@ mod tests {
         assert_eq!(hdr.node_count, 12);
 
         let mut engine = AiInferenceEngine::new(AcceleratorType::Npu);
-        let shape = TensorShape { batch: 1, channels: 3, height: 224, width: 224 };
-        let buf_id = engine.allocate_tensor(TensorDataType::Float32, shape).unwrap();
+        let shape = TensorShape {
+            batch: 1,
+            channels: 3,
+            height: 224,
+            width: 224,
+        };
+        let buf_id = engine
+            .allocate_tensor(TensorDataType::Float32, shape)
+            .unwrap();
         assert_eq!(buf_id, 1);
 
         let executed_nodes = engine.execute_inference(&hdr, buf_id).unwrap();

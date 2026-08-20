@@ -112,7 +112,11 @@ impl AndroidBinderEmulator {
         Err(AndroidError::BinderChannelFull)
     }
 
-    pub fn transact(&self, header: BinderTransactionHeader, payload: &[u8]) -> Result<u32, AndroidError> {
+    pub fn transact(
+        &self,
+        header: BinderTransactionHeader,
+        payload: &[u8],
+    ) -> Result<u32, AndroidError> {
         if payload.len() > MAX_TRANSACTION_PAYLOAD {
             return Err(AndroidError::InvalidTransaction);
         }

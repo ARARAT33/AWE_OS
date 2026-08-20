@@ -55,7 +55,12 @@ impl ContinuumMesh {
         }
     }
 
-    pub fn discover_and_pair(&mut self, device_id: u64, dev_type: DeviceType, pk_hash: u64) -> Result<usize, &'static str> {
+    pub fn discover_and_pair(
+        &mut self,
+        device_id: u64,
+        dev_type: DeviceType,
+        pk_hash: u64,
+    ) -> Result<usize, &'static str> {
         for (idx, slot) in self.nodes.iter_mut().enumerate() {
             if slot.is_none() {
                 *slot = Some(DeviceNode {
@@ -81,7 +86,11 @@ impl ContinuumMesh {
         Ok(self.local_state.sequence_number)
     }
 
-    pub fn sync_state_from_node(&mut self, node_id: u64, state: ContinuumState) -> Result<(), &'static str> {
+    pub fn sync_state_from_node(
+        &mut self,
+        node_id: u64,
+        state: ContinuumState,
+    ) -> Result<(), &'static str> {
         let mut authenticated = false;
         for slot in self.nodes.iter() {
             if let Some(node) = slot {
@@ -111,11 +120,16 @@ mod tests {
     #[test]
     fn test_continuum_mesh_pairing_and_state_sync() {
         let mut mesh = ContinuumMesh::new();
-        let idx = mesh.discover_and_pair(0x1122_3344_5566, DeviceType::Mobile, 0xABC123).unwrap();
+        let idx = mesh
+            .discover_and_pair(0x1122_3344_5566, DeviceType::Mobile, 0xABC123)
+            .unwrap();
         assert_eq!(idx, 0);
 
         mesh.update_clipboard(b"https://aweos.org").unwrap();
-        assert_eq!(&mesh.local_state.clipboard_buffer[..17], b"https://aweos.org");
+        assert_eq!(
+            &mesh.local_state.clipboard_buffer[..17],
+            b"https://aweos.org"
+        );
 
         let remote_state = ContinuumState {
             active_task_id: 42,
@@ -124,7 +138,10 @@ mod tests {
             sequence_number: 10,
         };
 
-        assert!(mesh.sync_state_from_node(0x1122_3344_5566, remote_state).is_ok());
+        assert!(
+            mesh.sync_state_from_node(0x1122_3344_5566, remote_state)
+                .is_ok()
+        );
         assert_eq!(mesh.local_state.active_task_id, 42);
         assert_eq!(mesh.local_state.sequence_number, 10);
     }

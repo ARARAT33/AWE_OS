@@ -46,7 +46,12 @@ impl WlinBridge {
         }
     }
 
-    pub fn map_cross_runtime_resource(&mut self, win32_handle: u32, linux_fd: i32, capacity: usize) -> Result<u32, &'static str> {
+    pub fn map_cross_runtime_resource(
+        &mut self,
+        win32_handle: u32,
+        linux_fd: i32,
+        capacity: usize,
+    ) -> Result<u32, &'static str> {
         let rid = self.counter;
         for slot in self.shared_handles.iter_mut() {
             if slot.is_none() {
