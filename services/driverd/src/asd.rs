@@ -323,11 +323,11 @@ impl DriverPackageManager {
 
     pub fn recover_driver(&mut self, driver_id: u32) -> Result<(), AsdError> {
         for slot in self.drivers.iter_mut().flatten() {
-            if slot.meta.driver_id == driver_id {
-                if slot.state == PackageState::Quarantined || slot.state == PackageState::Failed {
-                    slot.state = PackageState::Staged;
-                    return Ok(());
-                }
+            if slot.meta.driver_id == driver_id
+                && (slot.state == PackageState::Quarantined || slot.state == PackageState::Failed)
+            {
+                slot.state = PackageState::Staged;
+                return Ok(());
             }
         }
         Err(AsdError::DriverNotFound)

@@ -244,12 +244,10 @@ impl RepositoryIndex {
     }
 
     pub fn register(&mut self, meta: PackageMeta) -> Result<(), AwosError> {
-        for slot in self.entries.iter_mut() {
-            if let Some(existing) = slot {
-                if existing.package_id == meta.package_id && existing.version == meta.version {
-                    *existing = meta;
-                    return Ok(());
-                }
+        for existing in self.entries.iter_mut().flatten() {
+            if existing.package_id == meta.package_id && existing.version == meta.version {
+                *existing = meta;
+                return Ok(());
             }
         }
         for slot in self.entries.iter_mut() {
@@ -402,14 +400,14 @@ impl AppPackageManager {
 
     pub fn uninstall_package(&mut self, package_id: u64) -> Result<(), AwosError> {
         for slot in self.installed.iter_mut() {
-            if let Some(rec) = slot {
-                if rec.meta.package_id == package_id {
-                    if !package_transition(rec.state, AppPackageState::Removed) {
-                        return Err(AwosError::SandboxViolation);
-                    }
-                    *slot = None;
-                    return Ok(());
+            if let Some(rec) = slot
+                && rec.meta.package_id == package_id
+            {
+                if !package_transition(rec.state, AppPackageState::Removed) {
+                    return Err(AwosError::SandboxViolation);
                 }
+                *slot = None;
+                return Ok(());
             }
         }
         Err(AwosError::PackageNotFound)

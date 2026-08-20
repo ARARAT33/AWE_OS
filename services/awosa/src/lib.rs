@@ -335,11 +335,11 @@ impl MemoryManager {
 
     pub fn free(&mut self, virt_addr: u64) -> Result<(), RuntimeError> {
         for slot in self.regions.iter_mut() {
-            if let Some(reg) = slot {
-                if reg.virt_addr == virt_addr {
-                    *slot = None;
-                    return Ok(());
-                }
+            if let Some(reg) = slot
+                && reg.virt_addr == virt_addr
+            {
+                *slot = None;
+                return Ok(());
             }
         }
         Err(RuntimeError::NotFound)
@@ -736,7 +736,10 @@ mod tests {
         assert_eq!(pm.get_info(pid).unwrap().state, ProcessState::Running);
 
         pm.terminate(pid, 0).unwrap();
-        assert_eq!(pm.get_info(pid).unwrap().state, ProcessState::Terminated(0));
+        assert_eq!(
+            pm.get_info(pid).unwrap().state,
+            ProcessState::Terminated(0)
+        );
 
         // Fail without spawn cap
         assert_eq!(
