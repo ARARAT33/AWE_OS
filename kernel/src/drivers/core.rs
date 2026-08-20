@@ -290,11 +290,7 @@ impl<A: DriverAdapter> DriverSlot<A> {
         if self.state != AdapterState::Running {
             return Err(CoreError::NotBound);
         }
-        if bytes == 0
-            || bytes > hw.mmio_length
-            || address_bits < 32
-            || address_bits > hw.dma_bits
-        {
+        if bytes == 0 || bytes > hw.mmio_length || address_bits < 32 || address_bits > hw.dma_bits {
             return Err(CoreError::DmaDenied);
         }
         hal.dma_submit(hw, bytes)

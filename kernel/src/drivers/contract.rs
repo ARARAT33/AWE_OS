@@ -147,9 +147,10 @@ impl<const M: usize> DeviceContract<M> {
                 let mut j = 0;
                 while j < i {
                     if let Some(other) = self.mmio[j]
-                        && r.overlaps(&other) {
-                            return false;
-                        }
+                        && r.overlaps(&other)
+                    {
+                        return false;
+                    }
                     j += 1;
                 }
             }
@@ -161,9 +162,10 @@ impl<const M: usize> DeviceContract<M> {
         let mut i = 0;
         while i < M {
             if let Some(r) = self.mmio[i]
-                && r.contains(address) {
-                    return true;
-                }
+                && r.contains(address)
+            {
+                return true;
+            }
             i += 1;
         }
         false
@@ -172,9 +174,10 @@ impl<const M: usize> DeviceContract<M> {
         let mut i = 0;
         while i < M {
             if let Some(r) = self.mmio[i]
-                && r.contains_range(base, length) {
-                    return true;
-                }
+                && r.contains_range(base, length)
+            {
+                return true;
+            }
             i += 1;
         }
         false

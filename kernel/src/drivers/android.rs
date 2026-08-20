@@ -1,8 +1,7 @@
 #![no_std]
 use super::contract::DeviceContract;
 use super::core::{
-    AdapterState, AndroidDriverAdapter, CoreError, DriverSlot, HardwareAbstraction,
-    HardwareInfo,
+    AdapterState, AndroidDriverAdapter, CoreError, DriverSlot, HardwareAbstraction, HardwareInfo,
 };
 use super::universal::{DriverAbi, DriverOs};
 pub struct AndroidLayer<A> {

@@ -1,8 +1,7 @@
 #![no_std]
 use super::contract::DeviceContract;
 use super::core::{
-    AdapterState, CoreError, DriverSlot, HardwareAbstraction, HardwareInfo,
-    WindowsDriverAdapter,
+    AdapterState, CoreError, DriverSlot, HardwareAbstraction, HardwareInfo, WindowsDriverAdapter,
 };
 use super::universal::{DriverAbi, DriverOs};
 pub struct WindowsLayer<A> {

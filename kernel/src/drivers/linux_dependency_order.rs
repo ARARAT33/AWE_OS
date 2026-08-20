@@ -18,9 +18,7 @@ pub fn topological_order(
         return Err(OrderError::OutputFull);
     }
     for dep in deps {
-        if !nodes.contains(&dep.driver_hash)
-            || !nodes.contains(&dep.required_hash)
-        {
+        if !nodes.contains(&dep.driver_hash) || !nodes.contains(&dep.required_hash) {
             return Err(OrderError::MissingNode);
         }
     }
