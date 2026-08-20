@@ -1,0 +1,56 @@
+name: AOSIN Cross-Platform Installer Builders
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-installers:
+    name: Build AOSIN Installers (Windows & Linux)
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: aosin-installer-linux
+            binary_path: target/x86_64-unknown-linux-gnu/release/awe
+          - os: ubuntu-latest
+            target: x86_64-pc-windows-gnu
+            artifact_name: aosin-installer-windows.exe
+            binary_path: target/x86_64-pc-windows-gnu/release/awe.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        run: |
+          rustup target add ${{ matrix.target }}
+
+      - name: Install MinGW GCC for Windows target (if GNU)
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
+
+      - name: Build AOSIN Installer Binary
+        run: cargo build --release -p awe-cli --target ${{ matrix.target }}
+
+      - name: Package Installer
+        run: |
+          mkdir -p dist/installers
+          cp ${{ matrix.binary_path }} dist/installers/${{ matrix.artifact_name }}
+
+      - name: Upload AOSIN Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/installers/${{ matrix.artifact_name }}
+          if-no-files-found: error
