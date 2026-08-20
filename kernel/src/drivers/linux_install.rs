@@ -4,9 +4,9 @@ use super::bus::DeviceId;
 use super::contract::HardwareResource;
 use super::linux_package::{LinuxPackageError, LinuxPackageHeader, prepare_probe};
 use super::linux_resolver::{LinuxCandidate, ResolveError, resolve};
-use super::linux_runtime::LinuxRuntime;
 #[cfg(test)]
 use super::linux_runtime::LinuxDriverDescriptor;
+use super::linux_runtime::LinuxRuntime;
 use super::universal::DriverRequest;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

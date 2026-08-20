@@ -58,10 +58,12 @@ impl<const N: usize> ExperienceDb<N> {
         let mut i = 0;
         while i < N {
             if let Some(ref mut e) = self.entries[i]
-                && e.device == device && e.driver_id == driver_id {
-                    e.record(outcome);
-                    return true;
-                }
+                && e.device == device
+                && e.driver_id == driver_id
+            {
+                e.record(outcome);
+                return true;
+            }
             i += 1;
         }
         let mut j = 0;
@@ -80,9 +82,11 @@ impl<const N: usize> ExperienceDb<N> {
         let mut i = 0;
         while i < N {
             if let Some(e) = self.entries[i]
-                && e.device == device && e.driver_id == driver_id {
-                    return Some(e);
-                }
+                && e.device == device
+                && e.driver_id == driver_id
+            {
+                return Some(e);
+            }
             i += 1;
         }
         None

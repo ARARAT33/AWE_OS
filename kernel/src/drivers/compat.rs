@@ -61,9 +61,12 @@ impl<const N: usize> CompatibilityRegistry<N> {
         let mut i = 0;
         while i < N {
             if let Some(m) = self.entries[i]
-                && m.vendor == vendor && m.device == device && m.class_code == class_code {
-                    return Some(m);
-                }
+                && m.vendor == vendor
+                && m.device == device
+                && m.class_code == class_code
+            {
+                return Some(m);
+            }
             i += 1;
         }
         None
