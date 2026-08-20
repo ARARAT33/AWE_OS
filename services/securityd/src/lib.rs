@@ -65,7 +65,11 @@ impl SecurityDaemon {
         }
     }
 
-    pub fn extend_pcr(&mut self, pcr_index: usize, event_digest: &[u8; SHA256_DIGEST_LEN]) -> Result<(), &'static str> {
+    pub fn extend_pcr(
+        &mut self,
+        pcr_index: usize,
+        event_digest: &[u8; SHA256_DIGEST_LEN],
+    ) -> Result<(), &'static str> {
         if pcr_index >= MAX_PCR_REGISTERS {
             return Err("PCR index out of bounds");
         }
@@ -112,7 +116,13 @@ impl SecurityDaemon {
         Err("Key not found")
     }
 
-    pub fn issue_token(&mut self, subject_pid: u32, capabilities: u64, now: u64, ttl: u64) -> Result<SecurityToken, &'static str> {
+    pub fn issue_token(
+        &mut self,
+        subject_pid: u32,
+        capabilities: u64,
+        now: u64,
+        ttl: u64,
+    ) -> Result<SecurityToken, &'static str> {
         let tid = self.token_counter;
         let expires_at = now + ttl;
 
@@ -143,7 +153,13 @@ impl SecurityDaemon {
         Err("Capability token vault full")
     }
 
-    pub fn validate_token(&self, token_id: u64, subject_pid: u32, required_cap: u64, now: u64) -> bool {
+    pub fn validate_token(
+        &self,
+        token_id: u64,
+        subject_pid: u32,
+        required_cap: u64,
+        now: u64,
+    ) -> bool {
         for slot in self.tokens.iter() {
             if let Some(t) = slot {
                 if t.token_id == token_id && t.subject_pid == subject_pid {

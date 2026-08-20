@@ -156,15 +156,19 @@ mod product_core {
 
     #[test]
     fn full_awe_nexus_services_and_compatibility_integration() {
-        use awe_nexus::{NexusHeader, NexusMessage, NexusRouter, ServiceEndpoint};
         use awe_netd::{NetworkDaemon, SocketProtocol};
-        use awe_storaged::{StorageDaemon, VolumeType};
+        use awe_nexus::{NexusHeader, NexusMessage, NexusRouter, ServiceEndpoint};
         use awe_securityd::SecurityDaemon;
+        use awe_storaged::{StorageDaemon, VolumeType};
 
         // 1. AWE-Nexus Router
         let mut router = NexusRouter::new();
-        router.register_service(ServiceEndpoint::new(1, 0b111)).unwrap();
-        router.register_service(ServiceEndpoint::new(2, 0b111)).unwrap();
+        router
+            .register_service(ServiceEndpoint::new(1, 0b111))
+            .unwrap();
+        router
+            .register_service(ServiceEndpoint::new(2, 0b111))
+            .unwrap();
 
         let hdr = NexusHeader {
             sender_id: 1,
@@ -185,7 +189,9 @@ mod product_core {
 
         // 3. Storaged
         let mut storaged = StorageDaemon::new();
-        let vol = storaged.register_volume(VolumeType::Ramdisk, 1024, 0, false).unwrap();
+        let vol = storaged
+            .register_volume(VolumeType::Ramdisk, 1024, 0, false)
+            .unwrap();
         assert_eq!(vol, 1);
 
         // 4. Securityd
@@ -196,9 +202,9 @@ mod product_core {
 
     #[test]
     fn kernel_compatibility_runtimes_end_to_end() {
-        use aweos_kernel::compat::windows::{Win32SyscallDispatcher, NtStatus};
-        use aweos_kernel::compat::linux::LinuxSyscallDispatcher;
         use aweos_kernel::compat::android::AndroidBinderEmulator;
+        use aweos_kernel::compat::linux::LinuxSyscallDispatcher;
+        use aweos_kernel::compat::windows::{NtStatus, Win32SyscallDispatcher};
         use aweos_kernel::compat::wlin::WlinBridge;
 
         // Windows

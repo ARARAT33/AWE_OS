@@ -81,7 +81,8 @@ impl PeImage {
             return Err(NtStatus::InvalidParameter);
         }
 
-        let e_lfanew = u32::from_le_bytes([data[0x3C], data[0x3D], data[0x3E], data[0x3F]]) as usize;
+        let e_lfanew =
+            u32::from_le_bytes([data[0x3C], data[0x3D], data[0x3E], data[0x3F]]) as usize;
         if e_lfanew + 24 > data.len() {
             return Err(NtStatus::InvalidParameter);
         }
@@ -146,11 +147,36 @@ impl PeImage {
             let mut name = [0u8; 8];
             name.copy_from_slice(&data[offset..offset + 8]);
 
-            let virt_size = u32::from_le_bytes([data[offset + 8], data[offset + 9], data[offset + 10], data[offset + 11]]);
-            let virt_addr = u32::from_le_bytes([data[offset + 12], data[offset + 13], data[offset + 14], data[offset + 15]]);
-            let raw_size = u32::from_le_bytes([data[offset + 16], data[offset + 17], data[offset + 18], data[offset + 19]]);
-            let raw_ptr = u32::from_le_bytes([data[offset + 20], data[offset + 21], data[offset + 22], data[offset + 23]]);
-            let characteristics = u32::from_le_bytes([data[offset + 36], data[offset + 37], data[offset + 38], data[offset + 39]]);
+            let virt_size = u32::from_le_bytes([
+                data[offset + 8],
+                data[offset + 9],
+                data[offset + 10],
+                data[offset + 11],
+            ]);
+            let virt_addr = u32::from_le_bytes([
+                data[offset + 12],
+                data[offset + 13],
+                data[offset + 14],
+                data[offset + 15],
+            ]);
+            let raw_size = u32::from_le_bytes([
+                data[offset + 16],
+                data[offset + 17],
+                data[offset + 18],
+                data[offset + 19],
+            ]);
+            let raw_ptr = u32::from_le_bytes([
+                data[offset + 20],
+                data[offset + 21],
+                data[offset + 22],
+                data[offset + 23],
+            ]);
+            let characteristics = u32::from_le_bytes([
+                data[offset + 36],
+                data[offset + 37],
+                data[offset + 38],
+                data[offset + 39],
+            ]);
 
             sections[i] = Some(SectionHeader {
                 name,
@@ -204,7 +230,12 @@ impl Win32HandleTable {
         }
     }
 
-    pub fn allocate_handle(&mut self, obj_type: ObjectType, native_id: u64, access_mask: u32) -> Result<u32, NtStatus> {
+    pub fn allocate_handle(
+        &mut self,
+        obj_type: ObjectType,
+        native_id: u64,
+        access_mask: u32,
+    ) -> Result<u32, NtStatus> {
         let h = self.next_handle;
         for slot in self.handles.iter_mut() {
             if slot.is_none() {
@@ -249,14 +280,17 @@ impl Win32SyscallDispatcher {
     pub fn dispatch(&mut self, syscall_nr: u32, arg1: u64, arg2: u64, _arg3: u64) -> NtStatus {
         match syscall_nr {
             0x0055 => self.nt_create_file(arg1, arg2), // NtCreateFile
-            0x002A => NtStatus::Success,                // NtAllocateVirtualMemory
-            0x002C => NtStatus::Success,                // NtTerminateProcess
+            0x002A => NtStatus::Success,               // NtAllocateVirtualMemory
+            0x002C => NtStatus::Success,               // NtTerminateProcess
             _ => NtStatus::NotImplemented,
         }
     }
 
     fn nt_create_file(&mut self, path_hash: u64, access_mask: u64) -> NtStatus {
-        match self.handle_table.allocate_handle(ObjectType::File, path_hash, access_mask as u32) {
+        match self
+            .handle_table
+            .allocate_handle(ObjectType::File, path_hash, access_mask as u32)
+        {
             Ok(_) => NtStatus::Success,
             Err(status) => status,
         }
@@ -289,6 +323,9 @@ mod tests {
 
         let mut disp = Win32SyscallDispatcher::new();
         assert_eq!(disp.dispatch(0x0055, 0x1234, 0x01, 0), NtStatus::Success);
-        assert_eq!(disp.handle_table.lookup(4).unwrap().native_fd_or_pid, 0x1234);
+        assert_eq!(
+            disp.handle_table.lookup(4).unwrap().native_fd_or_pid,
+            0x1234
+        );
     }
 }

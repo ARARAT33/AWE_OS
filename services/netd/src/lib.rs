@@ -133,7 +133,11 @@ impl NetworkDaemon {
         Err("No free interface slots")
     }
 
-    pub fn create_socket(&mut self, protocol: SocketProtocol, owner_pid: u32) -> Result<u32, &'static str> {
+    pub fn create_socket(
+        &mut self,
+        protocol: SocketProtocol,
+        owner_pid: u32,
+    ) -> Result<u32, &'static str> {
         let sid = self.socket_counter;
         for slot in self.sockets.iter_mut() {
             if slot.is_none() {
@@ -145,7 +149,13 @@ impl NetworkDaemon {
         Err("Socket table full")
     }
 
-    pub fn add_firewall_rule(&mut self, protocol: Option<SocketProtocol>, port_start: u16, port_end: u16, action: FirewallAction) -> Result<u32, &'static str> {
+    pub fn add_firewall_rule(
+        &mut self,
+        protocol: Option<SocketProtocol>,
+        port_start: u16,
+        port_end: u16,
+        action: FirewallAction,
+    ) -> Result<u32, &'static str> {
         let rid = self.rule_counter;
         for slot in self.firewall_rules.iter_mut() {
             if slot.is_none() {
@@ -182,16 +192,24 @@ mod tests {
     #[test]
     fn test_netd_socket_and_firewall() {
         let mut netd = NetworkDaemon::new();
-        netd.add_interface(MacAddress([0x02, 0x00, 0x00, 0x00, 0x00, 0x01])).unwrap();
+        netd.add_interface(MacAddress([0x02, 0x00, 0x00, 0x00, 0x00, 0x01]))
+            .unwrap();
 
         let sock_id = netd.create_socket(SocketProtocol::Udp, 100).unwrap();
         assert_eq!(sock_id, 1);
 
         // Deny by default
-        assert_eq!(netd.evaluate_packet(SocketProtocol::Udp, 80), FirewallAction::Deny);
+        assert_eq!(
+            netd.evaluate_packet(SocketProtocol::Udp, 80),
+            FirewallAction::Deny
+        );
 
         // Add rule to allow HTTP (port 80)
-        netd.add_firewall_rule(Some(SocketProtocol::Udp), 80, 80, FirewallAction::Allow).unwrap();
-        assert_eq!(netd.evaluate_packet(SocketProtocol::Udp, 80), FirewallAction::Allow);
+        netd.add_firewall_rule(Some(SocketProtocol::Udp), 80, 80, FirewallAction::Allow)
+            .unwrap();
+        assert_eq!(
+            netd.evaluate_packet(SocketProtocol::Udp, 80),
+            FirewallAction::Allow
+        );
     }
 }
