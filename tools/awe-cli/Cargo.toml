@@ -1,0 +1,10 @@
+[package]
+name = "awe-cli"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "awe"
+path = "src/main.rs"
+
+[dependencies]

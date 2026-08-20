@@ -1,0 +1,182 @@
+[
+  {
+    "id": "MOD-A01",
+    "module": "Repository Workspace & Targets",
+    "priority": 100,
+    "status": "complete",
+    "source_files": ["Cargo.toml", "x86_64-aweos.json", "rust-toolchain.toml"],
+    "tests": ["tests/product-core/src/lib.rs"],
+    "dependencies": [],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-A02",
+    "module": "Boot Protocol & Bootloader",
+    "priority": 95,
+    "status": "complete",
+    "source_files": ["boot/protocol/src/lib.rs", "boot/aweloader/src/lib.rs"],
+    "tests": ["boot/aweloader/src/lib.rs"],
+    "dependencies": ["MOD-A01"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-B01",
+    "module": "Physical Memory & Page Tables",
+    "priority": 90,
+    "status": "complete",
+    "source_files": ["kernel/src/memory/physical.rs", "kernel/src/memory/paging.rs"],
+    "tests": ["kernel/src/memory/physical.rs", "kernel/src/memory/paging.rs"],
+    "dependencies": ["MOD-A02"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-B02",
+    "module": "Scheduler & Execution Core",
+    "priority": 85,
+    "status": "complete",
+    "source_files": ["kernel/src/scheduler/dispatch.rs", "kernel/src/process/dispatch.rs"],
+    "tests": ["kernel/src/scheduler/dispatch.rs"],
+    "dependencies": ["MOD-B01"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-B03",
+    "module": "Multi-Arch Definitions",
+    "priority": 80,
+    "status": "complete",
+    "source_files": ["kernel/src/arch/mod.rs"],
+    "tests": ["kernel/src/arch/mod.rs"],
+    "dependencies": ["MOD-B02"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-E01",
+    "module": "AWE-Nexus IPC Bus",
+    "priority": 75,
+    "status": "complete",
+    "source_files": ["services/nexus/src/lib.rs"],
+    "tests": ["services/nexus/src/lib.rs"],
+    "dependencies": ["MOD-B03"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-E02",
+    "module": "User-Space Network Service (netd)",
+    "priority": 70,
+    "status": "complete",
+    "source_files": ["services/netd/src/lib.rs"],
+    "tests": ["services/netd/src/lib.rs"],
+    "dependencies": ["MOD-E01"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-E03",
+    "module": "User-Space Storage Service (storaged)",
+    "priority": 65,
+    "status": "complete",
+    "source_files": ["services/storaged/src/lib.rs"],
+    "tests": ["services/storaged/src/lib.rs"],
+    "dependencies": ["MOD-E01"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-E04",
+    "module": "User-Space Security Service (securityd)",
+    "priority": 60,
+    "status": "complete",
+    "source_files": ["services/securityd/src/lib.rs"],
+    "tests": ["services/securityd/src/lib.rs"],
+    "dependencies": ["MOD-E01"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-F01",
+    "module": "AYUI Compositor, Shell & Applications",
+    "priority": 55,
+    "status": "complete",
+    "source_files": ["services/ayui/src/lib.rs"],
+    "tests": ["services/ayui/src/lib.rs"],
+    "dependencies": ["MOD-E01"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-H01",
+    "module": "Windows Compatibility Runtime",
+    "priority": 50,
+    "status": "complete",
+    "source_files": ["kernel/src/compat/windows.rs"],
+    "tests": ["kernel/src/compat/windows.rs"],
+    "dependencies": ["MOD-B02"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-H02",
+    "module": "Linux Compatibility Runtime",
+    "priority": 45,
+    "status": "complete",
+    "source_files": ["kernel/src/compat/linux.rs"],
+    "tests": ["kernel/src/compat/linux.rs"],
+    "dependencies": ["MOD-B02"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-H03",
+    "module": "Android Compatibility Runtime",
+    "priority": 40,
+    "status": "complete",
+    "source_files": ["kernel/src/compat/android.rs"],
+    "tests": ["kernel/src/compat/android.rs"],
+    "dependencies": ["MOD-B02"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-H04",
+    "module": "WLIN Unified Layer",
+    "priority": 35,
+    "status": "complete",
+    "source_files": ["kernel/src/compat/wlin.rs"],
+    "tests": ["kernel/src/compat/wlin.rs"],
+    "dependencies": ["MOD-H01", "MOD-H02"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-I01",
+    "module": "AOSIN Installer & Recovery",
+    "priority": 30,
+    "status": "complete",
+    "source_files": ["kernel/src/aosin/mod.rs"],
+    "tests": ["kernel/src/aosin/mod.rs"],
+    "dependencies": ["MOD-E03"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-J01",
+    "module": "Continuum Device Mesh",
+    "priority": 25,
+    "status": "complete",
+    "source_files": ["kernel/src/continuum/mod.rs"],
+    "tests": ["kernel/src/continuum/mod.rs"],
+    "dependencies": ["MOD-E02"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-L01",
+    "module": "AI/ML Hardware & Execution Runtime",
+    "priority": 20,
+    "status": "complete",
+    "source_files": ["kernel/src/ai/mod.rs"],
+    "tests": ["kernel/src/ai/mod.rs"],
+    "dependencies": ["MOD-B02"],
+    "remaining_work": []
+  },
+  {
+    "id": "MOD-M01",
+    "module": "Developer Tools & Scripting Engine",
+    "priority": 15,
+    "status": "complete",
+    "source_files": ["tools/awescript/src/lib.rs", "tools/awe-cli/src/main.rs"],
+    "tests": ["tools/awescript/src/lib.rs"],
+    "dependencies": ["MOD-A01"],
+    "remaining_work": []
+  }
+]

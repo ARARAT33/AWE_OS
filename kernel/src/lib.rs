@@ -13,10 +13,14 @@
 pub mod ac_boot_gate;
 pub mod ac_completion;
 pub mod ac_runtime;
+pub mod ai;
+pub mod aosin;
 pub mod arch;
 pub mod boot_guard;
 pub mod boot_phase;
 pub mod boot_state;
+pub mod compat;
+pub mod continuum;
 pub mod device;
 pub mod engineering_contracts;
 pub mod entry;

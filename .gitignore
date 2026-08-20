@@ -1,4 +1,7 @@
 /target
 /dist
+/build/*.iso
+/build/*.img
+extracted_docx_text.txt
 **/*.rs.bk
 *.log
