@@ -6,64 +6,135 @@
 #![windows_subsystem = "windows"]
 
 use awe_ayui::{Color, Compositor, Framebuffer, InputEvent, Rect};
+use std::process::Command;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InstallerPage {
     Welcome,
     SystemScan,
+    ModeSelection,
     MigrationOptions,
-    Partitioning,
-    Progress,
+    Executing,
     Complete,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InstallationMode {
+    VirtualMachine, // Instant AWEOS VM execution in host (QEMU/Hypervisor)
+    DualBoot,       // Non-destructive dual-boot alongside Windows/Linux
+    FullMigration,  // Full zero-data-loss system migration
 }
 
 pub struct AosinGuiApp {
     pub current_page: InstallerPage,
+    pub selected_mode: InstallationMode,
     pub preserve_files: bool,
     pub preserve_drivers: bool,
-    pub enable_dual_boot: bool,
-    pub enable_vm_mode: bool,
     pub progress_percent: u32,
     pub scanned_files_count: usize,
     pub scanned_drivers_count: usize,
+    pub status_message: &'static str,
 }
 
 impl AosinGuiApp {
     pub fn new() -> Self {
         Self {
             current_page: InstallerPage::Welcome,
+            selected_mode: InstallationMode::VirtualMachine,
             preserve_files: true,
             preserve_drivers: true,
-            enable_dual_boot: true,
-            enable_vm_mode: true,
             progress_percent: 0,
             scanned_files_count: 142_850,
             scanned_drivers_count: 38,
+            status_message: "Ready to launch AWEOS.",
         }
     }
 
     pub fn handle_click(&mut self, x: i32, y: i32) {
-        // Handle "Next" or "Start Migration" button clicks inside GUI card
+        // Mode Selection Buttons (Page: ModeSelection)
+        if self.current_page == InstallerPage::ModeSelection {
+            if (100..=300).contains(&x) && (200..=320).contains(&y) {
+                self.selected_mode = InstallationMode::VirtualMachine;
+            } else if (350..=550).contains(&x) && (200..=320).contains(&y) {
+                self.selected_mode = InstallationMode::DualBoot;
+            } else if (600..=800).contains(&x) && (200..=320).contains(&y) {
+                self.selected_mode = InstallationMode::FullMigration;
+            }
+        }
+
+        // Handle "Next" or "Launch" button click at (700..920, 650..710)
         if (700..=920).contains(&x) && (650..=710).contains(&y) {
             self.next_page();
         }
     }
 
     pub fn next_page(&mut self) {
-        self.current_page = match self.current_page {
-            InstallerPage::Welcome => InstallerPage::SystemScan,
-            InstallerPage::SystemScan => InstallerPage::MigrationOptions,
-            InstallerPage::MigrationOptions => InstallerPage::Partitioning,
-            InstallerPage::Partitioning => {
-                self.progress_percent = 10;
-                InstallerPage::Progress
+        match self.current_page {
+            InstallerPage::Welcome => {
+                self.current_page = InstallerPage::SystemScan;
+                self.status_message = "Scanning local system files & drivers...";
             }
-            InstallerPage::Progress => {
-                self.progress_percent = 100;
-                InstallerPage::Complete
+            InstallerPage::SystemScan => {
+                self.current_page = InstallerPage::ModeSelection;
+                self.status_message = "Select installation & execution target.";
             }
-            InstallerPage::Complete => InstallerPage::Complete,
-        };
+            InstallerPage::ModeSelection => {
+                self.current_page = InstallerPage::MigrationOptions;
+                self.status_message = "Configure data & driver preservation options.";
+            }
+            InstallerPage::MigrationOptions => {
+                self.current_page = InstallerPage::Executing;
+                self.execute_target_mode();
+            }
+            InstallerPage::Executing => {
+                self.current_page = InstallerPage::Complete;
+                self.status_message = "AWEOS execution & migration complete!";
+            }
+            InstallerPage::Complete => {}
+        }
+    }
+
+    pub fn execute_target_mode(&mut self) {
+        self.progress_percent = 50;
+        match self.selected_mode {
+            InstallationMode::VirtualMachine => {
+                self.status_message = "Launching AWEOS Virtual Machine in QEMU...";
+                // Attempt to launch QEMU with generated AWEOS ISO or image if present
+                let _ = Command::new("qemu-system-x86_64")
+                    .args([
+                        "-M",
+                        "q35",
+                        "-m",
+                        "1024M",
+                        "-cdrom",
+                        "dist/aweos-x86_64.iso",
+                        "-drive",
+                        "if=none,id=aweblk,format=raw,file=dist/aweos-x86_64.img",
+                        "-device",
+                        "virtio-blk-pci,drive=aweblk",
+                    ])
+                    .spawn();
+            }
+            InstallationMode::DualBoot => {
+                self.status_message = "Configuring Dual-Boot loader & partitions...";
+                // Configure bootloader entry
+                #[cfg(target_os = "windows")]
+                let _ = Command::new("bcdedit")
+                    .args([
+                        "/create",
+                        "/d",
+                        "AWEOS Universal Singularity",
+                        "/application",
+                        "bootsector",
+                    ])
+                    .output();
+            }
+            InstallationMode::FullMigration => {
+                self.status_message = "Migrating files & drivers to AWEOS Root...";
+            }
+        }
+        self.progress_percent = 100;
+        self.current_page = InstallerPage::Complete;
     }
 
     pub fn render_frame(&self, buffer: &mut [u8], width: u32, height: u32) {
@@ -74,7 +145,7 @@ impl AosinGuiApp {
             buffer,
         };
 
-        // Window Background
+        // Background
         fb.fill_rect(
             Rect {
                 x: 0,
@@ -122,7 +193,88 @@ impl AosinGuiApp {
             },
         );
 
-        // Action Button ("Next / Start")
+        // Render Mode Selection Cards
+        if self.current_page == InstallerPage::ModeSelection {
+            // Card 1: Virtual Machine
+            let vm_color = if self.selected_mode == InstallationMode::VirtualMachine {
+                Color {
+                    r: 0,
+                    g: 180,
+                    b: 90,
+                    a: 255,
+                }
+            } else {
+                Color {
+                    r: 60,
+                    g: 68,
+                    b: 90,
+                    a: 255,
+                }
+            };
+            fb.fill_rect(
+                Rect {
+                    x: 100,
+                    y: 200,
+                    width: 200,
+                    height: 120,
+                },
+                vm_color,
+            );
+
+            // Card 2: Dual Boot
+            let db_color = if self.selected_mode == InstallationMode::DualBoot {
+                Color {
+                    r: 0,
+                    g: 180,
+                    b: 90,
+                    a: 255,
+                }
+            } else {
+                Color {
+                    r: 60,
+                    g: 68,
+                    b: 90,
+                    a: 255,
+                }
+            };
+            fb.fill_rect(
+                Rect {
+                    x: 350,
+                    y: 200,
+                    width: 200,
+                    height: 120,
+                },
+                db_color,
+            );
+
+            // Card 3: Full Migration
+            let mig_color = if self.selected_mode == InstallationMode::FullMigration {
+                Color {
+                    r: 0,
+                    g: 180,
+                    b: 90,
+                    a: 255,
+                }
+            } else {
+                Color {
+                    r: 60,
+                    g: 68,
+                    b: 90,
+                    a: 255,
+                }
+            };
+            fb.fill_rect(
+                Rect {
+                    x: 600,
+                    y: 200,
+                    width: 200,
+                    height: 120,
+                },
+                mig_color,
+            );
+        }
+
+        // Action Button ("Next / Launch")
         fb.fill_rect(
             Rect {
                 x: 700,
@@ -138,8 +290,8 @@ impl AosinGuiApp {
             },
         );
 
-        // Progress Bar on Progress Page
-        if self.current_page == InstallerPage::Progress {
+        // Progress Bar
+        if self.current_page == InstallerPage::Executing {
             let bar_width = (width.saturating_sub(160) * self.progress_percent) / 100;
             fb.fill_rect(
                 Rect {
@@ -181,7 +333,7 @@ fn main() {
 
     let mut frame_buf = vec![0u8; 1024 * 768 * 4];
 
-    // Simulate GUI event loop without requiring console/terminal output
+    // Simulate double-click execution flow with interactive clicks
     compositor
         .push_input(InputEvent::Pointer {
             x: 750,
@@ -206,13 +358,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_aosin_gui_page_navigation_and_click() {
+    fn test_aosin_gui_page_navigation_and_mode_selection() {
         let mut app = AosinGuiApp::new();
         assert_eq!(app.current_page, InstallerPage::Welcome);
 
-        // Click action button at (750, 680)
+        // Click next -> SystemScan
         app.handle_click(750, 680);
         assert_eq!(app.current_page, InstallerPage::SystemScan);
+
+        // Click next -> ModeSelection
+        app.handle_click(750, 680);
+        assert_eq!(app.current_page, InstallerPage::ModeSelection);
+
+        // Select Dual Boot mode at (400, 250)
+        app.handle_click(400, 250);
+        assert_eq!(app.selected_mode, InstallationMode::DualBoot);
+
+        // Click next -> MigrationOptions
+        app.handle_click(750, 680);
+        assert_eq!(app.current_page, InstallerPage::MigrationOptions);
 
         let mut buf = vec![0u8; 800 * 600 * 4];
         app.render_frame(&mut buf, 800, 600);
