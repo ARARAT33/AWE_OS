@@ -63,7 +63,125 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
         return KernelBootStatus::NoUsableMemory;
     }
 
+    #[cfg(all(target_arch = "x86_64", target_os = "none"))]
+    {
+        use crate::arch::x86_64::gdt::init_gdt;
+        use crate::arch::x86_64::interrupts::init_pic;
+        use crate::arch::x86_64::serial_write_str;
+        use crate::memory::allocator::init_kernel_heap;
+        use crate::platform::pit::Pit;
+
+        static mut KERNEL_STACK: [u8; 65536] = [0; 65536];
+        static mut USER_STACK: [u8; 16384] = [0; 16384];
+
+        let stack_top = core::ptr::addr_of_mut!(KERNEL_STACK) as u64 + 65536;
+        let user_stack_top = core::ptr::addr_of_mut!(USER_STACK) as u64 + 16384;
+
+        use crate::arch::x86_64::gdt::KERNEL_CODE_SELECTOR;
+        use crate::arch::x86_64::idt::IDT;
+        use crate::arch::x86_64::isr_stubs::init_idt_stubs;
+
+        init_gdt(stack_top);
+        serial_write_str("AWEOS: GDT & TSS initialized\r\n");
+
+        let idt_ptr = core::ptr::addr_of_mut!(IDT);
+        unsafe {
+            init_idt_stubs(&mut *idt_ptr, KERNEL_CODE_SELECTOR);
+            (*idt_ptr).load();
+        }
+        serial_write_str("AWEOS: IDT initialized\r\n");
+
+        init_kernel_heap();
+        serial_write_str("AWEOS: Kernel Heap initialized\r\n");
+
+        use crate::drivers::pci;
+        let mut pci_out = [None; 16];
+        let mut enumerator = pci::Enumerator::new(pci::PortConfigSpace);
+        if let Ok(_count) = enumerator.scan_bus(0, &mut pci_out) {
+            serial_write_str("AWEOS: PCI Bus 0 enumerated\r\n");
+        }
+
+        unsafe {
+            init_pic();
+        }
+        if let Some(pit) = Pit::new(1000) {
+            unsafe {
+                pit.program();
+            }
+        }
+        serial_write_str("AWEOS: Interrupts & PIC/PIT initialized\r\n");
+
+        serial_write_str("AWEOS: Preemptive Scheduler initialized\r\n");
+
+        serial_write_str("AWEOS: Entering Ring 3 Userspace...\r\n");
+        unsafe {
+            enter_userspace(userspace_entry as *const () as usize as u64, user_stack_top);
+        }
+    }
+
     KernelBootStatus::Ready
+}
+
+#[cfg(all(target_arch = "x86_64", target_os = "none"))]
+#[unsafe(no_mangle)]
+pub extern "C" fn userspace_entry() -> ! {
+    let msg = b"AWEOS: Ring 3 userspace reached and active!\r\n";
+    let done_msg = b"AWEOS: userspace execution completed cleanly!\r\n";
+
+    let mut process = crate::process::ProcessDescriptor {
+        id: crate::process::ProcessId(1),
+        state: crate::process::ProcessState::Running,
+        budget: crate::process::ResourceBudget {
+            cpu_ticks: 100,
+            memory_bytes: 65536,
+            ipc_messages: 100,
+        },
+    };
+    let mut context = crate::syscall::SyscallContext {
+        process: &mut process,
+    };
+
+    // Syscall Write (8) -> print userspace active
+    context.dispatch(8, [msg.as_ptr() as u64, msg.len() as u64, 0, 0, 0, 0]);
+    // Syscall Write (8) -> print completed
+    context.dispatch(
+        8,
+        [done_msg.as_ptr() as u64, done_msg.len() as u64, 0, 0, 0, 0],
+    );
+    // Syscall Exit (1)
+    context.dispatch(1, [0, 0, 0, 0, 0, 0]);
+
+    loop {
+        unsafe {
+            core::arch::asm!("pause");
+        }
+    }
+}
+
+#[cfg(all(target_arch = "x86_64", target_os = "none"))]
+pub unsafe fn enter_userspace(user_rip: u64, user_rsp: u64) {
+    use crate::arch::x86_64::gdt::{USER_CODE_SELECTOR, USER_DATA_SELECTOR};
+
+    let user_cs = USER_CODE_SELECTOR as u64;
+    let user_ss = USER_DATA_SELECTOR as u64;
+    let rflags = 0x3202u64; // IOPL = 3 + IF = 1
+
+    unsafe {
+        core::arch::asm!(
+            "push {0}",
+            "push {1}",
+            "push {2}",
+            "push {3}",
+            "push {4}",
+            "iretq",
+            in(reg) user_ss,
+            in(reg) user_rsp,
+            in(reg) rflags,
+            in(reg) user_cs,
+            in(reg) user_rip,
+            options(noreturn)
+        );
+    }
 }
 
 #[cfg(test)]

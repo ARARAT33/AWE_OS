@@ -35,7 +35,7 @@ pub struct Bar {
 }
 
 impl Bar {
-    pub const fn validate(self) -> Result<(), PciError> {
+    pub fn validate(self) -> Result<(), PciError> {
         if self.size == 0 || !self.size.is_power_of_two() {
             return Err(PciError::InvalidBar);
         }
@@ -48,7 +48,7 @@ impl Bar {
         Ok(())
     }
 
-    pub const fn end(self) -> Result<u64, PciError> {
+    pub fn end(self) -> Result<u64, PciError> {
         self.base.checked_add(self.size).ok_or(PciError::AddressOverflow)
     }
 }
@@ -74,7 +74,7 @@ pub struct VirtioPciCapabilities {
 }
 
 impl VirtioPciCapabilities {
-    pub const fn validate(self) -> Result<(), PciError> {
+    pub fn validate(self) -> Result<(), PciError> {
         if !self.is_modern {
             return Err(PciError::UnsupportedTransport);
         }
@@ -101,7 +101,7 @@ pub struct VirtioPciTransport {
 }
 
 impl VirtioPciTransport {
-    pub const fn new(
+    pub fn new(
         id: PciId,
         caps: VirtioPciCapabilities,
         device_features: VirtioFeatures,

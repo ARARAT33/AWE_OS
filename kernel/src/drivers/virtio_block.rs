@@ -1,6 +1,6 @@
 #![no_std]
 
-use super::{VirtioDescriptor, VirtioError, VirtioSplitQueue, VirtioTransportState};
+use super::virtio::{VirtioDescriptor, VirtioError, VirtioMmioRegisters, VirtioSplitQueue, VirtioTransportState};
 
 pub const SECTOR_SIZE: u64 = 512;
 pub const MAX_REQUEST_SECTORS: u32 = 128;
@@ -45,7 +45,7 @@ pub struct VirtioBlockConfig {
 }
 
 impl VirtioBlockConfig {
-    pub const fn validate(&self) -> Result<(), BlockError> {
+    pub fn validate(&self) -> Result<(), BlockError> {
         if self.capacity_sectors == 0 || self.logical_block_size == 0 {
             return Err(BlockError::ZeroLength);
         }
@@ -55,7 +55,7 @@ impl VirtioBlockConfig {
         Ok(())
     }
 
-    pub const fn validate_request(&self, request: BlockRequest) -> Result<u64, BlockError> {
+    pub fn validate_request(&self, request: BlockRequest) -> Result<u64, BlockError> {
         self.validate()?;
         if request.sectors == 0 { return Err(BlockError::ZeroLength); }
         if request.sectors > MAX_REQUEST_SECTORS { return Err(BlockError::TooLarge); }
@@ -106,7 +106,7 @@ impl<const N: usize> VirtioBlockQueue<N> {
         descriptor: VirtioDescriptor,
         config: VirtioBlockConfig,
         transport: &mut VirtioTransportState,
-        mmio: &mut super::VirtioMmioRegisters,
+        mmio: &mut VirtioMmioRegisters,
     ) -> Result<(), BlockError> {
         if request_id as usize >= N { return Err(BlockError::Queue(VirtioError::InvalidQueueIndex)); }
         config.validate()?;
@@ -129,7 +129,7 @@ impl<const N: usize> VirtioBlockQueue<N> {
         Ok(())
     }
 
-    pub fn complete(&mut self, request_id: u16, bytes: u32, status: u8, mmio: &mut super::VirtioMmioRegisters) -> Result<(), BlockError> {
+    pub fn complete(&mut self, request_id: u16, bytes: u32, status: u8, mmio: &mut VirtioMmioRegisters) -> Result<(), BlockError> {
         if request_id as usize >= N { return Err(BlockError::Queue(VirtioError::InvalidQueueIndex)); }
         let index = request_id as usize;
         let submitted = self.pending_bytes[index].ok_or(BlockError::InvalidCompletion)?;
@@ -155,7 +155,7 @@ impl<const N: usize> VirtioBlockQueue<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::drivers::{VirtioFeatures, VirtioMmioRegisters};
+    use crate::drivers::virtio::{VirtioFeatures, VirtioMmioRegisters, VirtioTransportState};
 
     const CFG: VirtioBlockConfig = VirtioBlockConfig { capacity_sectors: 4096, logical_block_size: 512 };
 
@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_descriptor_and_completion() {
-        let mut transport = super::super::VirtioTransportState::new(VirtioFeatures::VERSION_1);
+        let mut transport = VirtioTransportState::new(VirtioFeatures::VERSION_1);
         let mut mmio = VirtioMmioRegisters::new(2, 1, VirtioFeatures::VERSION_1);
         transport.acknowledge().unwrap();
         transport.set_driver().unwrap();
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn completion_preserves_device_status() {
-        let mut transport = super::super::VirtioTransportState::new(VirtioFeatures::VERSION_1);
+        let mut transport = VirtioTransportState::new(VirtioFeatures::VERSION_1);
         let mut mmio = VirtioMmioRegisters::new(2, 1, VirtioFeatures::VERSION_1);
         transport.acknowledge().unwrap();
         transport.set_driver().unwrap();
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn rejects_completion_larger_than_submitted_payload() {
-        let mut transport = super::super::VirtioTransportState::new(VirtioFeatures::VERSION_1);
+        let mut transport = VirtioTransportState::new(VirtioFeatures::VERSION_1);
         let mut mmio = VirtioMmioRegisters::new(2, 1, VirtioFeatures::VERSION_1);
         transport.acknowledge().unwrap();
         transport.set_driver().unwrap();
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn queue_submission_is_transport_bound() {
-        let mut transport = super::super::VirtioTransportState::new(VirtioFeatures::VERSION_1);
+        let mut transport = VirtioTransportState::new(VirtioFeatures::VERSION_1);
         let mut mmio = VirtioMmioRegisters::new(2, 1, VirtioFeatures::VERSION_1);
         transport.acknowledge().unwrap();
         transport.set_driver().unwrap();

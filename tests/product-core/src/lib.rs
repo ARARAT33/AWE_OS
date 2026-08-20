@@ -201,6 +201,102 @@ mod product_core {
     }
 
     #[test]
+    fn qemu_automated_boot_smoke_test() {
+        use std::process::Command;
+        use std::time::{Duration, Instant};
+
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let workspace_root = manifest_dir.parent().unwrap().parent().unwrap();
+        let kernel_bin = workspace_root.join("target/x86_64-unknown-none/debug/aweos");
+
+        let status = Command::new("cargo")
+            .current_dir(workspace_root)
+            .args([
+                "build",
+                "--package",
+                "aweos-kernel-bin",
+                "--target",
+                "x86_64-unknown-none",
+            ])
+            .status()
+            .expect("failed to run cargo build");
+        assert!(status.success(), "cargo build failed");
+
+        let log_file = workspace_root.join("qemu-boot-test.log");
+        let _ = std::fs::remove_file(&log_file);
+
+        let mut child = Command::new("qemu-system-x86_64")
+            .current_dir(workspace_root)
+            .args([
+                "-kernel",
+                kernel_bin.to_str().unwrap(),
+                "-display",
+                "none",
+                "-chardev",
+                &format!("file,id=char0,path={}", log_file.display()),
+                "-serial",
+                "chardev:char0",
+            ])
+            .spawn()
+            .expect("failed to start qemu-system-x86_64");
+
+        let required_milestones = [
+            "AWEOS boot:",
+            "AWEOS CellKernel",
+            "AWEOS: GDT & TSS initialized",
+            "AWEOS: IDT initialized",
+            "AWEOS: Kernel Heap initialized",
+            "AWEOS: PCI Bus 0 enumerated",
+            "AWEOS: Interrupts & PIC/PIT initialized",
+            "AWEOS: Preemptive Scheduler initialized",
+            "AWEOS: Entering Ring 3 Userspace...",
+            "AWEOS: Ring 3 userspace reached and active!",
+            "AWEOS: userspace execution completed cleanly!",
+        ];
+
+        let start_time = Instant::now();
+        let timeout = Duration::from_secs(10);
+        let mut milestone_idx = 0;
+
+        loop {
+            if start_time.elapsed() > timeout {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("QEMU boot test timed out!");
+            }
+
+            if let Ok(content) = std::fs::read_to_string(&log_file) {
+                let mut current_search = milestone_idx;
+                for line in content.lines() {
+                    if current_search < required_milestones.len()
+                        && line.contains(required_milestones[current_search])
+                    {
+                        current_search += 1;
+                    }
+                }
+                milestone_idx = current_search;
+                if milestone_idx == required_milestones.len() {
+                    break;
+                }
+            }
+
+            std::thread::sleep(Duration::from_millis(100));
+        }
+
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = std::fs::remove_file(&log_file);
+
+        assert_eq!(
+            milestone_idx,
+            required_milestones.len(),
+            "QEMU boot test failed! Only passed {} of {} required milestones.",
+            milestone_idx,
+            required_milestones.len()
+        );
+    }
+
+    #[test]
     fn kernel_compatibility_runtimes_end_to_end() {
         use aweos_kernel::compat::android::AndroidBinderEmulator;
         use aweos_kernel::compat::linux::LinuxSyscallDispatcher;

@@ -13,6 +13,8 @@ use aweos_kernel::entry::{KernelBootStatus, kernel_entry};
 use aweos_kernel::memory::activate_bootstrap_identity_map;
 
 #[cfg(not(test))]
+const MULTIBOOT1_BOOTLOADER_MAGIC: u32 = 0x2BAD_B002;
+#[cfg(not(test))]
 const MULTIBOOT2_BOOTLOADER_MAGIC: u32 = 0x36D7_6289;
 #[cfg(not(test))]
 const MAX_MEMORY_REGIONS: usize = 128;
@@ -32,6 +34,35 @@ static mut MEMORY_REGIONS: [MemoryRegion; MAX_MEMORY_REGIONS] = [MemoryRegion {
     kind: 2,
     reserved: 0,
 }; MAX_MEMORY_REGIONS];
+
+#[repr(C, packed)]
+struct XenElfNote {
+    namesz: u32,
+    descsz: u32,
+    type_: u32,
+    name: [u8; 4],
+    desc: u32,
+}
+
+#[used]
+#[unsafe(link_section = ".note.Xen")]
+#[unsafe(no_mangle)]
+static PVH_NOTE: XenElfNote = XenElfNote {
+    namesz: 4,
+    descsz: 4,
+    type_: 18, // XEN_ELFNOTE_PHYS32_ENTRY
+    name: *b"Xen\0",
+    desc: 0x0010_0000,
+};
+
+#[used]
+#[unsafe(link_section = ".multiboot_header")]
+#[unsafe(no_mangle)]
+static MULTIBOOT1_HEADER: [u32; 3] = [
+    0x1BAD_B002,
+    0x0000_0003,
+    0xE452_4FFF, // 0 - (0x1BADB002 + 0x00000003)
+];
 
 #[used]
 #[unsafe(link_section = ".multiboot2_header")]
@@ -74,15 +105,15 @@ _start:
     mov dword ptr [boot_magic_saved], eax
     mov dword ptr [boot_info_saved], ebx
 
-    # Build a minimal identity map for the first 1 GiB using 2 MiB pages.
+    # Build a minimal identity map for the first 1 GiB using 2 MiB pages with User accessibility.
     # PML4[0] -> PDPT[0] -> PD[0..511].
     mov eax, offset BOOT_PDPT
-    or eax, 3
+    or eax, 7
     mov dword ptr [BOOT_PML4], eax
     mov dword ptr [BOOT_PML4 + 4], 0
 
     mov eax, offset BOOT_PD
-    or eax, 3
+    or eax, 7
     mov dword ptr [BOOT_PDPT], eax
     mov dword ptr [BOOT_PDPT + 4], 0
 
@@ -90,7 +121,7 @@ _start:
 1:
     mov eax, ecx
     shl eax, 21
-    or eax, 0x83
+    or eax, 0x87
     mov dword ptr [BOOT_PD + ecx * 8], eax
     mov dword ptr [BOOT_PD + ecx * 8 + 4], 0
     inc ecx
@@ -172,20 +203,25 @@ fn main() {}
 pub extern "C" fn rust_main(boot_magic: u32, boot_info_addr: u64) -> ! {
     serial_init();
     serial_write(b"AWEOS CellKernel\r\n");
-    serial_write(b"AWEOS boot: x86_64 Multiboot2 entry\r\n");
 
-    if boot_magic != MULTIBOOT2_BOOTLOADER_MAGIC {
-        serial_write(b"AWEOS: Multiboot2 magic mismatch\r\n");
-        serial_write(b"AWEOS: boot handoff rejected\r\n");
-        halt_forever();
-    }
-
-    if boot_info_addr == 0 {
-        serial_write(b"AWEOS: invalid Multiboot2 handoff\r\n");
-        halt_forever();
-    }
-
-    let info = parse_multiboot2(boot_info_addr as usize);
+    let info = if boot_magic == MULTIBOOT1_BOOTLOADER_MAGIC {
+        serial_write(b"AWEOS boot: x86_64 Multiboot1 entry\r\n");
+        if boot_info_addr == 0 {
+            serial_write(b"AWEOS: invalid Multiboot handoff\r\n");
+            halt_forever();
+        }
+        parse_multiboot1(boot_info_addr as usize)
+    } else if boot_magic == MULTIBOOT2_BOOTLOADER_MAGIC {
+        serial_write(b"AWEOS boot: x86_64 Multiboot2 entry\r\n");
+        if boot_info_addr == 0 {
+            serial_write(b"AWEOS: invalid Multiboot handoff\r\n");
+            halt_forever();
+        }
+        parse_multiboot2(boot_info_addr as usize)
+    } else {
+        serial_write(b"AWEOS boot: x86_64 Direct/PVH entry\r\n");
+        fallback_boot_info()
+    };
 
     match kernel_entry(&info) {
         KernelBootStatus::Ready => {
@@ -225,6 +261,126 @@ fn halt_forever() -> ! {
         unsafe {
             core::arch::asm!("hlt", options(nomem, nostack, preserves_flags));
         }
+    }
+}
+
+#[cfg(not(test))]
+fn fallback_boot_info() -> BootInfo {
+    let regions_ptr = core::ptr::addr_of_mut!(MEMORY_REGIONS) as *mut MemoryRegion;
+    unsafe {
+        core::ptr::write(
+            regions_ptr,
+            MemoryRegion {
+                base: FALLBACK_MEMORY_BASE,
+                length: FALLBACK_MEMORY_LENGTH,
+                kind: 1,
+                reserved: 0,
+            },
+        );
+    }
+    BootInfo {
+        magic: AWE_BOOT_MAGIC,
+        version: awe_boot_protocol::AWE_BOOT_VERSION,
+        size: core::mem::size_of::<BootInfo>() as u32,
+        architecture: Architecture::X86_64,
+        cpu_count: 1,
+        memory_regions: regions_ptr,
+        memory_region_count: 1,
+        framebuffer_address: 0,
+        framebuffer_size: 0,
+        framebuffer_width: 0,
+        framebuffer_height: 0,
+        framebuffer_pitch: 0,
+        acpi_rsdp: 0,
+        device_tree: 0,
+        kernel_base: 0,
+        kernel_size: 0,
+    }
+}
+
+#[cfg(not(test))]
+fn parse_multiboot1(addr: usize) -> BootInfo {
+    if addr == 0 {
+        return BootInfo::empty(Architecture::X86_64);
+    }
+
+    let flags = unsafe { core::ptr::read_unaligned(addr as *const u32) };
+    let regions_ptr = core::ptr::addr_of_mut!(MEMORY_REGIONS) as *mut MemoryRegion;
+    let mut region_count = 0u32;
+
+    if (flags & (1 << 6)) != 0 {
+        let mmap_length = unsafe { core::ptr::read_unaligned((addr + 44) as *const u32) } as usize;
+        let mmap_addr = unsafe { core::ptr::read_unaligned((addr + 48) as *const u32) } as usize;
+
+        let mut offset = 0usize;
+        while offset < mmap_length && (region_count as usize) < MAX_MEMORY_REGIONS {
+            let entry_ptr = mmap_addr + offset;
+            let size = unsafe { core::ptr::read_unaligned(entry_ptr as *const u32) } as usize;
+            if size == 0 {
+                break;
+            }
+            let base = unsafe { core::ptr::read_unaligned((entry_ptr + 4) as *const u64) };
+            let length = unsafe { core::ptr::read_unaligned((entry_ptr + 12) as *const u64) };
+            let kind = unsafe { core::ptr::read_unaligned((entry_ptr + 20) as *const u32) };
+
+            unsafe {
+                core::ptr::write(
+                    regions_ptr.add(region_count as usize),
+                    MemoryRegion {
+                        base,
+                        length,
+                        kind,
+                        reserved: 0,
+                    },
+                );
+            }
+            region_count += 1;
+            offset += size + 4;
+        }
+    }
+
+    if region_count == 0 {
+        let mem_upper = if (flags & (1 << 0)) != 0 {
+            (unsafe { core::ptr::read_unaligned((addr + 8) as *const u32) }) as u64
+        } else {
+            0
+        };
+        let length = if mem_upper > 0 {
+            mem_upper * 1024
+        } else {
+            FALLBACK_MEMORY_LENGTH
+        };
+        unsafe {
+            core::ptr::write(
+                regions_ptr,
+                MemoryRegion {
+                    base: FALLBACK_MEMORY_BASE,
+                    length,
+                    kind: 1,
+                    reserved: 0,
+                },
+            );
+        }
+        region_count = 1;
+    }
+
+    BootInfo {
+        magic: AWE_BOOT_MAGIC,
+        version: awe_boot_protocol::AWE_BOOT_VERSION,
+        size: core::mem::size_of::<BootInfo>() as u32,
+        architecture: Architecture::X86_64,
+        cpu_count: 1,
+        memory_regions: regions_ptr,
+        memory_region_count: region_count,
+        framebuffer_address: 0,
+        framebuffer_size: 0,
+        framebuffer_width: 0,
+        framebuffer_height: 0,
+        framebuffer_pitch: 0,
+        acpi_rsdp: 0,
+        device_tree: 0,
+        kernel_base: 0,
+        kernel_size: 0,
     }
 }
 
@@ -401,13 +557,28 @@ fn serial_init() {
 fn serial_write(bytes: &[u8]) {
     for &byte in bytes {
         unsafe {
-            core::arch::asm!(
-                "mov dx, 0x3FD", "2: in al, dx", "test al, 0x20", "jz 2b",
-                "mov dx, 0x3F8", "mov al, cl", "out dx, al",
-                in("cl") byte, out("al") _, out("dx") _, options(nostack, preserves_flags)
-            );
+            while (in8(0x3FD) & 0x20) == 0 {}
+            out8(0x3F8, byte);
         }
     }
+}
+
+#[cfg(not(test))]
+#[inline(always)]
+unsafe fn out8(port: u16, val: u8) {
+    unsafe {
+        core::arch::asm!("out dx, al", in("dx") port, in("al") val, options(nomem, nostack, preserves_flags));
+    }
+}
+
+#[cfg(not(test))]
+#[inline(always)]
+unsafe fn in8(port: u16) -> u8 {
+    let val: u8;
+    unsafe {
+        core::arch::asm!("in al, dx", in("dx") port, out("al") val, options(nomem, nostack, preserves_flags));
+    }
+    val
 }
 
 #[cfg(not(test))]

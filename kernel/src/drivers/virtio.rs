@@ -4,6 +4,12 @@
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct VirtioFeatures(pub u64);
 impl VirtioFeatures { pub const VERSION_1:Self=Self(1<<32); pub const ACCESS_PLATFORM:Self=Self(1<<33); pub const RING_INDIRECT_DESC:Self=Self(1<<28); pub const RING_EVENT_IDX:Self=Self(1<<29); pub const RING_PACKED:Self=Self(1<<34); pub const fn contains(self,o:Self)->bool{(self.0&o.0)==o.0} pub const fn intersection(self,o:Self)->Self{Self(self.0&o.0)} }
+impl core::ops::BitOr for VirtioFeatures {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        Self(self.0 | rhs.0)
+    }
+}
 pub const DESC_NEXT:u16=1; pub const DESC_WRITE:u16=2; pub const DESC_INDIRECT:u16=4; pub const MMIO_MAGIC:u32=0x7472_6976; pub const MMIO_VERSION:u32=2; pub const MMIO_QUEUE_NOTIFY:u64=0x050; pub const MMIO_INTERRUPT_STATUS:u64=0x060; pub const MMIO_INTERRUPT_ACK:u64=0x064; pub const IRQ_USED_RING:u32=1;
 #[derive(Clone,Copy,PartialEq,Eq,Debug)]pub enum VirtioError{MissingVersion,AlreadyReady,QueueCountZero,QueueTooLarge,InvalidQueueAlignment,DescriptorIndexOutOfBounds,DescriptorLengthZero,QueueNotReady,DescriptorCycle,QueueFull,InvalidQueueIndex,CompletionQueueFull,NoCompletion,InvalidStatus,QueueNotConfigured,BadMmioOffset,InvalidMmioWrite,QueueNotifiedBeforeReady,InterruptNotPending,DmaAddressOutOfRange,DmaLengthOutOfRange}
 #[repr(u8)]#[derive(Clone,Copy,PartialEq,Eq,Debug)]pub enum VirtioStatus{Reset=0,Acknowledge=1,Driver=2,DriverOk=4,FeaturesOk=8,Failed=128}impl VirtioStatus{pub const fn has(self,status:u8)->bool{(status&self as u8)==self as u8}}

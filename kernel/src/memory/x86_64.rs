@@ -12,7 +12,7 @@ use super::paging::{PageFlags, PageTableEntry};
 
 const ENTRIES: usize = 512;
 const HUGE_2M: u64 = 1 << 7;
-const TABLE_FLAGS: u64 = PageFlags::PRESENT.0 | PageFlags::WRITABLE.0;
+const TABLE_FLAGS: u64 = PageFlags::PRESENT.0 | PageFlags::WRITABLE.0 | PageFlags::USER.0;
 const LEAF_FLAGS: u64 = TABLE_FLAGS | HUGE_2M;
 
 #[repr(C, align(4096))]
