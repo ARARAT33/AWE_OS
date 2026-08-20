@@ -4,7 +4,11 @@ use super::DeviceId;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum ProbeOutcome { Unknown = 0, Success = 1, Failure = 2 }
+pub enum ProbeOutcome {
+    Unknown = 0,
+    Success = 1,
+    Failure = 2,
+}
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -19,7 +23,14 @@ pub struct DriverExperience {
 
 impl DriverExperience {
     pub const fn new(device: DeviceId, driver_id: u32) -> Self {
-        Self { device, driver_id, attempts: 0, successes: 0, failures: 0, last: ProbeOutcome::Unknown }
+        Self {
+            device,
+            driver_id,
+            attempts: 0,
+            successes: 0,
+            failures: 0,
+            last: ProbeOutcome::Unknown,
+        }
     }
     pub fn record(&mut self, outcome: ProbeOutcome) {
         self.attempts = self.attempts.saturating_add(1);
@@ -30,18 +41,27 @@ impl DriverExperience {
         }
         self.last = outcome;
     }
-    pub const fn stable(&self) -> bool { self.attempts >= 3 && self.successes > self.failures }
+    pub const fn stable(&self) -> bool {
+        self.attempts >= 3 && self.successes > self.failures
+    }
 }
 
-pub struct ExperienceDb<const N: usize> { entries: [Option<DriverExperience>; N] }
+pub struct ExperienceDb<const N: usize> {
+    entries: [Option<DriverExperience>; N],
+}
 
 impl<const N: usize> ExperienceDb<N> {
-    pub const fn new() -> Self { Self { entries: [None; N] } }
+    pub const fn new() -> Self {
+        Self { entries: [None; N] }
+    }
     pub fn record(&mut self, device: DeviceId, driver_id: u32, outcome: ProbeOutcome) -> bool {
         let mut i = 0;
         while i < N {
             if let Some(ref mut e) = self.entries[i] {
-                if e.device == device && e.driver_id == driver_id { e.record(outcome); return true; }
+                if e.device == device && e.driver_id == driver_id {
+                    e.record(outcome);
+                    return true;
+                }
             }
             i += 1;
         }
@@ -61,7 +81,9 @@ impl<const N: usize> ExperienceDb<N> {
         let mut i = 0;
         while i < N {
             if let Some(e) = self.entries[i] {
-                if e.device == device && e.driver_id == driver_id { return Some(e); }
+                if e.device == device && e.driver_id == driver_id {
+                    return Some(e);
+                }
             }
             i += 1;
         }

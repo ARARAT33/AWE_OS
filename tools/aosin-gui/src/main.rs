@@ -5,7 +5,9 @@
 
 #![windows_subsystem = "windows"]
 
-use awe_ayui::{Color, Compositor, Framebuffer, InputEvent, Rect};
+use awe_ayui::{Color, Framebuffer, Rect};
+#[cfg(not(target_os = "windows"))]
+use awe_ayui::{Compositor, InputEvent};
 use std::process::Command;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -399,7 +401,7 @@ mod win32_host {
         rgb_reserved: [u8; 32],
     }
 
-    extern "system" {
+    unsafe extern "system" {
         fn GetModuleHandleW(lp_module_name: LPCWSTR) -> HINSTANCE;
         fn RegisterClassExW(lp_wcx: *const WNDCLASSEXW) -> WORD;
         fn CreateWindowExW(

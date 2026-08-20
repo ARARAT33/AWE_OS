@@ -3,13 +3,18 @@
 use super::linux_dependency::Dependency;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum GraphError { MissingNode, Cycle }
+pub enum GraphError {
+    MissingNode,
+    Cycle,
+}
 
 /// Allocation-free bounded dependency graph validation.
 /// Nodes are represented by module hashes and edges by Dependency records.
 pub fn validate_graph(nodes: &[u64], edges: &[Dependency]) -> Result<(), GraphError> {
     for edge in edges {
-        if !nodes.iter().any(|n| *n == edge.driver_hash) || !nodes.iter().any(|n| *n == edge.required_hash) {
+        if !nodes.iter().any(|n| *n == edge.driver_hash)
+            || !nodes.iter().any(|n| *n == edge.required_hash)
+        {
             return Err(GraphError::MissingNode);
         }
     }
@@ -25,7 +30,9 @@ pub fn validate_graph(nodes: &[u64], edges: &[Dependency]) -> Result<(), GraphEr
             }
             steps += 1;
         }
-        if steps > nodes.len() { return Err(GraphError::Cycle); }
+        if steps > nodes.len() {
+            return Err(GraphError::Cycle);
+        }
     }
     Ok(())
 }
@@ -34,9 +41,58 @@ pub fn validate_graph(nodes: &[u64], edges: &[Dependency]) -> Result<(), GraphEr
 mod tests {
     use super::*;
     #[test]
-    fn validates_chain() { assert!(validate_graph(&[1,2,3], &[Dependency{driver_hash:1,required_hash:2},Dependency{driver_hash:2,required_hash:3}]).is_ok()); }
+    fn validates_chain() {
+        assert!(
+            validate_graph(
+                &[1, 2, 3],
+                &[
+                    Dependency {
+                        driver_hash: 1,
+                        required_hash: 2
+                    },
+                    Dependency {
+                        driver_hash: 2,
+                        required_hash: 3
+                    }
+                ]
+            )
+            .is_ok()
+        );
+    }
     #[test]
-    fn detects_cycle() { assert_eq!(validate_graph(&[1,2,3], &[Dependency{driver_hash:1,required_hash:2},Dependency{driver_hash:2,required_hash:3},Dependency{driver_hash:3,required_hash:1}]), Err(GraphError::Cycle)); }
+    fn detects_cycle() {
+        assert_eq!(
+            validate_graph(
+                &[1, 2, 3],
+                &[
+                    Dependency {
+                        driver_hash: 1,
+                        required_hash: 2
+                    },
+                    Dependency {
+                        driver_hash: 2,
+                        required_hash: 3
+                    },
+                    Dependency {
+                        driver_hash: 3,
+                        required_hash: 1
+                    }
+                ]
+            ),
+            Err(GraphError::Cycle)
+        );
+    }
     #[test]
-    fn detects_missing_node() { assert_eq!(validate_graph(&[1], &[Dependency{driver_hash:1,required_hash:9}]), Err(GraphError::MissingNode)); }
+    fn detects_missing_node() {
+        assert_eq!(
+            validate_graph(
+                &[1],
+                &[Dependency {
+                    driver_hash: 1,
+                    required_hash: 9
+                }]
+            ),
+            Err(GraphError::MissingNode)
+        );
+    }
 }

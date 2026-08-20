@@ -5,10 +5,20 @@ use super::linux_activation_rollback::activation_failed;
 use super::linux_dependency::Dependency;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum OrchestratorError { Order, InvalidSequence, RollbackBufferFull }
+pub enum OrchestratorError {
+    Order,
+    InvalidSequence,
+    RollbackBufferFull,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum OrchestratorState { Ready, Activating, Activated, RollbackRequired, RolledBack }
+pub enum OrchestratorState {
+    Ready,
+    Activating,
+    Activated,
+    RollbackRequired,
+    RolledBack,
+}
 
 /// Allocation-free orchestration metadata for a multi-driver transaction.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -21,11 +31,18 @@ pub struct ActivationOrchestrator<const N: usize> {
 
 impl<const N: usize> ActivationOrchestrator<N> {
     pub const fn new() -> Self {
-        Self { state: OrchestratorState::Ready, order: [0; N], count: 0, activated: 0 }
+        Self {
+            state: OrchestratorState::Ready,
+            order: [0; N],
+            count: 0,
+            activated: 0,
+        }
     }
 
     pub fn prepare(&mut self, nodes: &[u64], deps: &[Dependency]) -> Result<(), OrchestratorError> {
-        if nodes.len() > N { return Err(OrchestratorError::Order); }
+        if nodes.len() > N {
+            return Err(OrchestratorError::Order);
+        }
         self.count = build_activation_order(nodes, deps, &mut self.order)
             .map_err(|_| OrchestratorError::Order)?;
         validate_activation_order(&self.order[..self.count], deps)
@@ -36,7 +53,9 @@ impl<const N: usize> ActivationOrchestrator<N> {
     }
 
     pub fn begin(&mut self) -> Result<(), OrchestratorError> {
-        if self.state != OrchestratorState::Ready { return Err(OrchestratorError::InvalidSequence); }
+        if self.state != OrchestratorState::Ready {
+            return Err(OrchestratorError::InvalidSequence);
+        }
         self.state = OrchestratorState::Activating;
         Ok(())
     }
@@ -47,13 +66,19 @@ impl<const N: usize> ActivationOrchestrator<N> {
         }
         let node = self.order[self.activated];
         self.activated += 1;
-        if self.activated == self.count { self.state = OrchestratorState::Activated; }
+        if self.activated == self.count {
+            self.state = OrchestratorState::Activated;
+        }
         Ok(node)
     }
 
     pub fn fail(&mut self, rollback: &mut [u64]) -> Result<usize, OrchestratorError> {
-        if self.state != OrchestratorState::Activating { return Err(OrchestratorError::InvalidSequence); }
-        if rollback.len() < self.activated { return Err(OrchestratorError::RollbackBufferFull); }
+        if self.state != OrchestratorState::Activating {
+            return Err(OrchestratorError::InvalidSequence);
+        }
+        if rollback.len() < self.activated {
+            return Err(OrchestratorError::RollbackBufferFull);
+        }
         let n = activation_failed(&self.order[..self.count], self.activated, rollback)
             .map_err(|_| OrchestratorError::InvalidSequence)?;
         self.state = OrchestratorState::RollbackRequired;
@@ -61,7 +86,9 @@ impl<const N: usize> ActivationOrchestrator<N> {
     }
 
     pub fn complete_rollback(&mut self) -> Result<(), OrchestratorError> {
-        if self.state != OrchestratorState::RollbackRequired { return Err(OrchestratorError::InvalidSequence); }
+        if self.state != OrchestratorState::RollbackRequired {
+            return Err(OrchestratorError::InvalidSequence);
+        }
         self.activated = 0;
         self.state = OrchestratorState::RolledBack;
         Ok(())
@@ -75,7 +102,16 @@ mod tests {
     #[test]
     fn failure_rolls_back_only_successfully_activated_nodes() {
         let nodes = [10, 20, 30, 40];
-        let deps = [Dependency { driver_hash: 10, required_hash: 20 }, Dependency { driver_hash: 20, required_hash: 30 }];
+        let deps = [
+            Dependency {
+                driver_hash: 10,
+                required_hash: 20,
+            },
+            Dependency {
+                driver_hash: 20,
+                required_hash: 30,
+            },
+        ];
         let mut o = ActivationOrchestrator::<4>::new();
         o.prepare(&nodes, &deps).unwrap();
         o.begin().unwrap();
@@ -91,7 +127,10 @@ mod tests {
     #[test]
     fn successful_sequence_reaches_activated() {
         let nodes = [1, 2];
-        let deps = [Dependency { driver_hash: 1, required_hash: 2 }];
+        let deps = [Dependency {
+            driver_hash: 1,
+            required_hash: 2,
+        }];
         let mut o = ActivationOrchestrator::<2>::new();
         o.prepare(&nodes, &deps).unwrap();
         o.begin().unwrap();

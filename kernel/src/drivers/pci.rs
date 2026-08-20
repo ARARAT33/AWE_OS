@@ -45,10 +45,18 @@ impl PciConfigAddress {
         Ok(Self { raw })
     }
 
-    pub const fn bus(self) -> u8 { ((self.raw >> 16) & 0xff) as u8 }
-    pub const fn device(self) -> u8 { ((self.raw >> 11) & 0x1f) as u8 }
-    pub const fn function(self) -> u8 { ((self.raw >> 8) & 0x07) as u8 }
-    pub const fn offset(self) -> u8 { (self.raw & 0xfc) as u8 }
+    pub const fn bus(self) -> u8 {
+        ((self.raw >> 16) & 0xff) as u8
+    }
+    pub const fn device(self) -> u8 {
+        ((self.raw >> 11) & 0x1f) as u8
+    }
+    pub const fn function(self) -> u8 {
+        ((self.raw >> 8) & 0x07) as u8
+    }
+    pub const fn offset(self) -> u8 {
+        (self.raw & 0xfc) as u8
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -203,7 +211,13 @@ mod tests {
     }
 
     impl ConfigSpace for FakeConfig {
-        fn read32(&mut self, _bus: u8, _device: u8, _function: u8, offset: u8) -> Result<u32, PciError> {
+        fn read32(
+            &mut self,
+            _bus: u8,
+            _device: u8,
+            _function: u8,
+            offset: u8,
+        ) -> Result<u32, PciError> {
             self.reads += 1;
             if !self.present {
                 return Ok(0xffff_ffff);
@@ -230,14 +244,26 @@ mod tests {
 
     #[test]
     fn config_address_rejects_invalid_alignment_and_fields() {
-        assert_eq!(PciConfigAddress::new(0, 0, 0, 0x02), Err(PciError::InvalidFunction));
-        assert_eq!(PciConfigAddress::new(0, 32, 0, 0), Err(PciError::InvalidFunction));
-        assert_eq!(PciConfigAddress::new(0, 0, 8, 0), Err(PciError::InvalidFunction));
+        assert_eq!(
+            PciConfigAddress::new(0, 0, 0, 0x02),
+            Err(PciError::InvalidFunction)
+        );
+        assert_eq!(
+            PciConfigAddress::new(0, 32, 0, 0),
+            Err(PciError::InvalidFunction)
+        );
+        assert_eq!(
+            PciConfigAddress::new(0, 0, 8, 0),
+            Err(PciError::InvalidFunction)
+        );
     }
 
     #[test]
     fn absent_function_is_ignored() {
-        let mut e = Enumerator::new(FakeConfig { present: false, reads: 0 });
+        let mut e = Enumerator::new(FakeConfig {
+            present: false,
+            reads: 0,
+        });
         let mut out = [None; 1];
         assert_eq!(e.scan_bus(0, &mut out).unwrap(), 0);
         assert!(out[0].is_none());
@@ -245,7 +271,10 @@ mod tests {
 
     #[test]
     fn present_function_is_decoded() {
-        let mut e = Enumerator::new(FakeConfig { present: true, reads: 0 });
+        let mut e = Enumerator::new(FakeConfig {
+            present: true,
+            reads: 0,
+        });
         let mut out = [None; 1];
         assert_eq!(e.scan_bus(0, &mut out).unwrap(), 1);
         let f = out[0].unwrap();
@@ -258,7 +287,10 @@ mod tests {
 
     #[test]
     fn multi_bus_scan_is_bounded_and_deterministic() {
-        let mut e = Enumerator::new(FakeConfig { present: true, reads: 0 });
+        let mut e = Enumerator::new(FakeConfig {
+            present: true,
+            reads: 0,
+        });
         let mut out = [None; 2];
         assert_eq!(e.scan_buses(1, 2, &mut out).unwrap(), 2);
         assert_eq!(out[0].unwrap().bus, 1);
@@ -267,22 +299,34 @@ mod tests {
 
     #[test]
     fn rejects_invalid_function_numbers() {
-        let mut e = Enumerator::new(FakeConfig { present: true, reads: 0 });
+        let mut e = Enumerator::new(FakeConfig {
+            present: true,
+            reads: 0,
+        });
         assert_eq!(e.probe_function(0, 32, 0), Err(PciError::InvalidFunction));
         assert_eq!(e.probe_function(0, 0, 8), Err(PciError::InvalidFunction));
     }
 
     #[test]
     fn enforces_bounded_scan_output() {
-        let mut e = Enumerator::new(FakeConfig { present: true, reads: 0 });
+        let mut e = Enumerator::new(FakeConfig {
+            present: true,
+            reads: 0,
+        });
         let mut out = [None; MAX_PCI_FUNCTIONS + 1];
         assert_eq!(e.scan_bus(0, &mut out), Err(PciError::CapacityExceeded));
     }
 
     #[test]
     fn rejects_unbounded_bus_scan() {
-        let mut e = Enumerator::new(FakeConfig { present: true, reads: 0 });
+        let mut e = Enumerator::new(FakeConfig {
+            present: true,
+            reads: 0,
+        });
         let mut out = [None; 1];
-        assert_eq!(e.scan_buses(0, (MAX_PCI_BUSES + 1) as u8, &mut out), Err(PciError::CapacityExceeded));
+        assert_eq!(
+            e.scan_buses(0, (MAX_PCI_BUSES + 1) as u8, &mut out),
+            Err(PciError::CapacityExceeded)
+        );
     }
 }

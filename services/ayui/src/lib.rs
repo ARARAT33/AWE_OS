@@ -44,14 +44,54 @@ pub struct Color {
 }
 
 impl Color {
-    pub const BLACK: Self = Self { r: 0, g: 0, b: 0, a: 255 };
-    pub const WHITE: Self = Self { r: 255, g: 255, b: 255, a: 255 };
-    pub const RED: Self = Self { r: 255, g: 0, b: 0, a: 255 };
-    pub const GREEN: Self = Self { r: 0, g: 255, b: 0, a: 255 };
-    pub const BLUE: Self = Self { r: 0, g: 120, b: 215, a: 255 };
-    pub const DARK_GRAY: Self = Self { r: 32, g: 32, b: 32, a: 255 };
-    pub const LIGHT_GRAY: Self = Self { r: 192, g: 192, b: 192, a: 255 };
-    pub const YELLOW: Self = Self { r: 255, g: 255, b: 0, a: 255 };
+    pub const BLACK: Self = Self {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 255,
+    };
+    pub const WHITE: Self = Self {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 255,
+    };
+    pub const RED: Self = Self {
+        r: 255,
+        g: 0,
+        b: 0,
+        a: 255,
+    };
+    pub const GREEN: Self = Self {
+        r: 0,
+        g: 255,
+        b: 0,
+        a: 255,
+    };
+    pub const BLUE: Self = Self {
+        r: 0,
+        g: 120,
+        b: 215,
+        a: 255,
+    };
+    pub const DARK_GRAY: Self = Self {
+        r: 32,
+        g: 32,
+        b: 32,
+        a: 255,
+    };
+    pub const LIGHT_GRAY: Self = Self {
+        r: 192,
+        g: 192,
+        b: 192,
+        a: 255,
+    };
+    pub const YELLOW: Self = Self {
+        r: 255,
+        g: 255,
+        b: 0,
+        a: 255,
+    };
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -114,12 +154,37 @@ pub struct Theme {
 impl Theme {
     pub const fn default_dark() -> Self {
         Self {
-            bg_color: Color { r: 24, g: 28, b: 36, a: 255 },
-            window_border: Color { r: 60, g: 64, b: 72, a: 255 },
-            titlebar_active: Color { r: 0, g: 120, b: 215, a: 255 },
-            titlebar_inactive: Color { r: 45, g: 50, b: 60, a: 255 },
+            bg_color: Color {
+                r: 24,
+                g: 28,
+                b: 36,
+                a: 255,
+            },
+            window_border: Color {
+                r: 60,
+                g: 64,
+                b: 72,
+                a: 255,
+            },
+            titlebar_active: Color {
+                r: 0,
+                g: 120,
+                b: 215,
+                a: 255,
+            },
+            titlebar_inactive: Color {
+                r: 45,
+                g: 50,
+                b: 60,
+                a: 255,
+            },
             text_color: Color::WHITE,
-            accent_color: Color { r: 0, g: 153, b: 255, a: 255 },
+            accent_color: Color {
+                r: 0,
+                g: 153,
+                b: 255,
+                a: 255,
+            },
             dark_mode: true,
         }
     }
@@ -420,7 +485,12 @@ impl Compositor {
         }
     }
 
-    pub fn register_monitor(&mut self, bounds: Rect, primary: bool, gpu_accel: bool) -> Result<u8, UiError> {
+    pub fn register_monitor(
+        &mut self,
+        bounds: Rect,
+        primary: bool,
+        gpu_accel: bool,
+    ) -> Result<u8, UiError> {
         if self.monitor_count >= MAX_MONITORS {
             return Err(UiError::Full);
         }
@@ -439,7 +509,12 @@ impl Compositor {
         self.create_app_window(bounds, AppType::Generic, b"Window")
     }
 
-    pub fn create_app_window(&mut self, bounds: Rect, app_type: AppType, title: &[u8]) -> Result<WindowId, UiError> {
+    pub fn create_app_window(
+        &mut self,
+        bounds: Rect,
+        app_type: AppType,
+        title: &[u8],
+    ) -> Result<WindowId, UiError> {
         if !bounds.valid() {
             return Err(UiError::InvalidRect);
         }
@@ -560,8 +635,21 @@ impl Compositor {
             width: fb.width,
             height: 40,
         };
-        fb.fill_rect(taskbar_rect, Color { r: 18, g: 20, b: 26, a: 255 });
-        fb.draw_text(10, (fb.height as i32) - 30, "AWE_OS AYUI Desktop", self.theme.text_color);
+        fb.fill_rect(
+            taskbar_rect,
+            Color {
+                r: 18,
+                g: 20,
+                b: 26,
+                a: 255,
+            },
+        );
+        fb.draw_text(
+            10,
+            (fb.height as i32) - 30,
+            "AWE_OS AYUI Desktop",
+            self.theme.text_color,
+        );
 
         // Render visible windows
         for win in self.windows.iter().flatten() {
@@ -590,7 +678,8 @@ impl Compositor {
                 fb.fill_rect(content_rect, win.bg_color);
 
                 // Render App Title
-                let title_str = core::str::from_utf8(&win.title_bytes[..win.title_len]).unwrap_or("App");
+                let title_str =
+                    core::str::from_utf8(&win.title_bytes[..win.title_len]).unwrap_or("App");
                 fb.draw_text(win.bounds.x + 8, win.bounds.y + 6, title_str, Color::WHITE);
             }
         }
@@ -679,7 +768,18 @@ mod tests {
     #[test]
     fn multi_monitor_and_clipboard_work() {
         let mut c = Compositor::new();
-        let mid = c.register_monitor(Rect { x: 0, y: 0, width: 1920, height: 1080 }, true, true).unwrap();
+        let mid = c
+            .register_monitor(
+                Rect {
+                    x: 0,
+                    y: 0,
+                    width: 1920,
+                    height: 1080,
+                },
+                true,
+                true,
+            )
+            .unwrap();
         assert_eq!(mid, 0);
 
         c.clipboard.copy(b"AWEOS Clipboard").unwrap();

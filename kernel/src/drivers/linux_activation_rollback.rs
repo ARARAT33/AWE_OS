@@ -1,12 +1,20 @@
 #![no_std]
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum RollbackError { InvalidOrder, RollbackFailed }
+pub enum RollbackError {
+    InvalidOrder,
+    RollbackFailed,
+}
 
 /// Tracks successfully activated drivers and returns the exact reverse-order
 /// sequence required for safe rollback. No heap allocation is used.
-pub fn build_rollback_order(activation_order: &[u64], out: &mut [u64]) -> Result<usize, RollbackError> {
-    if out.len() < activation_order.len() { return Err(RollbackError::InvalidOrder); }
+pub fn build_rollback_order(
+    activation_order: &[u64],
+    out: &mut [u64],
+) -> Result<usize, RollbackError> {
+    if out.len() < activation_order.len() {
+        return Err(RollbackError::InvalidOrder);
+    }
     for (i, node) in activation_order.iter().rev().enumerate() {
         out[i] = *node;
     }
@@ -53,6 +61,9 @@ mod tests {
     fn rejects_invalid_count() {
         let order = [1, 2];
         let mut rollback = [0; 2];
-        assert_eq!(activation_failed(&order, 3, &mut rollback), Err(RollbackError::InvalidOrder));
+        assert_eq!(
+            activation_failed(&order, 3, &mut rollback),
+            Err(RollbackError::InvalidOrder)
+        );
     }
 }

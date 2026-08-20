@@ -1,8 +1,69 @@
 #![no_std]
-use super::bus::DeviceId;use super::contract::HardwareResource;pub use super::linux_runtime::LinuxDriverDescriptor;use super::linux_runtime::{LinuxRuntime,LinuxRuntimeError};use super::universal::DriverRequest;
-#[derive(Clone,Copy,PartialEq,Eq,Debug)]pub enum LinuxPackageError{InvalidHeader,InvalidLength,InvalidChecksum,Runtime(LinuxRuntimeError)}
-#[repr(C)]#[derive(Clone,Copy,PartialEq,Eq,Debug)]pub struct LinuxPackageHeader{pub magic:u32,pub format_version:u16,pub descriptor_size:u16,pub payload_size:u32,pub checksum:u64}
-pub const LDRIVER_MAGIC:u32=0x4157_4452;pub const MAX_PAYLOAD:u32=16*1024*1024;
-pub fn validate_package(header:LinuxPackageHeader,descriptor:LinuxDriverDescriptor)->Result<(),LinuxPackageError>{if header.magic!=LDRIVER_MAGIC||header.format_version==0||header.descriptor_size as usize!=core::mem::size_of::<LinuxDriverDescriptor>(){return Err(LinuxPackageError::InvalidHeader)}if header.payload_size==0||header.payload_size>MAX_PAYLOAD||header.checksum==0||descriptor.module_hash==0{return Err(LinuxPackageError::InvalidLength)}if !descriptor.signed{return Err(LinuxPackageError::Runtime(LinuxRuntimeError::Unsigned))}Ok(())}
-pub fn package_request(header:LinuxPackageHeader,descriptor:LinuxDriverDescriptor,device:DeviceId,resources:HardwareResource)->Result<DriverRequest,LinuxPackageError>{validate_package(header,descriptor)?;LinuxRuntime::new(descriptor.api_version).probe_request(descriptor,device,resources).map_err(LinuxPackageError::Runtime)}
-pub fn prepare_probe(runtime:&LinuxRuntime,header:LinuxPackageHeader,descriptor:LinuxDriverDescriptor,device:DeviceId,resources:HardwareResource)->Result<DriverRequest,LinuxPackageError>{validate_package(header,descriptor)?;runtime.probe_request(descriptor,device,resources).map_err(LinuxPackageError::Runtime)}
+use super::bus::DeviceId;
+use super::contract::HardwareResource;
+pub use super::linux_runtime::LinuxDriverDescriptor;
+use super::linux_runtime::{LinuxRuntime, LinuxRuntimeError};
+use super::universal::DriverRequest;
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LinuxPackageError {
+    InvalidHeader,
+    InvalidLength,
+    InvalidChecksum,
+    Runtime(LinuxRuntimeError),
+}
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct LinuxPackageHeader {
+    pub magic: u32,
+    pub format_version: u16,
+    pub descriptor_size: u16,
+    pub payload_size: u32,
+    pub checksum: u64,
+}
+pub const LDRIVER_MAGIC: u32 = 0x4157_4452;
+pub const MAX_PAYLOAD: u32 = 16 * 1024 * 1024;
+pub fn validate_package(
+    header: LinuxPackageHeader,
+    descriptor: LinuxDriverDescriptor,
+) -> Result<(), LinuxPackageError> {
+    if header.magic != LDRIVER_MAGIC
+        || header.format_version == 0
+        || header.descriptor_size as usize != core::mem::size_of::<LinuxDriverDescriptor>()
+    {
+        return Err(LinuxPackageError::InvalidHeader);
+    }
+    if header.payload_size == 0
+        || header.payload_size > MAX_PAYLOAD
+        || header.checksum == 0
+        || descriptor.module_hash == 0
+    {
+        return Err(LinuxPackageError::InvalidLength);
+    }
+    if !descriptor.signed {
+        return Err(LinuxPackageError::Runtime(LinuxRuntimeError::Unsigned));
+    }
+    Ok(())
+}
+pub fn package_request(
+    header: LinuxPackageHeader,
+    descriptor: LinuxDriverDescriptor,
+    device: DeviceId,
+    resources: HardwareResource,
+) -> Result<DriverRequest, LinuxPackageError> {
+    validate_package(header, descriptor)?;
+    LinuxRuntime::new(descriptor.api_version)
+        .probe_request(descriptor, device, resources)
+        .map_err(LinuxPackageError::Runtime)
+}
+pub fn prepare_probe(
+    runtime: &LinuxRuntime,
+    header: LinuxPackageHeader,
+    descriptor: LinuxDriverDescriptor,
+    device: DeviceId,
+    resources: HardwareResource,
+) -> Result<DriverRequest, LinuxPackageError> {
+    validate_package(header, descriptor)?;
+    runtime
+        .probe_request(descriptor, device, resources)
+        .map_err(LinuxPackageError::Runtime)
+}

@@ -2,7 +2,9 @@
 
 use super::pci::PciFunction;
 use super::virtio::VirtioFeatures;
-use super::virtio_pci::{Bar, PciError, PciId, VirtioPciCapabilities, VirtioPciTransport, VIRTIO_VENDOR_ID};
+use super::virtio_pci::{
+    Bar, PciError, PciId, VIRTIO_VENDOR_ID, VirtioPciCapabilities, VirtioPciTransport,
+};
 
 /// Maximum number of VirtIO functions admitted by one bounded probe pass.
 pub const MAX_VIRTIO_PROBES: usize = 8;
@@ -89,7 +91,12 @@ impl VirtioPciProbe {
         } else {
             (raw & !0xf) as u64
         };
-        let bar = Bar { base, size, is_io, prefetchable: false };
+        let bar = Bar {
+            base,
+            size,
+            is_io,
+            prefetchable: false,
+        };
         match bar.validate() {
             Ok(()) => Ok(bar),
             Err(_) => Err(ProbeError::InvalidBar),
@@ -128,15 +135,30 @@ mod tests {
 
     #[test]
     fn classifies_supported_virtio_devices() {
-        assert_eq!(VirtioPciProbe::classify(&network_function()), Ok(VirtioDeviceKind::Network));
-        let block = PciFunction { device_id: 0x1042, ..network_function() };
-        assert_eq!(VirtioPciProbe::classify(&block), Ok(VirtioDeviceKind::Block));
+        assert_eq!(
+            VirtioPciProbe::classify(&network_function()),
+            Ok(VirtioDeviceKind::Network)
+        );
+        let block = PciFunction {
+            device_id: 0x1042,
+            ..network_function()
+        };
+        assert_eq!(
+            VirtioPciProbe::classify(&block),
+            Ok(VirtioDeviceKind::Block)
+        );
     }
 
     #[test]
     fn rejects_non_virtio_before_transport_creation() {
-        let non_virtio = PciFunction { vendor_id: 0x1234, ..network_function() };
-        assert_eq!(VirtioPciProbe::classify(&non_virtio), Err(ProbeError::NotVirtio));
+        let non_virtio = PciFunction {
+            vendor_id: 0x1234,
+            ..network_function()
+        };
+        assert_eq!(
+            VirtioPciProbe::classify(&non_virtio),
+            Err(ProbeError::NotVirtio)
+        );
     }
 
     #[test]
@@ -148,7 +170,8 @@ mod tests {
             None,
             VirtioFeatures::VERSION_1,
             4,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(kind, VirtioDeviceKind::Network);
         transport.negotiate(VirtioFeatures::VERSION_1).unwrap();
         transport.configure_queue_count(2).unwrap();
@@ -159,8 +182,12 @@ mod tests {
     fn rejects_zero_capability_window() {
         assert_eq!(
             VirtioPciProbe::prepare(
-                network_function(), 0, 0x1000, None,
-                VirtioFeatures::VERSION_1, 4,
+                network_function(),
+                0,
+                0x1000,
+                None,
+                VirtioFeatures::VERSION_1,
+                4,
             ),
             Err(ProbeError::InvalidBar)
         );
@@ -169,8 +196,12 @@ mod tests {
     #[test]
     fn rejects_unbounded_queue_configuration() {
         let result = VirtioPciProbe::prepare(
-            network_function(), 0x1000, 0x1000, None,
-            VirtioFeatures::VERSION_1, 0,
+            network_function(),
+            0x1000,
+            0x1000,
+            None,
+            VirtioFeatures::VERSION_1,
+            0,
         );
         assert_eq!(result, Err(ProbeError::CapacityExceeded));
     }
