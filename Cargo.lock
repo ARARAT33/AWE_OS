@@ -10,6 +10,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "awe-app-calculator"
+version = "0.1.0"
+dependencies = [
+ "awe-ayui",
+]
+
+[[package]]
+name = "awe-app-filemanager"
+version = "0.1.0"
+dependencies = [
+ "awe-ayui",
+ "awe-storaged",
+]
+
+[[package]]
+name = "awe-app-settings"
+version = "0.1.0"
+dependencies = [
+ "awe-ayui",
+ "awe-netd",
+]
+
+[[package]]
+name = "awe-app-terminal"
+version = "0.1.0"
+dependencies = [
+ "awe-ayui",
+ "awe-nexus",
+]
+
+[[package]]
 name = "awe-appd"
 version = "0.1.0"
 
@@ -22,8 +53,22 @@ name = "awe-ayui"
 version = "0.1.0"
 
 [[package]]
+name = "awe-boot-arm"
+version = "0.1.0"
+dependencies = [
+ "awe-boot-protocol",
+]
+
+[[package]]
 name = "awe-boot-protocol"
 version = "0.1.0"
+
+[[package]]
+name = "awe-boot-riscv"
+version = "0.1.0"
+dependencies = [
+ "awe-boot-protocol",
+]
 
 [[package]]
 name = "awe-cli"
