@@ -20,7 +20,9 @@ fn print_help() {
     println!("Commands:");
     println!("  build [target]           Build kernel, services, apps, or full workspace");
     println!("  sdk <init|bind>          Initialize SDK project or generate C/Rust bindings");
-    println!("  pkg <create|install|...> Manage .awos packages (install, uninstall, update, rollback)");
+    println!(
+        "  pkg <create|install|...> Manage .awos packages (install, uninstall, update, rollback)"
+    );
     println!("  driver <create|...>      Manage .asd drivers (install, quarantine, recover)");
     println!("  sign <file> --key <id>   Sign .awos or .asd package with cryptographic key");
     println!("  cap <edit|check>         Edit or validate package capabilities & permissions");
@@ -75,7 +77,9 @@ fn main() {
                 }
                 "bind" => {
                     println!("[awe-sdk] Generating AWOSA C/Rust language ABI bindings...");
-                    println!("[awe-sdk] AWOSA ABI v1.3 headers generated: awosa_abi.h, awosa_abi.rs");
+                    println!(
+                        "[awe-sdk] AWOSA ABI v1.3 headers generated: awosa_abi.h, awosa_abi.rs"
+                    );
                 }
                 _ => println!("Usage: awe sdk <init <app_name> | bind>"),
             }
@@ -87,7 +91,16 @@ fn main() {
                 "create" => {
                     println!("[awe-pkg] Packaging .awos bundle...");
                     let status = Command::new("cargo")
-                        .args(["run", "-p", "aweosa-builder", "--", "build", "manifest.json", "main.rs", "app.awos"])
+                        .args([
+                            "run",
+                            "-p",
+                            "aweosa-builder",
+                            "--",
+                            "build",
+                            "manifest.json",
+                            "main.rs",
+                            "app.awos",
+                        ])
                         .status();
                     if status.is_ok_and(|s| s.success()) {
                         println!("[awe-pkg] Package created: app.awos");
@@ -98,7 +111,9 @@ fn main() {
                 "install" => {
                     let pkg = args.get(3).map(|s| s.as_str()).unwrap_or("app.awos");
                     println!("[awe-pkg] Installing .awos package: {pkg}...");
-                    println!("[awe-pkg] Verified publisher identity and dependencies. Installed successfully.");
+                    println!(
+                        "[awe-pkg] Verified publisher identity and dependencies. Installed successfully."
+                    );
                 }
                 "list" => {
                     println!("=== Installed .awos Packages ===");
@@ -113,7 +128,9 @@ fn main() {
                 }
                 "update" => {
                     let pkg = args.get(3).map(|s| s.as_str()).unwrap_or("app_v2.awos");
-                    println!("[awe-pkg] Updating package with {pkg}... Version upgraded, backup checkpoint saved.");
+                    println!(
+                        "[awe-pkg] Updating package with {pkg}... Version upgraded, backup checkpoint saved."
+                    );
                 }
                 "rollback" => {
                     let id = args.get(3).map(|s| s.as_str()).unwrap_or("1001");
@@ -158,7 +175,9 @@ fn main() {
             let file = args.get(3).map(|s| s.as_str()).unwrap_or("manifest.json");
             match sub {
                 "edit" => {
-                    println!("[awe-cap] Capability editor loaded for {file}. Updated capability bitmask.");
+                    println!(
+                        "[awe-cap] Capability editor loaded for {file}. Updated capability bitmask."
+                    );
                 }
                 "check" => {
                     println!("[awe-cap] Inspecting manifest capabilities for {file}:");
@@ -194,7 +213,13 @@ fn main() {
             if sub == "matrix" || sub == "compat" {
                 println!("[awe-test] Running Automated Cross-Platform Compatibility Matrix...");
                 let status = Command::new("cargo")
-                    .args(["test", "-p", "awe-product-core-tests", "--", "kernel_compatibility_runtimes_end_to_end"])
+                    .args([
+                        "test",
+                        "-p",
+                        "awe-product-core-tests",
+                        "--",
+                        "kernel_compatibility_runtimes_end_to_end",
+                    ])
                     .status();
                 if status.is_ok_and(|s| s.success()) {
                     println!("[awe-test] Compatibility Matrix Tests PASSED.");
@@ -203,9 +228,7 @@ fn main() {
                 }
             } else {
                 println!("[awe-test] Running all workspace unit & integration tests...");
-                let status = Command::new("cargo")
-                    .args(["test", "--workspace"])
-                    .status();
+                let status = Command::new("cargo").args(["test", "--workspace"]).status();
                 if status.is_ok_and(|s| s.success()) {
                     println!("[awe-test] All workspace tests PASSED.");
                 } else {

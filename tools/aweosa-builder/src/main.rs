@@ -16,7 +16,12 @@ fn put_u32(out: &mut Vec<u8>, v: u32) {
     out.extend_from_slice(&v.to_le_bytes());
 }
 
-fn package_awos(manifest: &[u8], code: &[u8], data: &[u8], signer_key_id: u8) -> io::Result<Vec<u8>> {
+fn package_awos(
+    manifest: &[u8],
+    code: &[u8],
+    data: &[u8],
+    signer_key_id: u8,
+) -> io::Result<Vec<u8>> {
     if manifest.len() > 64 * 1024 || code.is_empty() || code.len() > 256 * 1024 * 1024 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -73,9 +78,9 @@ fn main() -> io::Result<()> {
             Ok(())
         }
         Some("inspect") => {
-            let pkg_path = args
-                .next()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "missing package file"))?;
+            let pkg_path = args.next().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "missing package file")
+            })?;
             let bytes = fs::read(&pkg_path)?;
             if bytes.len() < AWOS_HEADER_LEN || &bytes[0..4] != AWOS_MAGIC {
                 return Err(io::Error::new(

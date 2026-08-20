@@ -197,7 +197,11 @@ impl SandboxProfile {
         }
     }
 
-    pub fn validate_access(&self, required_cap: u64, pages_requested: u32) -> Result<(), AwosError> {
+    pub fn validate_access(
+        &self,
+        required_cap: u64,
+        pages_requested: u32,
+    ) -> Result<(), AwosError> {
         if (self.capability_mask & required_cap) != required_cap {
             return Err(AwosError::SandboxViolation);
         }
@@ -367,11 +371,7 @@ impl AppPackageManager {
         }
     }
 
-    pub fn install_package(
-        &mut self,
-        bytes: &[u8],
-        meta: PackageMeta,
-    ) -> Result<u64, AwosError> {
+    pub fn install_package(&mut self, bytes: &[u8], meta: PackageMeta) -> Result<u64, AwosError> {
         let header = validate_awos(bytes)?;
         let (_manifest, code, _data, sig) = package_parts(bytes, header)?;
 
@@ -415,7 +415,11 @@ impl AppPackageManager {
         Err(AwosError::PackageNotFound)
     }
 
-    pub fn update_package(&mut self, new_meta: PackageMeta, new_bytes: &[u8]) -> Result<(), AwosError> {
+    pub fn update_package(
+        &mut self,
+        new_meta: PackageMeta,
+        new_bytes: &[u8],
+    ) -> Result<(), AwosError> {
         let header = validate_awos(new_bytes)?;
         let (_manifest, code, _data, sig) = package_parts(new_bytes, header)?;
         new_meta.publisher.verify_signature(code, sig)?;
@@ -477,7 +481,13 @@ mod tests {
     use std::vec;
     use std::vec::Vec;
 
-    fn build_awos_bytes(manifest: usize, code: usize, data: usize, sig: usize, sig_byte0: u8) -> Vec<u8> {
+    fn build_awos_bytes(
+        manifest: usize,
+        code: usize,
+        data: usize,
+        sig: usize,
+        sig_byte0: u8,
+    ) -> Vec<u8> {
         let mut b = Vec::with_capacity(AWOS_HEADER_LEN + manifest + code + data + sig);
         b.extend_from_slice(&AWOS_MAGIC);
         b.extend_from_slice(&AWOS_VERSION.to_le_bytes());
@@ -537,7 +547,10 @@ mod tests {
         assert_eq!(rec.active_version, 1);
 
         // Update to v2
-        let meta_v2 = PackageMeta { version: 2, ..meta_v1 };
+        let meta_v2 = PackageMeta {
+            version: 2,
+            ..meta_v1
+        };
         let bytes_v2 = build_awos_bytes(4, 8, 2, 64, expected_sig);
 
         mgr.update_package(meta_v2, &bytes_v2).expect("update v2");
@@ -552,6 +565,9 @@ mod tests {
 
         // Uninstall
         mgr.uninstall_package(1001).expect("uninstall");
-        assert_eq!(mgr.get_installed_record(1001), Err(AwosError::PackageNotFound));
+        assert_eq!(
+            mgr.get_installed_record(1001),
+            Err(AwosError::PackageNotFound)
+        );
     }
 }

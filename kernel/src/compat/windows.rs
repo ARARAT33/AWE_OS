@@ -303,13 +303,13 @@ impl Win32SyscallDispatcher {
 
     pub fn dispatch(&mut self, syscall_nr: u32, arg1: u64, arg2: u64, _arg3: u64) -> NtStatus {
         match syscall_nr {
-            0x0055 => self.nt_create_file(arg1, arg2),              // NtCreateFile
-            0x002A => NtStatus::Success,                            // NtAllocateVirtualMemory
-            0x002B => NtStatus::Success,                            // NtFreeVirtualMemory
-            0x002C => NtStatus::Success,                            // NtTerminateProcess
-            0x0033 => self.nt_open_key(arg1),                       // NtOpenKey (Registry)
-            0x0036 => self.nt_query_value_key(arg1 as u32),         // NtQueryValueKey
-            0x007C => NtStatus::Success,                            // NtQuerySystemInformation
+            0x0055 => self.nt_create_file(arg1, arg2), // NtCreateFile
+            0x002A => NtStatus::Success,               // NtAllocateVirtualMemory
+            0x002B => NtStatus::Success,               // NtFreeVirtualMemory
+            0x002C => NtStatus::Success,               // NtTerminateProcess
+            0x0033 => self.nt_open_key(arg1),          // NtOpenKey (Registry)
+            0x0036 => self.nt_query_value_key(arg1 as u32), // NtQueryValueKey
+            0x007C => NtStatus::Success,               // NtQuerySystemInformation
             _ => NtStatus::NotImplemented,
         }
     }
@@ -385,7 +385,10 @@ mod tests {
             disp.handle_table.lookup(4).unwrap().native_fd_or_pid,
             0x1234
         );
-        assert_eq!(disp.dispatch(0x0033, 0x484B_4C4D_534F_4654, 0, 0), NtStatus::Success);
+        assert_eq!(
+            disp.dispatch(0x0033, 0x484B_4C4D_534F_4654, 0, 0),
+            NtStatus::Success
+        );
         assert_eq!(disp.dispatch(0x0036, 8, 0, 0), NtStatus::Success);
     }
 }

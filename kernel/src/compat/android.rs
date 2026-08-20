@@ -183,7 +183,9 @@ mod tests {
         assert_eq!(&header.magic[0..4], &DEX_MAGIC);
         assert_eq!(header.file_size, 128);
 
-        let caps = map_android_permissions_to_awe_capabilities(ANDROID_PERM_INTERNET | ANDROID_PERM_READ_STORAGE);
+        let caps = map_android_permissions_to_awe_capabilities(
+            ANDROID_PERM_INTERNET | ANDROID_PERM_READ_STORAGE,
+        );
         assert_eq!(caps, 0b101); // CAP_NET (4) | CAP_FS_READ (1)
 
         let mut binder = AndroidBinderEmulator::new();

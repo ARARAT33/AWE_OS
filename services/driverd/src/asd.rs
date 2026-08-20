@@ -248,11 +248,7 @@ impl DriverPackageManager {
         }
     }
 
-    pub fn install_driver(
-        &mut self,
-        bytes: &[u8],
-        meta: DriverMeta,
-    ) -> Result<u32, AsdError> {
+    pub fn install_driver(&mut self, bytes: &[u8], meta: DriverMeta) -> Result<u32, AsdError> {
         let header = validate_asd(bytes)?;
         let (_manifest, payload, sig) = package_parts(bytes, header)?;
 
@@ -273,7 +269,11 @@ impl DriverPackageManager {
         Err(AsdError::StorageFull)
     }
 
-    pub fn update_driver(&mut self, new_meta: DriverMeta, new_bytes: &[u8]) -> Result<(), AsdError> {
+    pub fn update_driver(
+        &mut self,
+        new_meta: DriverMeta,
+        new_bytes: &[u8],
+    ) -> Result<(), AsdError> {
         let header = validate_asd(new_bytes)?;
         let (_manifest, payload, sig) = package_parts(new_bytes, header)?;
         new_meta.signer.verify(payload, sig)?;
@@ -415,7 +415,10 @@ mod tests {
 
         // Quarantine
         mgr.quarantine_driver(500).expect("quarantine driver");
-        assert_eq!(mgr.get_record(500).unwrap().state, PackageState::Quarantined);
+        assert_eq!(
+            mgr.get_record(500).unwrap().state,
+            PackageState::Quarantined
+        );
 
         // Recover
         mgr.recover_driver(500).expect("recover driver");

@@ -42,7 +42,13 @@ mod product_core {
         bytes
     }
 
-    fn awos_package(manifest: usize, code: usize, data: usize, signature: usize, sig_byte0: u8) -> Vec<u8> {
+    fn awos_package(
+        manifest: usize,
+        code: usize,
+        data: usize,
+        signature: usize,
+        sig_byte0: u8,
+    ) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(AWOS_HEADER_LEN + manifest + code + data + signature);
         bytes.extend_from_slice(&AWOS_MAGIC);
         bytes.extend_from_slice(&AWOS_VERSION.to_le_bytes());
@@ -257,7 +263,9 @@ mod product_core {
         assert_eq!(lin.dispatch(39, 0, 0, 0).unwrap(), 1); // sys_getpid
         let child_pid = lin.dispatch(56, 0, 0, 0).unwrap(); // sys_clone
         assert_eq!(child_pid, 2);
-        println!("  [PASS] LINUX/POSIX Executable Subset: ELF64 Parser, VFS Fd, Syscall Dispatcher (sys_open, sys_write, sys_getpid, sys_clone)");
+        println!(
+            "  [PASS] LINUX/POSIX Executable Subset: ELF64 Parser, VFS Fd, Syscall Dispatcher (sys_open, sys_write, sys_getpid, sys_clone)"
+        );
 
         // 2. Windows / Win32 Compatibility Subset
         let mut mock_pe = [0u8; 512];
@@ -278,9 +286,14 @@ mod product_core {
 
         let mut win = Win32SyscallDispatcher::new();
         assert_eq!(win.dispatch(0x0055, 0x9999, 0x01, 0), NtStatus::Success); // NtCreateFile
-        assert_eq!(win.dispatch(0x0033, 0x484B_4C4D_534F_4654, 0, 0), NtStatus::Success); // NtOpenKey
+        assert_eq!(
+            win.dispatch(0x0033, 0x484B_4C4D_534F_4654, 0, 0),
+            NtStatus::Success
+        ); // NtOpenKey
         assert_eq!(win.dispatch(0x0036, 8, 0, 0), NtStatus::Success); // NtQueryValueKey
-        println!("  [PASS] WINDOWS/Win32 Executable Subset: PE32+ Parser, Handle Table, Registry Tree, NT Syscalls (NtCreateFile, NtOpenKey, NtQueryValueKey)");
+        println!(
+            "  [PASS] WINDOWS/Win32 Executable Subset: PE32+ Parser, Handle Table, Registry Tree, NT Syscalls (NtCreateFile, NtOpenKey, NtQueryValueKey)"
+        );
 
         // 3. Android Runtime & Binder IPC Subset
         let mut mock_dex = [0u8; 128];
@@ -291,7 +304,9 @@ mod product_core {
         let dex_hdr = DexHeader::parse(&mock_dex).expect("Android DEX parse");
         assert_eq!(dex_hdr.file_size, 128);
 
-        let caps = map_android_permissions_to_awe_capabilities(ANDROID_PERM_INTERNET | ANDROID_PERM_READ_STORAGE);
+        let caps = map_android_permissions_to_awe_capabilities(
+            ANDROID_PERM_INTERNET | ANDROID_PERM_READ_STORAGE,
+        );
         assert_eq!(caps, 0b101);
 
         let mut binder = AndroidBinderEmulator::new();
@@ -306,14 +321,18 @@ mod product_core {
             payload_len: 8,
         };
         assert_eq!(binder.transact(txn_hdr, &[1; 8]).unwrap(), 8);
-        println!("  [PASS] ANDROID Runtime Subset: DEX Header Parser, Permissions Mapping, Binder IPC Channel Emulation");
+        println!(
+            "  [PASS] ANDROID Runtime Subset: DEX Header Parser, Permissions Mapping, Binder IPC Channel Emulation"
+        );
 
         // 4. WLIN Hybrid Interoperability Bridge
         let mut wlin = WlinBridge::new();
         let rid = wlin.map_cross_runtime_resource(4, 3, 2048).unwrap();
         assert_eq!(rid, 1);
         assert_eq!(wlin.lookup_linux_fd(4), Some(3));
-        println!("  [PASS] WLIN Hybrid Bridge Subset: Handle & FD Cross-Mapping, Path Translation Hash Engine");
+        println!(
+            "  [PASS] WLIN Hybrid Bridge Subset: Handle & FD Cross-Mapping, Path Translation Hash Engine"
+        );
 
         // 5. AWOSA Native Application Platform Lifecycle
         let pub_id = PublisherIdentity {
@@ -335,9 +354,16 @@ mod product_core {
         };
 
         let mut app_mgr = AppPackageManager::new();
-        app_mgr.install_package(&awos_bytes, meta_awos).expect("install .awos");
-        assert_eq!(app_mgr.get_installed_record(2001).unwrap().active_version, 1);
-        println!("  [PASS] AWOSA Native Application Engine: .awos Package Format, Signature Verification, App PackageManager Lifecycle");
+        app_mgr
+            .install_package(&awos_bytes, meta_awos)
+            .expect("install .awos");
+        assert_eq!(
+            app_mgr.get_installed_record(2001).unwrap().active_version,
+            1
+        );
+        println!(
+            "  [PASS] AWOSA Native Application Engine: .awos Package Format, Signature Verification, App PackageManager Lifecycle"
+        );
 
         // 6. ASD Native Driver Supervisor Lifecycle
         let signer = DriverSignerKey {
@@ -357,11 +383,15 @@ mod product_core {
         };
 
         let mut drv_mgr = DriverPackageManager::new();
-        drv_mgr.install_driver(&asd_bytes, meta_drv).expect("install .asd");
+        drv_mgr
+            .install_driver(&asd_bytes, meta_drv)
+            .expect("install .asd");
         drv_mgr.quarantine_driver(700).expect("quarantine .asd");
         drv_mgr.recover_driver(700).expect("recover .asd");
         assert_eq!(drv_mgr.get_record(700).unwrap().state, PackageState::Staged);
-        println!("  [PASS] ASD Native Driver Engine: .asd Driver Package Format, Signer Verification, Driver Supervisor Lifecycle");
+        println!(
+            "  [PASS] ASD Native Driver Engine: .asd Driver Package Format, Signer Verification, Driver Supervisor Lifecycle"
+        );
 
         println!("============================================================");
         println!("   COMPATIBILITY MATRIX SUMMARY: ALL 6 SUBSYSTEMS PASSED");

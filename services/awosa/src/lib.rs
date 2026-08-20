@@ -736,10 +736,7 @@ mod tests {
         assert_eq!(pm.get_info(pid).unwrap().state, ProcessState::Running);
 
         pm.terminate(pid, 0).unwrap();
-        assert_eq!(
-            pm.get_info(pid).unwrap().state,
-            ProcessState::Terminated(0)
-        );
+        assert_eq!(pm.get_info(pid).unwrap().state, ProcessState::Terminated(0));
 
         // Fail without spawn cap
         assert_eq!(
@@ -799,10 +796,7 @@ mod tests {
 
         // IPC
         let cid = sdk.ipc_api.create_channel(ProcessId(1), CAP_IPC).unwrap();
-        let sent = sdk
-            .ipc_api
-            .send_message(cid, b"ping", CAP_IPC)
-            .unwrap();
+        let sent = sdk.ipc_api.send_message(cid, b"ping", CAP_IPC).unwrap();
         assert_eq!(sent, 4);
     }
 

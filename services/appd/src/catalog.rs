@@ -1,6 +1,6 @@
 //! Native AWE application catalog. Application code remains user-space.
 
-use crate::{AppId, AppManifest, AWE_APP_ABI_MAJOR, AWE_APP_ABI_MINOR};
+use crate::{AWE_APP_ABI_MAJOR, AWE_APP_ABI_MINOR, AppId, AppManifest};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BuiltinApp {
