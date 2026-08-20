@@ -1,10 +1,11 @@
 //! AOSIN Graphical User Interface (GUI) Installer & Migration Application.
 //!
-//! Provides a standalone graphical UI for zero-data-loss migration, non-destructive
-//! dual-boot partitioning, built-in virtual machine environment setup, and
-//! automatic driver profile preservation.
+//! #![windows_subsystem = "windows"] prevents a console/terminal window from opening
+//! on double-click under Windows.
 
-use awe_ayui::{Color, Compositor, Framebuffer, Rect};
+#![windows_subsystem = "windows"]
+
+use awe_ayui::{Color, Compositor, Framebuffer, InputEvent, Rect};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InstallerPage {
@@ -41,13 +42,26 @@ impl AosinGuiApp {
         }
     }
 
+    pub fn handle_click(&mut self, x: i32, y: i32) {
+        // Handle "Next" or "Start Migration" button clicks inside GUI card
+        if (700..=920).contains(&x) && (650..=710).contains(&y) {
+            self.next_page();
+        }
+    }
+
     pub fn next_page(&mut self) {
         self.current_page = match self.current_page {
             InstallerPage::Welcome => InstallerPage::SystemScan,
             InstallerPage::SystemScan => InstallerPage::MigrationOptions,
             InstallerPage::MigrationOptions => InstallerPage::Partitioning,
-            InstallerPage::Partitioning => InstallerPage::Progress,
-            InstallerPage::Progress => InstallerPage::Complete,
+            InstallerPage::Partitioning => {
+                self.progress_percent = 10;
+                InstallerPage::Progress
+            }
+            InstallerPage::Progress => {
+                self.progress_percent = 100;
+                InstallerPage::Complete
+            }
             InstallerPage::Complete => InstallerPage::Complete,
         };
     }
@@ -60,7 +74,7 @@ impl AosinGuiApp {
             buffer,
         };
 
-        // Window background
+        // Window Background
         fb.fill_rect(
             Rect {
                 x: 0,
@@ -76,13 +90,13 @@ impl AosinGuiApp {
             },
         );
 
-        // Header bar
+        // Header Title Bar
         fb.fill_rect(
             Rect {
                 x: 0,
                 y: 0,
                 width,
-                height: 50,
+                height: 60,
             },
             Color {
                 r: 0,
@@ -92,13 +106,13 @@ impl AosinGuiApp {
             },
         );
 
-        // Main Card
+        // Main Dialog Card
         fb.fill_rect(
             Rect {
                 x: 40,
-                y: 80,
+                y: 90,
                 width: width.saturating_sub(80),
-                height: height.saturating_sub(160),
+                height: height.saturating_sub(180),
             },
             Color {
                 r: 32,
@@ -108,7 +122,23 @@ impl AosinGuiApp {
             },
         );
 
-        // Progress bar if on progress page
+        // Action Button ("Next / Start")
+        fb.fill_rect(
+            Rect {
+                x: 700,
+                y: 650,
+                width: 220,
+                height: 60,
+            },
+            Color {
+                r: 0,
+                g: 180,
+                b: 90,
+                a: 255,
+            },
+        );
+
+        // Progress Bar on Progress Page
         if self.current_page == InstallerPage::Progress {
             let bar_width = (width.saturating_sub(160) * self.progress_percent) / 100;
             fb.fill_rect(
@@ -116,12 +146,12 @@ impl AosinGuiApp {
                     x: 80,
                     y: (height / 2) as i32,
                     width: bar_width,
-                    height: 20,
+                    height: 28,
                 },
                 Color {
                     r: 0,
-                    g: 200,
-                    b: 80,
+                    g: 220,
+                    b: 100,
                     a: 255,
                 },
             );
@@ -136,10 +166,6 @@ impl Default for AosinGuiApp {
 }
 
 fn main() {
-    println!("============================================================");
-    println!("   AOSIN GUI — Graphical AWEOS Installer & Migration Tool");
-    println!("============================================================");
-
     let mut app = AosinGuiApp::new();
     let mut compositor = Compositor::new();
     let win_id = compositor
@@ -155,32 +181,24 @@ fn main() {
 
     let mut frame_buf = vec![0u8; 1024 * 768 * 4];
 
-    println!("[aosin-gui] Page 1: Welcome Screen (Zero-Data-Loss Migration)");
-    app.render_frame(&mut frame_buf, 1024, 768);
+    // Simulate GUI event loop without requiring console/terminal output
+    compositor
+        .push_input(InputEvent::Pointer {
+            x: 750,
+            y: 680,
+            buttons: 1,
+        })
+        .ok();
 
-    app.next_page();
-    println!(
-        "[aosin-gui] Page 2: System Scan (Found {} files, {} drivers preserved)",
-        app.scanned_files_count, app.scanned_drivers_count
-    );
-    app.render_frame(&mut frame_buf, 1024, 768);
+    while let Some(evt) = compositor.pop_input() {
+        if let InputEvent::Pointer { x, y, buttons } = evt
+            && buttons == 1
+        {
+            app.handle_click(x, y);
+        }
+    }
 
-    app.next_page();
-    println!(
-        "[aosin-gui] Page 3: Migration Options (Files: ON, Drivers: ON, Dual-Boot: ON, VM: ON)"
-    );
     app.render_frame(&mut frame_buf, 1024, 768);
-
-    app.next_page();
-    println!("[aosin-gui] Page 4: Partitioning & Virtual Machine Preparation");
-    app.render_frame(&mut frame_buf, 1024, 768);
-
-    app.next_page();
-    app.progress_percent = 100;
-    println!("[aosin-gui] Page 5: Installation Complete! Hardware & files fully preserved.");
-    app.render_frame(&mut frame_buf, 1024, 768);
-
-    println!("[aosin-gui] AOSIN Standalone GUI Application Rendered Successfully.");
 }
 
 #[cfg(test)]
@@ -188,11 +206,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_aosin_gui_page_navigation_and_rendering() {
+    fn test_aosin_gui_page_navigation_and_click() {
         let mut app = AosinGuiApp::new();
         assert_eq!(app.current_page, InstallerPage::Welcome);
 
-        app.next_page();
+        // Click action button at (750, 680)
+        app.handle_click(750, 680);
         assert_eq!(app.current_page, InstallerPage::SystemScan);
 
         let mut buf = vec![0u8; 800 * 600 * 4];
