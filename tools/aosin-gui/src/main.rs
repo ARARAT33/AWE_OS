@@ -451,6 +451,7 @@ mod win32_host {
 
     static mut APP_INSTANCE: Option<AosinGuiApp> = None;
 
+    #[allow(static_mut_refs)]
     unsafe extern "system" fn wnd_proc(
         h_wnd: HWND,
         msg: UINT,

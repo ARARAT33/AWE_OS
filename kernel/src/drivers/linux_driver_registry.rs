@@ -136,6 +136,12 @@ impl<const N: usize> DriverRegistry<N> {
     }
 }
 
+impl<const N: usize> Default for DriverRegistry<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

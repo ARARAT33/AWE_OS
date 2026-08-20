@@ -1,6 +1,6 @@
 #![no_std]
 
-use super::{DeviceContract, DeviceId, DeviceKind, DriverBus};
+use super::{DeviceContract, DeviceKind, DriverBus};
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -60,14 +60,19 @@ impl<const N: usize> CompatibilityRegistry<N> {
     pub fn find(&self, vendor: u16, device: u16, class_code: u32) -> Option<DriverManifest> {
         let mut i = 0;
         while i < N {
-            if let Some(m) = self.entries[i] {
-                if m.vendor == vendor && m.device == device && m.class_code == class_code {
+            if let Some(m) = self.entries[i]
+                && m.vendor == vendor && m.device == device && m.class_code == class_code {
                     return Some(m);
                 }
-            }
             i += 1;
         }
         None
+    }
+}
+
+impl<const N: usize> Default for CompatibilityRegistry<N> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

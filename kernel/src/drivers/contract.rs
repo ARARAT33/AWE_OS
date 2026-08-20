@@ -146,11 +146,10 @@ impl<const M: usize> DeviceContract<M> {
                 }
                 let mut j = 0;
                 while j < i {
-                    if let Some(other) = self.mmio[j] {
-                        if r.overlaps(&other) {
+                    if let Some(other) = self.mmio[j]
+                        && r.overlaps(&other) {
                             return false;
                         }
-                    }
                     j += 1;
                 }
             }
@@ -161,11 +160,10 @@ impl<const M: usize> DeviceContract<M> {
     pub const fn allows_mmio(&self, address: u64) -> bool {
         let mut i = 0;
         while i < M {
-            if let Some(r) = self.mmio[i] {
-                if r.contains(address) {
+            if let Some(r) = self.mmio[i]
+                && r.contains(address) {
                     return true;
                 }
-            }
             i += 1;
         }
         false
@@ -173,11 +171,10 @@ impl<const M: usize> DeviceContract<M> {
     pub const fn allows_mmio_range(&self, base: u64, length: u64) -> bool {
         let mut i = 0;
         while i < M {
-            if let Some(r) = self.mmio[i] {
-                if r.contains_range(base, length) {
+            if let Some(r) = self.mmio[i]
+                && r.contains_range(base, length) {
                     return true;
                 }
-            }
             i += 1;
         }
         false
@@ -204,13 +201,13 @@ impl<const M: usize> DeviceContract<M> {
         end <= limit
     }
     pub const fn allows_interrupt(&self, mode: InterruptMode) -> bool {
-        match (self.interrupt, mode) {
-            (InterruptMode::None, InterruptMode::None) => true,
-            (InterruptMode::Legacy, InterruptMode::Legacy)
-            | (InterruptMode::Msi, InterruptMode::Msi)
-            | (InterruptMode::MsiX, InterruptMode::MsiX) => true,
-            _ => false,
-        }
+        matches!(
+            (self.interrupt, mode),
+            (InterruptMode::None, InterruptMode::None)
+                | (InterruptMode::Legacy, InterruptMode::Legacy)
+                | (InterruptMode::Msi, InterruptMode::Msi)
+                | (InterruptMode::MsiX, InterruptMode::MsiX)
+        )
     }
 }
 

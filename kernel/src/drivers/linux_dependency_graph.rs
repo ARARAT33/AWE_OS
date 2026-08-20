@@ -12,8 +12,8 @@ pub enum GraphError {
 /// Nodes are represented by module hashes and edges by Dependency records.
 pub fn validate_graph(nodes: &[u64], edges: &[Dependency]) -> Result<(), GraphError> {
     for edge in edges {
-        if !nodes.iter().any(|n| *n == edge.driver_hash)
-            || !nodes.iter().any(|n| *n == edge.required_hash)
+        if !nodes.contains(&edge.driver_hash)
+            || !nodes.contains(&edge.required_hash)
         {
             return Err(GraphError::MissingNode);
         }

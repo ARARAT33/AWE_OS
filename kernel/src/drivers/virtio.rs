@@ -378,6 +378,12 @@ impl<const N: usize> VirtioSplitQueue<N> {
     }
 }
 
+impl<const N: usize> Default for VirtioSplitQueue<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub type VirtioDevice = VirtioMmioRegisters;
 pub fn validate_chain<const N: usize>(queue: &VirtioSplitQueue<N>) -> Result<(), VirtioError> {
     let mut i = 0usize;

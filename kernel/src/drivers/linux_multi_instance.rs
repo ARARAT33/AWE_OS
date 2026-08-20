@@ -131,3 +131,9 @@ impl<const N: usize> MultiInstanceManager<N> {
             .map_err(MultiInstanceError::Lifecycle)
     }
 }
+
+impl<const N: usize> Default for MultiInstanceManager<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
