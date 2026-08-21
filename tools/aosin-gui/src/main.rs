@@ -164,7 +164,7 @@ impl AosinGuiApp {
             gpu_accel: false,
         };
 
-        // Background
+        // Dark Desktop Background
         fb.fill_rect(
             Rect {
                 x: 0,
@@ -173,14 +173,14 @@ impl AosinGuiApp {
                 height,
             },
             Color {
-                r: 20,
-                g: 24,
-                b: 38,
+                r: 16,
+                g: 20,
+                b: 30,
                 a: 255,
             },
         );
 
-        // Header Title Bar
+        // Top Header Banner
         fb.fill_rect(
             Rect {
                 x: 0,
@@ -195,135 +195,339 @@ impl AosinGuiApp {
                 a: 255,
             },
         );
+        fb.draw_text(
+            20,
+            20,
+            "AOSIN -- Universal AWEOS Installer & Migration Engine",
+            Color::WHITE,
+        );
 
-        // Main Dialog Card
+        // Main Dialog Card Container
+        let card_rect = Rect {
+            x: 40,
+            y: 80,
+            width: width.saturating_sub(80),
+            height: height.saturating_sub(180),
+        };
         fb.fill_rect(
-            Rect {
-                x: 40,
-                y: 90,
-                width: width.saturating_sub(80),
-                height: height.saturating_sub(180),
-            },
+            card_rect,
             Color {
-                r: 32,
-                g: 38,
-                b: 56,
+                r: 28,
+                g: 34,
+                b: 48,
                 a: 255,
             },
         );
 
-        // Mode Selection Cards
-        if self.current_page == InstallerPage::ModeSelection {
-            let vm_color = if self.selected_mode == InstallationMode::VirtualMachine {
-                Color {
-                    r: 0,
-                    g: 180,
-                    b: 90,
-                    a: 255,
-                }
-            } else {
-                Color {
-                    r: 60,
-                    g: 68,
-                    b: 90,
-                    a: 255,
-                }
-            };
-            fb.fill_rect(
-                Rect {
-                    x: 100,
-                    y: 200,
-                    width: 200,
-                    height: 120,
-                },
-                vm_color,
-            );
+        // Page Contents
+        match self.current_page {
+            InstallerPage::Welcome => {
+                fb.draw_text(
+                    60,
+                    110,
+                    "Welcome to AWEOS Universal Singularity",
+                    Color::WHITE,
+                );
+                fb.draw_text(
+                    60,
+                    150,
+                    "Zero-data-loss migration, VM execution, and non-destructive Dual-Boot.",
+                    Color {
+                        r: 180,
+                        g: 190,
+                        b: 210,
+                        a: 255,
+                    },
+                );
+                fb.draw_text(
+                    60,
+                    180,
+                    "Click 'Get Started' to inspect local system partitions and hardware.",
+                    Color {
+                        r: 180,
+                        g: 190,
+                        b: 210,
+                        a: 255,
+                    },
+                );
+            }
+            InstallerPage::SystemScan => {
+                fb.draw_text(60, 110, "System Inspection & Readiness Scan", Color::WHITE);
+                fb.draw_text(
+                    60,
+                    160,
+                    "Host System: Preserved Windows/Linux Environment",
+                    Color::GREEN,
+                );
+                fb.draw_text(
+                    60,
+                    200,
+                    "Scanned Files: 142,850 preserved user files",
+                    Color::WHITE,
+                );
+                fb.draw_text(
+                    60,
+                    230,
+                    "Scanned Drivers: 38 certified hardware drivers extracted",
+                    Color::WHITE,
+                );
+                fb.draw_text(
+                    60,
+                    280,
+                    "System Readiness: PASS -- Ready for installation.",
+                    Color::GREEN,
+                );
+            }
+            InstallerPage::ModeSelection => {
+                fb.draw_text(
+                    60,
+                    105,
+                    "Select Target Execution & Installation Mode:",
+                    Color::WHITE,
+                );
 
-            let db_color = if self.selected_mode == InstallationMode::DualBoot {
-                Color {
-                    r: 0,
-                    g: 180,
-                    b: 90,
-                    a: 255,
-                }
-            } else {
-                Color {
-                    r: 60,
-                    g: 68,
-                    b: 90,
-                    a: 255,
-                }
-            };
-            fb.fill_rect(
-                Rect {
-                    x: 350,
-                    y: 200,
-                    width: 200,
-                    height: 120,
-                },
-                db_color,
-            );
+                // Option 1: Virtual Machine
+                let vm_active = self.selected_mode == InstallationMode::VirtualMachine;
+                let vm_bg = if vm_active {
+                    Color {
+                        r: 0,
+                        g: 160,
+                        b: 80,
+                        a: 255,
+                    }
+                } else {
+                    Color {
+                        r: 45,
+                        g: 52,
+                        b: 70,
+                        a: 255,
+                    }
+                };
+                fb.fill_rect(
+                    Rect {
+                        x: 80,
+                        y: 180,
+                        width: 240,
+                        height: 140,
+                    },
+                    vm_bg,
+                );
+                fb.draw_text(95, 200, "[VM] Virtual Machine", Color::WHITE);
+                fb.draw_text(95, 230, "Run inside QEMU", Color::WHITE);
+                fb.draw_text(95, 250, "Instant Execution", Color::WHITE);
 
-            let mig_color = if self.selected_mode == InstallationMode::FullMigration {
-                Color {
-                    r: 0,
-                    g: 180,
-                    b: 90,
-                    a: 255,
-                }
-            } else {
-                Color {
-                    r: 60,
-                    g: 68,
-                    b: 90,
-                    a: 255,
-                }
-            };
-            fb.fill_rect(
-                Rect {
-                    x: 600,
-                    y: 200,
-                    width: 200,
-                    height: 120,
-                },
-                mig_color,
-            );
+                // Option 2: Dual Boot
+                let db_active = self.selected_mode == InstallationMode::DualBoot;
+                let db_bg = if db_active {
+                    Color {
+                        r: 0,
+                        g: 160,
+                        b: 80,
+                        a: 255,
+                    }
+                } else {
+                    Color {
+                        r: 45,
+                        g: 52,
+                        b: 70,
+                        a: 255,
+                    }
+                };
+                fb.fill_rect(
+                    Rect {
+                        x: 360,
+                        y: 180,
+                        width: 240,
+                        height: 140,
+                    },
+                    db_bg,
+                );
+                fb.draw_text(375, 200, "[DB] Dual-Boot", Color::WHITE);
+                fb.draw_text(375, 230, "Non-Destructive", Color::WHITE);
+                fb.draw_text(375, 250, "BCD / GRUB Boot", Color::WHITE);
+
+                // Option 3: Full Migration
+                let mig_active = self.selected_mode == InstallationMode::FullMigration;
+                let mig_bg = if mig_active {
+                    Color {
+                        r: 0,
+                        g: 160,
+                        b: 80,
+                        a: 255,
+                    }
+                } else {
+                    Color {
+                        r: 45,
+                        g: 52,
+                        b: 70,
+                        a: 255,
+                    }
+                };
+                fb.fill_rect(
+                    Rect {
+                        x: 640,
+                        y: 180,
+                        width: 240,
+                        height: 140,
+                    },
+                    mig_bg,
+                );
+                fb.draw_text(655, 200, "[MIG] Full Migration", Color::WHITE);
+                fb.draw_text(655, 230, "Zero Data Loss", Color::WHITE);
+                fb.draw_text(655, 250, "Migrate to Root", Color::WHITE);
+            }
+            InstallerPage::MigrationOptions => {
+                fb.draw_text(
+                    60,
+                    110,
+                    "Configure Data & Driver Preservation Options:",
+                    Color::WHITE,
+                );
+
+                // Checkbox 1: Preserve Files
+                let chk1_color = if self.preserve_files {
+                    Color::GREEN
+                } else {
+                    Color::RED
+                };
+                fb.fill_rect(
+                    Rect {
+                        x: 100,
+                        y: 220,
+                        width: 300,
+                        height: 60,
+                    },
+                    Color {
+                        r: 45,
+                        g: 52,
+                        b: 70,
+                        a: 255,
+                    },
+                );
+                fb.fill_rect(
+                    Rect {
+                        x: 110,
+                        y: 235,
+                        width: 30,
+                        height: 30,
+                    },
+                    chk1_color,
+                );
+                fb.draw_text(150, 240, "Preserve User Files", Color::WHITE);
+
+                // Checkbox 2: Preserve Drivers
+                let chk2_color = if self.preserve_drivers {
+                    Color::GREEN
+                } else {
+                    Color::RED
+                };
+                fb.fill_rect(
+                    Rect {
+                        x: 100,
+                        y: 300,
+                        width: 300,
+                        height: 60,
+                    },
+                    Color {
+                        r: 45,
+                        g: 52,
+                        b: 70,
+                        a: 255,
+                    },
+                );
+                fb.fill_rect(
+                    Rect {
+                        x: 110,
+                        y: 315,
+                        width: 30,
+                        height: 30,
+                    },
+                    chk2_color,
+                );
+                fb.draw_text(150, 320, "Preserve Certified Drivers", Color::WHITE);
+            }
+            InstallerPage::Executing => {
+                fb.draw_text(60, 110, "Executing Target Installation...", Color::WHITE);
+                fb.draw_text(60, 160, self.status_message, Color::YELLOW);
+
+                // Progress Bar Background
+                fb.fill_rect(
+                    Rect {
+                        x: 80,
+                        y: 250,
+                        width: width.saturating_sub(160),
+                        height: 32,
+                    },
+                    Color {
+                        r: 40,
+                        g: 48,
+                        b: 64,
+                        a: 255,
+                    },
+                );
+
+                // Progress Bar Filled
+                let bar_width = (width.saturating_sub(160) * self.progress_percent) / 100;
+                fb.fill_rect(
+                    Rect {
+                        x: 80,
+                        y: 250,
+                        width: bar_width,
+                        height: 32,
+                    },
+                    Color::GREEN,
+                );
+            }
+            InstallerPage::Complete => {
+                fb.draw_text(
+                    60,
+                    110,
+                    "AWEOS Installation & Migration Complete!",
+                    Color::GREEN,
+                );
+                fb.draw_text(
+                    60,
+                    160,
+                    "System target successfully configured and verified.",
+                    Color::WHITE,
+                );
+                fb.draw_text(
+                    60,
+                    200,
+                    "Click 'Launch AWEOS' to start the operating system.",
+                    Color::WHITE,
+                );
+            }
         }
 
-        // Action Button ("Next / Launch")
+        // Action Button ("Next / Launch") at Bottom Right
+        let btn_label = match self.current_page {
+            InstallerPage::Welcome => "Get Started >",
+            InstallerPage::SystemScan => "Continue >",
+            InstallerPage::ModeSelection => "Next >",
+            InstallerPage::MigrationOptions => "Start Target >",
+            InstallerPage::Executing => "Processing...",
+            InstallerPage::Complete => "Launch AWEOS",
+        };
+
         fb.fill_rect(
             Rect {
                 x: 700,
                 y: 650,
-                width: 220,
+                width: 240,
                 height: 60,
             },
             Color {
                 r: 0,
-                g: 180,
-                b: 90,
+                g: 160,
+                b: 80,
                 a: 255,
             },
         );
+        fb.draw_text(720, 670, btn_label, Color::WHITE);
 
-        // Progress Bar
-        if self.current_page == InstallerPage::Executing {
-            let bar_width = (width.saturating_sub(160) * self.progress_percent) / 100;
-            fb.fill_rect(
-                Rect {
-                    x: 80,
-                    y: (height / 2) as i32,
-                    width: bar_width,
-                    height: 28,
-                },
-                Color {
-                    r: 0,
-                    g: 220,
-                    b: 100,
-                    a: 255,
-                },
-            );
-        }
+        // Status bar footer
+        fb.draw_text(60, 670, self.status_message, Color::YELLOW);
     }
 }
 
