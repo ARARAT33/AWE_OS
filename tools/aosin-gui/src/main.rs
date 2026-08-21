@@ -55,17 +55,26 @@ impl AosinGuiApp {
     pub fn handle_click(&mut self, x: i32, y: i32) {
         // Mode Selection Buttons (Page: ModeSelection)
         if self.current_page == InstallerPage::ModeSelection {
-            if (100..=300).contains(&x) && (200..=320).contains(&y) {
+            if (80..=320).contains(&x) && (180..=320).contains(&y) {
                 self.selected_mode = InstallationMode::VirtualMachine;
-            } else if (350..=550).contains(&x) && (200..=320).contains(&y) {
+            } else if (360..=600).contains(&x) && (180..=320).contains(&y) {
                 self.selected_mode = InstallationMode::DualBoot;
-            } else if (600..=800).contains(&x) && (200..=320).contains(&y) {
+            } else if (640..=880).contains(&x) && (180..=320).contains(&y) {
                 self.selected_mode = InstallationMode::FullMigration;
             }
         }
 
-        // Handle "Next" or "Launch" button click at (700..920, 650..710)
-        if (700..=920).contains(&x) && (650..=710).contains(&y) {
+        // Migration Options Toggles (Page: MigrationOptions)
+        if self.current_page == InstallerPage::MigrationOptions {
+            if (100..=400).contains(&x) && (220..=280).contains(&y) {
+                self.preserve_files = !self.preserve_files;
+            } else if (100..=400).contains(&x) && (300..=360).contains(&y) {
+                self.preserve_drivers = !self.preserve_drivers;
+            }
+        }
+
+        // Handle "Next" / "Action" button click at (700..940, 650..710)
+        if (700..=940).contains(&x) && (650..=710).contains(&y) {
             self.next_page();
         }
     }
@@ -97,7 +106,7 @@ impl AosinGuiApp {
     }
 
     pub fn execute_target_mode(&mut self) {
-        self.progress_percent = 50;
+        self.progress_percent = 25;
         match self.selected_mode {
             InstallationMode::VirtualMachine => {
                 self.status_message = "Launching AWEOS Virtual Machine in QEMU...";
@@ -117,20 +126,29 @@ impl AosinGuiApp {
                     .spawn();
             }
             InstallationMode::DualBoot => {
-                self.status_message = "Configuring Dual-Boot loader & partitions...";
+                self.status_message =
+                    "Configuring Non-Destructive Dual-Boot loader & partitions...";
                 #[cfg(target_os = "windows")]
-                let _ = Command::new("bcdedit")
-                    .args([
-                        "/create",
-                        "/d",
-                        "AWEOS Universal Singularity",
-                        "/application",
-                        "bootsector",
-                    ])
-                    .output();
+                {
+                    let _ = Command::new("bcdedit")
+                        .args([
+                            "/create",
+                            "/d",
+                            "AWEOS Universal Singularity",
+                            "/application",
+                            "bootsector",
+                        ])
+                        .output();
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    let _ = Command::new("grub-mkconfig")
+                        .args(["-o", "/boot/grub/grub.cfg"])
+                        .output();
+                }
             }
             InstallationMode::FullMigration => {
-                self.status_message = "Migrating files & drivers to AWEOS Root...";
+                self.status_message = "Migrating host files & certified drivers to AWEOS Root...";
             }
         }
         self.progress_percent = 100;
