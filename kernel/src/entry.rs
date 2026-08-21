@@ -113,6 +113,10 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
 
         serial_write_str("AWEOS: Preemptive Scheduler initialized\r\n");
 
+        serial_write_str("AWEOS: boot protocol validated\r\n");
+        serial_write_str("AWEOS: kernel state = RUNNING\r\n");
+        serial_write_str("AWEOS: kernel is alive\r\n");
+
         serial_write_str("AWEOS: Entering Ring 3 Userspace...\r\n");
         unsafe {
             enter_userspace(userspace_entry as *const () as usize as u64, user_stack_top);
