@@ -155,6 +155,190 @@ impl AosinGuiApp {
         self.current_page = InstallerPage::Complete;
     }
 
+    pub fn draw_awe_logo(&self, fb: &mut Framebuffer, x: i32, y: i32) {
+        fb.fill_rect(
+            Rect {
+                x,
+                y,
+                width: 32,
+                height: 32,
+            },
+            Color {
+                r: 255,
+                g: 255,
+                b: 255,
+                a: 255,
+            },
+        );
+        fb.fill_rect(
+            Rect {
+                x: x + 6,
+                y: y + 6,
+                width: 20,
+                height: 20,
+            },
+            Color {
+                r: 0,
+                g: 120,
+                b: 215,
+                a: 255,
+            },
+        );
+        fb.fill_rect(
+            Rect {
+                x: x + 12,
+                y: y + 12,
+                width: 8,
+                height: 8,
+            },
+            Color::GREEN,
+        );
+    }
+
+    pub fn draw_icon_vm(&self, fb: &mut Framebuffer, x: i32, y: i32, color: Color) {
+        fb.fill_rect(
+            Rect {
+                x,
+                y,
+                width: 36,
+                height: 24,
+            },
+            color,
+        );
+        fb.fill_rect(
+            Rect {
+                x: x + 4,
+                y: y + 4,
+                width: 28,
+                height: 16,
+            },
+            Color {
+                r: 16,
+                g: 20,
+                b: 30,
+                a: 255,
+            },
+        );
+        fb.fill_rect(
+            Rect {
+                x: x + 14,
+                y: y + 24,
+                width: 8,
+                height: 6,
+            },
+            color,
+        );
+        fb.fill_rect(
+            Rect {
+                x: x + 10,
+                y: y + 30,
+                width: 16,
+                height: 4,
+            },
+            color,
+        );
+    }
+
+    pub fn draw_icon_dualboot(&self, fb: &mut Framebuffer, x: i32, y: i32, color: Color) {
+        fb.fill_rect(
+            Rect {
+                x,
+                y,
+                width: 16,
+                height: 32,
+            },
+            Color {
+                r: 0,
+                g: 120,
+                b: 215,
+                a: 255,
+            },
+        );
+        fb.fill_rect(
+            Rect {
+                x: x + 20,
+                y,
+                width: 16,
+                height: 32,
+            },
+            color,
+        );
+        fb.fill_rect(
+            Rect {
+                x: x + 17,
+                y: y + 12,
+                width: 2,
+                height: 8,
+            },
+            Color::WHITE,
+        );
+    }
+
+    pub fn draw_icon_migration(&self, fb: &mut Framebuffer, x: i32, y: i32, color: Color) {
+        fb.fill_rect(
+            Rect {
+                x,
+                y: y + 8,
+                width: 20,
+                height: 16,
+            },
+            Color {
+                r: 120,
+                g: 130,
+                b: 150,
+                a: 255,
+            },
+        );
+        fb.fill_rect(
+            Rect {
+                x: x + 24,
+                y: y + 8,
+                width: 16,
+                height: 16,
+            },
+            color,
+        );
+        fb.fill_rect(
+            Rect {
+                x: x + 16,
+                y: y + 14,
+                width: 12,
+                height: 4,
+            },
+            Color::WHITE,
+        );
+    }
+
+    pub fn draw_icon_checkmark(&self, fb: &mut Framebuffer, x: i32, y: i32) {
+        fb.fill_rect(
+            Rect {
+                x,
+                y: y + 10,
+                width: 6,
+                height: 6,
+            },
+            Color::WHITE,
+        );
+        fb.fill_rect(
+            Rect {
+                x: x + 4,
+                y: y + 14,
+                width: 6,
+                height: 6,
+            },
+            Color::WHITE,
+        );
+        fb.fill_rect(
+            Rect {
+                x: x + 8,
+                y: y + 6,
+                width: 6,
+                height: 12,
+            },
+            Color::WHITE,
+        );
+    }
+
     pub fn render_frame(&self, buffer: &mut [u8], width: u32, height: u32) {
         let mut fb = Framebuffer {
             width,
@@ -195,8 +379,9 @@ impl AosinGuiApp {
                 a: 255,
             },
         );
+        self.draw_awe_logo(&mut fb, 16, 14);
         fb.draw_text(
-            20,
+            60,
             20,
             "AOSIN -- Universal AWEOS Installer & Migration Engine",
             Color::WHITE,
@@ -312,9 +497,10 @@ impl AosinGuiApp {
                     },
                     vm_bg,
                 );
-                fb.draw_text(95, 200, "[VM] Virtual Machine", Color::WHITE);
-                fb.draw_text(95, 230, "Run inside QEMU", Color::WHITE);
-                fb.draw_text(95, 250, "Instant Execution", Color::WHITE);
+                self.draw_icon_vm(&mut fb, 95, 195, Color::WHITE);
+                fb.draw_text(140, 200, "Virtual Machine", Color::WHITE);
+                fb.draw_text(95, 240, "Run inside QEMU / Hypervisor", Color::WHITE);
+                fb.draw_text(95, 260, "Instant safe sandbox execution", Color::WHITE);
 
                 // Option 2: Dual Boot
                 let db_active = self.selected_mode == InstallationMode::DualBoot;
@@ -342,9 +528,10 @@ impl AosinGuiApp {
                     },
                     db_bg,
                 );
-                fb.draw_text(375, 200, "[DB] Dual-Boot", Color::WHITE);
-                fb.draw_text(375, 230, "Non-Destructive", Color::WHITE);
-                fb.draw_text(375, 250, "BCD / GRUB Boot", Color::WHITE);
+                self.draw_icon_dualboot(&mut fb, 375, 195, Color::WHITE);
+                fb.draw_text(420, 200, "Dual-Boot", Color::WHITE);
+                fb.draw_text(375, 240, "Non-destructive partition", Color::WHITE);
+                fb.draw_text(375, 260, "BCD / GRUB boot integration", Color::WHITE);
 
                 // Option 3: Full Migration
                 let mig_active = self.selected_mode == InstallationMode::FullMigration;
@@ -372,9 +559,10 @@ impl AosinGuiApp {
                     },
                     mig_bg,
                 );
-                fb.draw_text(655, 200, "[MIG] Full Migration", Color::WHITE);
-                fb.draw_text(655, 230, "Zero Data Loss", Color::WHITE);
-                fb.draw_text(655, 250, "Migrate to Root", Color::WHITE);
+                self.draw_icon_migration(&mut fb, 655, 195, Color::WHITE);
+                fb.draw_text(705, 200, "Full Migration", Color::WHITE);
+                fb.draw_text(655, 240, "Zero-data-loss system migration", Color::WHITE);
+                fb.draw_text(655, 260, "Migrate files & drivers to Root", Color::WHITE);
             }
             InstallerPage::MigrationOptions => {
                 fb.draw_text(
@@ -394,7 +582,7 @@ impl AosinGuiApp {
                     Rect {
                         x: 100,
                         y: 220,
-                        width: 300,
+                        width: 400,
                         height: 60,
                     },
                     Color {
@@ -413,7 +601,10 @@ impl AosinGuiApp {
                     },
                     chk1_color,
                 );
-                fb.draw_text(150, 240, "Preserve User Files", Color::WHITE);
+                if self.preserve_files {
+                    self.draw_icon_checkmark(&mut fb, 118, 238);
+                }
+                fb.draw_text(150, 240, "Preserve User Files & Documents", Color::WHITE);
 
                 // Checkbox 2: Preserve Drivers
                 let chk2_color = if self.preserve_drivers {
@@ -425,7 +616,7 @@ impl AosinGuiApp {
                     Rect {
                         x: 100,
                         y: 300,
-                        width: 300,
+                        width: 400,
                         height: 60,
                     },
                     Color {
@@ -444,7 +635,15 @@ impl AosinGuiApp {
                     },
                     chk2_color,
                 );
-                fb.draw_text(150, 320, "Preserve Certified Drivers", Color::WHITE);
+                if self.preserve_drivers {
+                    self.draw_icon_checkmark(&mut fb, 118, 318);
+                }
+                fb.draw_text(
+                    150,
+                    320,
+                    "Preserve Certified Hardware Drivers",
+                    Color::WHITE,
+                );
             }
             InstallerPage::Executing => {
                 fb.draw_text(60, 110, "Executing Target Installation...", Color::WHITE);
