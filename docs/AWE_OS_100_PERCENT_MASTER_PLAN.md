@@ -266,7 +266,7 @@ Every release candidate must pass:
 - [ ] performance regression budget;
 - [ ] security gates;
 - [ ] signed release artifacts;
-- [ ] no unresolved critical/high release blocker.
+- [ ] no unresolved critical/high issue.
 
 ## 21. Progress accounting
 

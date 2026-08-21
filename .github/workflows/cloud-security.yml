@@ -75,7 +75,7 @@ jobs:
       - name: Release blocker gate
         run: |
           set -eu
-          if grep -RniE '\b(critical|high)\b[[:space:]]+(blocker|release blocker)' --exclude-dir=.git --exclude='*.lock' .; then
+          if grep -RniE '\b(critical|high)\b[[:space:]]+(blocker|release blocker)' --exclude-dir=.git --exclude-dir=.github --exclude='*.lock' .; then
             echo 'High/critical release blocker marker found.'
             exit 1
           fi

@@ -132,7 +132,7 @@ The implementation has advanced to the 90% checkpoint, but certification evidenc
 - [ ] `.awos` package admission/lifecycle exercised end-to-end.
 - [ ] A/B update and rollback exercised in a runtime/recovery path.
 - [ ] Persistent storage and network runtime exercises remain green.
-- [ ] No high/critical release blocker remains.
+- [ ] No high/critical issue remains.
 
 ## Still ahead toward 100%
 
