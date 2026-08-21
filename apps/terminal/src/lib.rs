@@ -62,12 +62,10 @@ impl AweTerminalApp {
                     }
                 }
             }
-            c if (32..=126).contains(&c) => {
-                if self.command_len < self.command_buffer.len() {
-                    self.command_buffer[self.command_len] = c;
-                    self.command_len += 1;
-                    self.backend.write_char(c);
-                }
+            c if (32..=126).contains(&c) && self.command_len < self.command_buffer.len() => {
+                self.command_buffer[self.command_len] = c;
+                self.command_len += 1;
+                self.backend.write_char(c);
             }
             _ => {}
         }
