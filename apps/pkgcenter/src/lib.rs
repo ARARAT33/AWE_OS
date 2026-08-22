@@ -54,7 +54,17 @@ impl PackageCenterApp {
         );
 
         fb.draw_text(20, 20, "AWE_OS Package & Driver Center", Color::WHITE);
-        fb.draw_text(20, 50, "Verified .awos & .asd Store", Color { r: 160, g: 170, b: 190, a: 255 });
+        fb.draw_text(
+            20,
+            50,
+            "Verified .awos & .asd Store",
+            Color {
+                r: 160,
+                g: 170,
+                b: 190,
+                a: 255,
+            },
+        );
 
         let pkgs = [
             "terminal.awos (Official AWE Terminal)",

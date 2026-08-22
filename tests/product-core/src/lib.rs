@@ -579,7 +579,10 @@ mod product_core {
         // Unsupported NT syscall fails closed
         assert_eq!(win.dispatch(0xFFFF, 0, 0, 0), NtStatus::NotImplemented);
         // Invalid PE image parsing fails closed
-        assert!(matches!(PeImage::parse(b"NOT_A_PE_HEADER"), Err(NtStatus::InvalidParameter)));
+        assert!(matches!(
+            PeImage::parse(b"NOT_A_PE_HEADER"),
+            Err(NtStatus::InvalidParameter)
+        ));
 
         // Linux ELF64
         let mut lin = LinuxSyscallDispatcher::new();
@@ -587,14 +590,20 @@ mod product_core {
         // Unsupported Linux syscall fails closed
         assert_eq!(lin.dispatch(9999, 0, 0, 0), Err(LinuxErrno::ENOSYS));
         // Invalid ELF image parsing fails closed
-        assert!(matches!(Elf64Image::parse(b"NOT_A_VALID_ELF_HEADER"), Err(LinuxErrno::EINVAL)));
+        assert!(matches!(
+            Elf64Image::parse(b"NOT_A_VALID_ELF_HEADER"),
+            Err(LinuxErrno::EINVAL)
+        ));
 
         // Android Binder & DEX
         let mut binder = AndroidBinderEmulator::new();
         let ch = binder.register_service_channel(0x1122).unwrap();
         assert_eq!(ch, 1);
         // Invalid DEX magic parsing fails closed
-        assert!(matches!(DexHeader::parse(b"INVALID_DEX_MAGIC"), Err(AndroidError::InvalidDexMagic)));
+        assert!(matches!(
+            DexHeader::parse(b"INVALID_DEX_MAGIC"),
+            Err(AndroidError::InvalidDexMagic)
+        ));
 
         // WLIN Bridge
         let mut wlin = WlinBridge::new();

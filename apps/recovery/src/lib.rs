@@ -54,7 +54,17 @@ impl RecoveryEnvApp {
         );
 
         fb.draw_text(20, 20, "AWE_OS Atomic Recovery & Maintenance", Color::WHITE);
-        fb.draw_text(20, 50, "Status: HEALTHY (Slot A Active)", Color { r: 80, g: 220, b: 120, a: 255 });
+        fb.draw_text(
+            20,
+            50,
+            "Status: HEALTHY (Slot A Active)",
+            Color {
+                r: 80,
+                g: 220,
+                b: 120,
+                a: 255,
+            },
+        );
 
         let actions = [
             "1. Rollback to Slot B Backup",

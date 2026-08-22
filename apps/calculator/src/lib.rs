@@ -80,7 +80,8 @@ impl AweCalculatorApp {
             },
         );
 
-        let disp_str = core::str::from_utf8(&self.display_buffer[..self.display_len]).unwrap_or("0");
+        let disp_str =
+            core::str::from_utf8(&self.display_buffer[..self.display_len]).unwrap_or("0");
         fb.draw_text(20, 26, disp_str, Color::WHITE);
 
         // Keypad buttons

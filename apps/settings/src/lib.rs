@@ -111,7 +111,17 @@ impl AweSettingsApp {
 
         let active_name = self.categories[self.active_category];
         fb.draw_text(240, 20, active_name, Color::WHITE);
-        fb.draw_text(240, 50, "AWE_OS 1.0 Production Kernel & Service Stack", Color { r: 180, g: 190, b: 200, a: 255 });
+        fb.draw_text(
+            240,
+            50,
+            "AWE_OS 1.0 Production Kernel & Service Stack",
+            Color {
+                r: 180,
+                g: 190,
+                b: 200,
+                a: 255,
+            },
+        );
     }
 }
 

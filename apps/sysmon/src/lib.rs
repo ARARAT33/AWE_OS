@@ -61,7 +61,17 @@ impl SysMonApp {
         fb.draw_text(20, 20, "AWE_OS CellKernel Resource Monitor", Color::WHITE);
 
         // CPU Bar
-        fb.draw_text(20, 60, "CPU Usage: 12%", Color { r: 0, g: 153, b: 255, a: 255 });
+        fb.draw_text(
+            20,
+            60,
+            "CPU Usage: 12%",
+            Color {
+                r: 0,
+                g: 153,
+                b: 255,
+                a: 255,
+            },
+        );
         fb.fill_rect(
             Rect {
                 x: 20,
@@ -92,7 +102,17 @@ impl SysMonApp {
         );
 
         // Memory Bar
-        fb.draw_text(20, 120, "Memory Usage: 256MB / 4096MB", Color { r: 0, g: 255, b: 120, a: 255 });
+        fb.draw_text(
+            20,
+            120,
+            "Memory Usage: 256MB / 4096MB",
+            Color {
+                r: 0,
+                g: 255,
+                b: 120,
+                a: 255,
+            },
+        );
         fb.fill_rect(
             Rect {
                 x: 20,

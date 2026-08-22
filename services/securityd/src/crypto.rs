@@ -1,8 +1,8 @@
 //! Cryptographic utilities for AWE_OS (`awe-securityd`).
 
-pub use ed25519_dalek::{SigningKey, VerifyingKey, Signature as Ed25519Signature};
-pub use hmac::{Hmac, Mac, KeyInit};
-pub use sha2::{Sha256, Sha512, Digest};
+pub use ed25519_dalek::{Signature as Ed25519Signature, SigningKey, VerifyingKey};
+pub use hmac::{Hmac, KeyInit, Mac};
+pub use sha2::{Digest, Sha256, Sha512};
 
 pub type HmacSha256 = Hmac<Sha256>;
 

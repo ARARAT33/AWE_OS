@@ -63,7 +63,17 @@ impl AweFileManagerApp {
         );
 
         // Sidebar title
-        fb.draw_text(12, 12, "PLACES", Color { r: 160, g: 170, b: 190, a: 255 });
+        fb.draw_text(
+            12,
+            12,
+            "PLACES",
+            Color {
+                r: 160,
+                g: 170,
+                b: 190,
+                a: 255,
+            },
+        );
         fb.draw_text(12, 36, "Root Drive", Color::WHITE);
         fb.draw_text(12, 56, "Home", Color::WHITE);
         fb.draw_text(12, 76, "Network", Color::WHITE);
@@ -104,7 +114,17 @@ impl AweFileManagerApp {
         // Entries list
         for (i, entry) in self.entries.iter().enumerate() {
             let y = 60 + (i as i32) * 28;
-            fb.draw_text(220, y, "[DIR] ", Color { r: 0, g: 153, b: 255, a: 255 });
+            fb.draw_text(
+                220,
+                y,
+                "[DIR] ",
+                Color {
+                    r: 0,
+                    g: 153,
+                    b: 255,
+                    a: 255,
+                },
+            );
             fb.draw_text(270, y, entry, Color::WHITE);
         }
     }
