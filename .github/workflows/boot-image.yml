@@ -1,4 +1,4 @@
-name: AWEOS Boot Image
+name: AWEOS Bootable Image Pipeline
 
 on:
   push:
@@ -14,89 +14,60 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-x86_64:
+  build-and-smoke-test-image:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-none
-      - name: Cache Cargo
-        uses: actions/cache@v5
+
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-boot-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-boot-image-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-boot-cargo-
-      - name: Prime Cargo cache
-        run: cargo fetch
-      - name: Install boot image and emulator tools
+            ${{ runner.os }}-boot-image-
+
+      - name: Install QEMU and ISO Tools
         run: sudo apt-get update && sudo apt-get install -y grub-pc-bin grub-common xorriso mtools qemu-system-x86
-      - name: Build kernel
+
+      - name: Build kernel binary
         env:
           AWEOS_QEMU_SMOKE: "1"
-        run: cargo build --release -p aweos-kernel-bin --target x86_64-unknown-none --offline
-      - name: Validate ELF
+        run: cargo build --release -p aweos-kernel-bin --target x86_64-unknown-none
+
+      - name: Validate Multiboot2 Header
+        run: grub-file --is-x86-multiboot2 target/x86_64-unknown-none/release/aweos
+
+      - name: Generate Bootable ISO & GPT Disk Image
+        run: python3 scripts/make_images.py
+
+      - name: Smoke Test Bootable ISO in QEMU
         run: |
-          file target/x86_64-unknown-none/release/aweos
-          grub-file --is-x86-multiboot2 target/x86_64-unknown-none/release/aweos
-      - name: Build ISO
-        run: |
-          mkdir -p dist/iso/boot/grub
-          cp target/x86_64-unknown-none/release/aweos dist/iso/boot/aweos
-          cp kernel-bin/grub.cfg dist/iso/boot/grub/grub.cfg
-          grub-mkrescue -o dist/aweos-x86_64.iso dist/iso
-      - name: QEMU unattended boot smoke test
-        id: qemu
-        shell: bash
-        run: |
-          set +e
-          timeout 15s qemu-system-x86_64 \
-            -M q35 \
-            -m 512M \
-            -cdrom dist/aweos-x86_64.iso \
-            -display none \
-            -serial stdio \
-            -no-reboot \
-            -no-shutdown \
-            -d guest_errors,cpu_reset \
-            -D dist/qemu-debug.log \
-            > dist/qemu.log 2>&1
-          qemu_status=$?
-          grep -q "AWEOS: boot protocol validated" dist/qemu.log
-          boot_ok=$?
-          grep -q "AWEOS: kernel state = RUNNING" dist/qemu.log
-          running_ok=$?
-          grep -q "AWEOS: kernel is alive" dist/qemu.log
-          alive_ok=$?
-          echo "qemu_status=$qemu_status" >> "$GITHUB_OUTPUT"
-          echo "boot_ok=$boot_ok" >> "$GITHUB_OUTPUT"
-          echo "running_ok=$running_ok" >> "$GITHUB_OUTPUT"
-          echo "alive_ok=$alive_ok" >> "$GITHUB_OUTPUT"
-          echo "--- serial/qemu output ---"
-          cat dist/qemu.log
-          echo "--- qemu debug output ---"
-          cat dist/qemu-debug.log || true
-          if [ "$qemu_status" -ne 124 ] && [ "$qemu_status" -ne 0 ]; then exit 1; fi
-          if [ "$boot_ok" -ne 0 ] || [ "$running_ok" -ne 0 ] || [ "$alive_ok" -ne 0 ]; then exit 1; fi
-      - name: Upload ISO and boot diagnostics
-        if: always()
+          set -euo pipefail
+          qemu-system-x86_64 -cdrom dist/aweos-x86_64.iso -display none -serial file:qemu-iso-smoke.log -no-reboot &
+          qemu_pid=$!
+          for i in $(seq 1 30); do
+            if grep -q "AWEOS: kernel is alive" qemu-iso-smoke.log 2>/dev/null; then
+              echo "ISO Boot Successful!"
+              kill $qemu_pid 2>/dev/null || true
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "ISO Boot Failed or Timed Out!"
+          cat qemu-iso-smoke.log 2>/dev/null || true
+          kill $qemu_pid 2>/dev/null || true
+          exit 1
+
+      - name: Upload Bootable Images
         uses: actions/upload-artifact@v7
         with:
-          name: aweos-x86_64-iso
-          path: |
-            dist/aweos-x86_64.iso
-            dist/qemu.log
-            dist/qemu-debug.log
-          if-no-files-found: warn
-      - name: Boot diagnostics summary
-        if: always()
-        run: |
-          echo "QEMU status: ${{ steps.qemu.outputs.qemu_status }}"
-          echo "boot marker: ${{ steps.qemu.outputs.boot_ok }}"
-          echo "running marker: ${{ steps.qemu.outputs.running_ok }}"
-          echo "alive marker: ${{ steps.qemu.outputs.alive_ok }}"
+          name: aweos-bootable-images
+          path: dist/

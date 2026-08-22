@@ -170,27 +170,27 @@ pub fn package_parts<'a>(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DriverSignerKey {
     pub key_id: u32,
-    pub fingerprint: [u8; 16],
+    pub public_key: [u8; 32],
     pub is_certified: bool,
 }
 
 impl DriverSignerKey {
     pub fn verify(&self, payload: &[u8], signature: &[u8]) -> Result<(), AsdError> {
+        if !self.is_certified {
+            return Err(AsdError::CapabilityDenied);
+        }
         if signature.len() < ASD_MIN_SIGNATURE {
             return Err(AsdError::MissingSignature);
         }
-        let mut sum = 0u8;
-        for b in payload {
-            sum = sum.wrapping_add(*b);
+        let sig_bytes: &[u8; 64] = signature[..64]
+            .try_into()
+            .map_err(|_| AsdError::MissingSignature)?;
+
+        if awe_securityd::ed25519_verify(&self.public_key, payload, sig_bytes) {
+            Ok(())
+        } else {
+            Err(AsdError::InvalidSignature)
         }
-        let mut expected = sum ^ self.fingerprint[0];
-        if self.is_certified {
-            expected ^= 0xC5;
-        }
-        if signature[0] != expected {
-            return Err(AsdError::InvalidSignature);
-        }
-        Ok(())
     }
 }
 
@@ -388,17 +388,22 @@ mod tests {
 
     #[test]
     fn validates_canonical_header_and_bounds() {
+        let seed = [0x55u8; 32];
+        let (pk, sk) = awe_securityd::ed25519_keypair_from_seed(&seed);
+
         let signer = DriverSignerKey {
             key_id: 1,
-            fingerprint: [0x10; 16],
+            public_key: pk,
             is_certified: true,
         };
-        // payload sum = 16 * 0x55 = 0x550 -> 0x50
-        // expected sig = 0x50 ^ 0x10 ^ 0xC5 = 0x85
-        let sum_payload = (0x55u8).wrapping_mul(16);
-        let expected_sig = sum_payload ^ 0x10 ^ 0xC5;
 
-        let b = build_asd_bytes(8, 16, 64, expected_sig);
+        let payload_bytes = vec![0x55u8; 16];
+        let real_sig = awe_securityd::ed25519_sign(&sk, &payload_bytes);
+
+        let mut b = build_asd_bytes(8, 16, 64, 0);
+        let sig_offset = ASD_HEADER_LEN + 8 + 16;
+        b[sig_offset..sig_offset + 64].copy_from_slice(&real_sig);
+
         assert!(validate_asd(&b).is_ok());
 
         let meta = DriverMeta {
@@ -427,15 +432,16 @@ mod tests {
 
     #[test]
     fn rejects_unknown_architecture() {
+        let seed = [0x55u8; 32];
+        let (pk, _sk) = awe_securityd::ed25519_keypair_from_seed(&seed);
+
         let _signer = DriverSignerKey {
             key_id: 1,
-            fingerprint: [0x10; 16],
+            public_key: pk,
             is_certified: true,
         };
-        let sum_payload = (0x55u8).wrapping_mul(16);
-        let expected_sig = sum_payload ^ 0x10 ^ 0xC5;
 
-        let mut b = build_asd_bytes(8, 16, 64, expected_sig);
+        let mut b = build_asd_bytes(8, 16, 64, 0);
         b[6..8].copy_from_slice(&0x1234u16.to_le_bytes());
         assert_eq!(validate_asd(&b), Err(AsdError::UnsupportedArchitecture));
     }

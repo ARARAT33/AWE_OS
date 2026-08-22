@@ -1,18 +1,42 @@
 //! Native AWEOS Calculator Application.
 
-use awe_ayui::{Color, Framebuffer, Rect};
+#![no_std]
+
+use awe_ayui::{AppType, Color, Compositor, Framebuffer, Rect};
 
 pub struct AweCalculatorApp {
-    pub display_value: f64,
-    pub accumulator: f64,
+    pub window_width: u32,
+    pub window_height: u32,
+    pub display_buffer: [u8; 16],
+    pub display_len: usize,
 }
 
 impl AweCalculatorApp {
     pub fn new() -> Self {
-        Self {
-            display_value: 0.0,
-            accumulator: 0.0,
-        }
+        let mut app = Self {
+            window_width: 320,
+            window_height: 420,
+            display_buffer: [0u8; 16],
+            display_len: 0,
+        };
+        app.set_display("0");
+        app
+    }
+
+    pub fn set_display(&mut self, val: &str) {
+        let len = val.len().min(16);
+        self.display_buffer[..len].copy_from_slice(&val.as_bytes()[..len]);
+        self.display_len = len;
+    }
+
+    pub fn launch(&self, compositor: &mut Compositor) {
+        let bounds = Rect {
+            x: 200,
+            y: 150,
+            width: self.window_width,
+            height: self.window_height,
+        };
+        let _ = compositor.create_app_window(bounds, AppType::Generic, b"Calculator");
     }
 
     pub fn render(&self, buffer: &mut [u8], width: u32, height: u32) {
@@ -24,6 +48,7 @@ impl AweCalculatorApp {
             gpu_accel: false,
         };
 
+        // Window background
         fb.fill_rect(
             Rect {
                 x: 0,
@@ -32,12 +57,63 @@ impl AweCalculatorApp {
                 height,
             },
             Color {
-                r: 16,
-                g: 18,
-                b: 26,
+                r: 28,
+                g: 32,
+                b: 42,
                 a: 255,
             },
         );
+
+        // Display box
+        fb.fill_rect(
+            Rect {
+                x: 10,
+                y: 10,
+                width: width.saturating_sub(20),
+                height: 50,
+            },
+            Color {
+                r: 18,
+                g: 20,
+                b: 28,
+                a: 255,
+            },
+        );
+
+        let disp_str =
+            core::str::from_utf8(&self.display_buffer[..self.display_len]).unwrap_or("0");
+        fb.draw_text(20, 26, disp_str, Color::WHITE);
+
+        // Keypad buttons
+        let keys = [
+            ["C", "(", ")", "/"],
+            ["7", "8", "9", "*"],
+            ["4", "5", "6", "-"],
+            ["1", "2", "3", "+"],
+            ["0", ".", "C", "="],
+        ];
+
+        for (r, row) in keys.iter().enumerate() {
+            for (c, key) in row.iter().enumerate() {
+                let bx = 10 + (c as i32) * 72;
+                let by = 70 + (r as i32) * 64;
+                fb.fill_rect(
+                    Rect {
+                        x: bx,
+                        y: by,
+                        width: 64,
+                        height: 56,
+                    },
+                    Color {
+                        r: 45,
+                        g: 52,
+                        b: 68,
+                        a: 255,
+                    },
+                );
+                fb.draw_text(bx + 26, by + 20, key, Color::WHITE);
+            }
+        }
     }
 }
 
@@ -53,10 +129,15 @@ mod tests {
 
     #[test]
     fn test_calculator_app() {
+        let mut compositor = Compositor::new();
         let app = AweCalculatorApp::new();
-        assert_eq!(app.display_value, 0.0);
-        let mut buf = vec![0u8; 400 * 500 * 4];
-        app.render(&mut buf, 400, 500);
+        app.launch(&mut compositor);
+        assert_eq!(compositor.window_count(), 1);
+
+        extern crate alloc;
+        use alloc::vec;
+        let mut buf = vec![0u8; 320 * 420 * 4];
+        app.render(&mut buf, 320, 420);
         assert!(!buf.iter().all(|&b| b == 0));
     }
 }

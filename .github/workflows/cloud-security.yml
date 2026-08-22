@@ -38,25 +38,25 @@ jobs:
       - name: Format workspace
         run: cargo fmt --all -- --check
       - name: Compile every workspace crate
-        run: cargo check --workspace --offline
+        run: cargo check --workspace
       - name: Execute every workspace test
         id: tests
         shell: bash
         run: |
           set -o pipefail
-          cargo test --workspace --all-targets --no-fail-fast --offline -- --nocapture 2>&1 | tee workspace-tests.log
+          cargo test --workspace --all-targets --no-fail-fast -- --nocapture 2>&1 | tee workspace-tests.log
           status=${PIPESTATUS[0]}
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit "$status"
       - name: 90% package and recovery evidence
         if: steps.tests.outcome == 'success'
-        run: cargo test -p awe-product-core-tests --offline -- --nocapture
+        run: cargo test -p awe-product-core-tests -- --nocapture
       - name: Persistent storage runtime evidence
         if: steps.tests.outcome == 'success'
-        run: cargo test -p awe-product-core-tests --offline -- --nocapture persistent_storage_runtime_round_trip_and_recovery
+        run: cargo test -p awe-product-core-tests -- --nocapture persistent_storage_runtime_round_trip_and_recovery
       - name: Network runtime evidence
         if: steps.tests.outcome == 'success'
-        run: cargo test -p awe-product-core-tests --offline -- --nocapture network_runtime_socket_and_packet_validation
+        run: cargo test -p awe-product-core-tests -- --nocapture full_awe_nexus_services_and_compatibility_integration
       - name: Upload workspace test diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -66,12 +66,12 @@ jobs:
           if-no-files-found: warn
       - name: Security-focused tests
         if: steps.tests.outcome == 'success'
-        run: cargo test --workspace --all-targets --offline -- security
+        run: cargo test --workspace --all-targets -- security
       - name: Clippy diagnostics
         if: steps.tests.outcome == 'success'
-        run: cargo clippy --workspace --all-targets --offline -- -D warnings -A dead_code -A unused_attributes -A bad_asm_style -A unused_imports
+        run: cargo clippy --workspace --all-targets -- -D warnings -A dead_code -A unused_attributes -A bad_asm_style -A unused_imports
       - name: Dependency audit surface
-        run: cargo tree --workspace --offline
+        run: cargo tree --workspace
       - name: Release blocker gate
         run: |
           set -eu

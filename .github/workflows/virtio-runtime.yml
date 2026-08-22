@@ -44,12 +44,12 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run storage and driver contract tests
-        run: cargo test --workspace --all-targets --offline
+        run: cargo test --workspace --all-targets
 
       - name: Build kernel
         env:
           AWEOS_QEMU_SMOKE: "1"
-        run: cargo build --release -p aweos-kernel-bin --target x86_64-unknown-none --offline
+        run: cargo build --release -p aweos-kernel-bin --target x86_64-unknown-none
 
       - name: Validate kernel ELF
         run: |

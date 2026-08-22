@@ -5,6 +5,11 @@
 
 #![no_std]
 
+pub mod crypto;
+pub use crypto::{
+    ed25519_keypair_from_seed, ed25519_sign, ed25519_verify, hmac_sha256, sha256, sha512,
+};
+
 pub const MAX_PCR_REGISTERS: usize = 24;
 pub const MAX_KEYS: usize = 32;
 pub const MAX_CAPABILITY_TOKENS: usize = 64;
@@ -127,13 +132,16 @@ impl SecurityDaemon {
         let tid = self.token_counter;
         let expires_at = now + ttl;
 
-        let mut hmac = [0u8; 16];
-        let bytes_pid = subject_pid.to_le_bytes();
-        let bytes_cap = capabilities.to_le_bytes();
+        let mut payload = [0u8; 32];
+        payload[0..8].copy_from_slice(&tid.to_le_bytes());
+        payload[8..12].copy_from_slice(&subject_pid.to_le_bytes());
+        payload[12..20].copy_from_slice(&capabilities.to_le_bytes());
+        payload[20..28].copy_from_slice(&now.to_le_bytes());
+        payload[28..32].copy_from_slice(&(ttl as u32).to_le_bytes());
 
-        for (i, slot) in hmac.iter_mut().enumerate() {
-            *slot = self.secret_salt[i] ^ bytes_pid[i % 4] ^ bytes_cap[i % 8];
-        }
+        let full_hmac = hmac_sha256(&self.secret_salt, &payload);
+        let mut hmac_sig = [0u8; 16];
+        hmac_sig.copy_from_slice(&full_hmac[..16]);
 
         let token = SecurityToken {
             token_id: tid,
@@ -141,7 +149,7 @@ impl SecurityDaemon {
             capabilities,
             issued_at: now,
             expires_at,
-            hmac_signature: hmac,
+            hmac_signature: hmac_sig,
         };
 
         for slot in self.tokens.iter_mut() {
