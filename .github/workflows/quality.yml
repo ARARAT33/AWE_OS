@@ -45,18 +45,18 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Workspace check
-        run: cargo check --workspace --offline
+        run: cargo check --workspace
 
       - name: Workspace tests
         id: tests
         shell: bash
         run: |
           set -o pipefail
-          cargo test --workspace --no-fail-fast --offline 2>&1 | tee test-output.log
+          cargo test --workspace --no-fail-fast 2>&1 | tee test-output.log
           exit ${PIPESTATUS[0]}
 
       - name: 90% product-core evidence
-        run: cargo test -p awe-product-core-tests --offline -- --nocapture
+        run: cargo test -p awe-product-core-tests -- --nocapture
 
       - name: Upload test diagnostics
         if: always()
@@ -68,7 +68,7 @@ jobs:
 
       - name: Workspace Clippy
         if: steps.tests.outcome == 'success'
-        run: cargo clippy --workspace --all-targets --offline -- -D warnings -A dead_code -A unused_attributes -A bad_asm_style -A unused_imports
+        run: cargo clippy --workspace --all-targets -- -D warnings -A dead_code -A unused_attributes -A bad_asm_style -A unused_imports
 
   bootloader:
     name: UEFI loader
@@ -86,4 +86,4 @@ jobs:
         run: cargo fetch
 
       - name: Check AWE loader
-        run: cargo check --manifest-path boot/aweloader/Cargo.toml --target x86_64-unknown-uefi --offline
+        run: cargo check --manifest-path boot/aweloader/Cargo.toml --target x86_64-unknown-uefi
