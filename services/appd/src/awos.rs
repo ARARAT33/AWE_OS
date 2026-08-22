@@ -144,7 +144,7 @@ pub fn package_parts<'a>(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PublisherIdentity {
     pub publisher_id: u64,
-    pub key_fingerprint: [u8; 16],
+    pub public_key: [u8; 32],
     pub is_official: bool,
 }
 
@@ -157,19 +157,15 @@ impl PublisherIdentity {
         if signature_bytes.len() < AWOS_MIN_SIGNATURE {
             return Err(AwosError::MissingSignature);
         }
-        // Cryptographic check over payload using key_fingerprint XOR checksum
-        let mut check_sum = 0u8;
-        for b in payload_bytes {
-            check_sum = check_sum.wrapping_add(*b);
+        let sig_bytes: &[u8; 64] = signature_bytes[..64]
+            .try_into()
+            .map_err(|_| AwosError::MissingSignature)?;
+
+        if awe_securityd::ed25519_verify(&self.public_key, payload_bytes, sig_bytes) {
+            Ok(())
+        } else {
+            Err(AwosError::InvalidSignature)
         }
-        let mut expected_first_byte = check_sum ^ self.key_fingerprint[0];
-        if self.is_official {
-            expected_first_byte ^= 0xA5;
-        }
-        if signature_bytes[0] != expected_first_byte {
-            return Err(AwosError::InvalidSignature);
-        }
-        Ok(())
     }
 }
 
@@ -516,18 +512,21 @@ mod tests {
 
     #[test]
     fn test_awos_package_install_update_rollback_uninstall() {
+        let seed = [0x77u8; 32];
+        let (pk, sk) = awe_securityd::ed25519_keypair_from_seed(&seed);
+
         let pub_id = PublisherIdentity {
             publisher_id: 100,
-            key_fingerprint: [0x12; 16],
+            public_key: pk,
             is_official: true,
         };
 
-        // Checksum of 8 bytes of 0x90 is 8 * 0x90 = 0x480 -> wrapping_add sum = 0x80
-        // Expected sig byte 0 = 0x80 ^ 0x12 ^ 0xA5 = 0x37
-        let sum_code = (0x90u8).wrapping_mul(8);
-        let expected_sig = sum_code ^ 0x12 ^ 0xA5;
+        let code_bytes = vec![0x90u8; 8];
+        let real_sig = awe_securityd::ed25519_sign(&sk, &code_bytes);
 
-        let bytes_v1 = build_awos_bytes(4, 8, 2, 64, expected_sig);
+        let mut bytes_v1 = build_awos_bytes(4, 8, 2, 64, 0);
+        let sig_offset_v1 = AWOS_HEADER_LEN + 4 + 8 + 2;
+        bytes_v1[sig_offset_v1..sig_offset_v1 + 64].copy_from_slice(&real_sig);
 
         let meta_v1 = PackageMeta {
             package_id: 1001,
@@ -549,7 +548,8 @@ mod tests {
             version: 2,
             ..meta_v1
         };
-        let bytes_v2 = build_awos_bytes(4, 8, 2, 64, expected_sig);
+        let mut bytes_v2 = build_awos_bytes(4, 8, 2, 64, 0);
+        bytes_v2[sig_offset_v1..sig_offset_v1 + 64].copy_from_slice(&real_sig);
 
         mgr.update_package(meta_v2, &bytes_v2).expect("update v2");
         let rec2 = mgr.get_installed_record(1001).unwrap();

@@ -1,8 +1,12 @@
 //! Native AWEOS Universal File Manager Application.
 
-use awe_ayui::{Color, Framebuffer, Rect};
+#![no_std]
+
+use awe_ayui::{AppType, Color, Compositor, Framebuffer, Rect};
 
 pub struct AweFileManagerApp {
+    pub window_width: u32,
+    pub window_height: u32,
     pub current_path: &'static str,
     pub entries: [&'static str; 5],
 }
@@ -10,6 +14,8 @@ pub struct AweFileManagerApp {
 impl AweFileManagerApp {
     pub fn new() -> Self {
         Self {
+            window_width: 680,
+            window_height: 440,
             current_path: "awe://storage/root",
             entries: [
                 "System",
@@ -19,6 +25,16 @@ impl AweFileManagerApp {
                 "Media",
             ],
         }
+    }
+
+    pub fn launch(&self, compositor: &mut Compositor) {
+        let bounds = Rect {
+            x: 80,
+            y: 60,
+            width: self.window_width,
+            height: self.window_height,
+        };
+        let _ = compositor.create_app_window(bounds, AppType::FileManager, b"File Manager");
     }
 
     pub fn render(&self, buffer: &mut [u8], width: u32, height: u32) {
@@ -46,6 +62,12 @@ impl AweFileManagerApp {
             },
         );
 
+        // Sidebar title
+        fb.draw_text(12, 12, "PLACES", Color { r: 160, g: 170, b: 190, a: 255 });
+        fb.draw_text(12, 36, "Root Drive", Color::WHITE);
+        fb.draw_text(12, 56, "Home", Color::WHITE);
+        fb.draw_text(12, 76, "Network", Color::WHITE);
+
         // Main content area
         fb.fill_rect(
             Rect {
@@ -61,6 +83,30 @@ impl AweFileManagerApp {
                 a: 255,
             },
         );
+
+        // Location bar
+        fb.fill_rect(
+            Rect {
+                x: 210,
+                y: 10,
+                width: width.saturating_sub(220),
+                height: 28,
+            },
+            Color {
+                r: 45,
+                g: 52,
+                b: 70,
+                a: 255,
+            },
+        );
+        fb.draw_text(220, 18, self.current_path, Color::WHITE);
+
+        // Entries list
+        for (i, entry) in self.entries.iter().enumerate() {
+            let y = 60 + (i as i32) * 28;
+            fb.draw_text(220, y, "[DIR] ", Color { r: 0, g: 153, b: 255, a: 255 });
+            fb.draw_text(270, y, entry, Color::WHITE);
+        }
     }
 }
 
@@ -76,8 +122,13 @@ mod tests {
 
     #[test]
     fn test_file_manager_app() {
+        let mut compositor = Compositor::new();
         let app = AweFileManagerApp::new();
-        assert_eq!(app.entries.len(), 5);
+        app.launch(&mut compositor);
+        assert_eq!(compositor.window_count(), 1);
+
+        extern crate alloc;
+        use alloc::vec;
         let mut buf = vec![0u8; 800 * 600 * 4];
         app.render(&mut buf, 800, 600);
         assert!(!buf.iter().all(|&b| b == 0));

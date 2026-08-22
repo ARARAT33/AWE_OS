@@ -82,9 +82,21 @@ mod product_core {
 
     #[test]
     fn asd_admission_is_exercised_end_to_end() {
-        let sum_payload = (0x55u32 * 128) as u8;
-        let expected_sig = sum_payload ^ 0x10 ^ 0xC5;
-        let package = asd_package(16, 128, 64, expected_sig);
+        let seed = [0x55u8; 32];
+        let (_pk, sk) = awe_securityd::ed25519_keypair_from_seed(&seed);
+
+        let manifest_bytes = vec![0u8; 16];
+        let payload_bytes = vec![0x55u8; 128];
+        let mut package_payload_for_sig = Vec::new();
+        package_payload_for_sig.extend_from_slice(&manifest_bytes);
+        package_payload_for_sig.extend_from_slice(&payload_bytes);
+
+        let real_sig = awe_securityd::ed25519_sign(&sk, &package_payload_for_sig);
+
+        let mut package = asd_package(16, 128, 64, 0);
+        let sig_offset = ASD_HEADER_LEN + 16 + 128;
+        package[sig_offset..sig_offset + 64].copy_from_slice(&real_sig);
+
         assert!(validate_asd(&package).is_ok());
 
         let mut malformed = package.clone();
@@ -111,9 +123,16 @@ mod product_core {
 
     #[test]
     fn awos_admission_and_lifecycle_are_exercised_end_to_end() {
-        let sum_code = (0x90u32 * 256) as u8;
-        let expected_sig = sum_code ^ 0x12 ^ 0xA5;
-        let package = awos_package(16, 256, 32, 64, expected_sig);
+        let seed = [0x77u8; 32];
+        let (_pk, sk) = awe_securityd::ed25519_keypair_from_seed(&seed);
+
+        let code_bytes = vec![0x90u8; 256];
+        let real_sig = awe_securityd::ed25519_sign(&sk, &code_bytes);
+
+        let mut package = awos_package(16, 256, 32, 64, 0);
+        let sig_offset = AWOS_HEADER_LEN + 16 + 256 + 32;
+        package[sig_offset..sig_offset + 64].copy_from_slice(&real_sig);
+
         assert!(validate_awos(&package).is_ok());
 
         let mut malformed = package.clone();
@@ -335,15 +354,21 @@ mod product_core {
         );
 
         // 5. AWOSA Native Application Platform Lifecycle
+        let seed_app = [0x88u8; 32];
+        let (pk_app, sk_app) = awe_securityd::ed25519_keypair_from_seed(&seed_app);
+
         let pub_id = PublisherIdentity {
             publisher_id: 200,
-            key_fingerprint: [0x34; 16],
+            public_key: pk_app,
             is_official: true,
         };
-        let sum_code = (0x90u32 * 16) as u8;
-        let expected_sig = sum_code ^ 0x34 ^ 0xA5;
 
-        let awos_bytes = awos_package(8, 16, 4, 64, expected_sig);
+        let app_code = vec![0x90u8; 16];
+        let app_sig = awe_securityd::ed25519_sign(&sk_app, &app_code);
+
+        let mut awos_bytes = awos_package(8, 16, 4, 64, 0);
+        let sig_offset_awos = AWOS_HEADER_LEN + 8 + 16 + 4;
+        awos_bytes[sig_offset_awos..sig_offset_awos + 64].copy_from_slice(&app_sig);
         let meta_awos = PackageMeta {
             package_id: 2001,
             version: 1,
@@ -366,15 +391,21 @@ mod product_core {
         );
 
         // 6. ASD Native Driver Supervisor Lifecycle
+        let seed_drv = [0x99u8; 32];
+        let (pk_drv, sk_drv) = awe_securityd::ed25519_keypair_from_seed(&seed_drv);
+
         let signer = DriverSignerKey {
             key_id: 10,
-            fingerprint: [0x56; 16],
+            public_key: pk_drv,
             is_certified: true,
         };
-        let sum_payload = (0x55u32 * 32) as u8;
-        let expected_drv_sig = sum_payload ^ 0x56 ^ 0xC5;
 
-        let asd_bytes = asd_package(16, 32, 64, expected_drv_sig);
+        let drv_payload = vec![0x55u8; 32];
+        let drv_sig = awe_securityd::ed25519_sign(&sk_drv, &drv_payload);
+
+        let mut asd_bytes = asd_package(16, 32, 64, 0);
+        let sig_offset_asd = ASD_HEADER_LEN + 16 + 32;
+        asd_bytes[sig_offset_asd..sig_offset_asd + 64].copy_from_slice(&drv_sig);
         let meta_drv = DriverMeta {
             driver_id: 700,
             version: 1,
@@ -537,23 +568,33 @@ mod product_core {
 
     #[test]
     fn kernel_compatibility_runtimes_end_to_end() {
-        use aweos_kernel::compat::android::AndroidBinderEmulator;
-        use aweos_kernel::compat::linux::LinuxSyscallDispatcher;
-        use aweos_kernel::compat::windows::{NtStatus, Win32SyscallDispatcher};
+        use aweos_kernel::compat::android::{AndroidBinderEmulator, AndroidError, DexHeader};
+        use aweos_kernel::compat::linux::{Elf64Image, LinuxErrno, LinuxSyscallDispatcher};
+        use aweos_kernel::compat::windows::{NtStatus, PeImage, Win32SyscallDispatcher};
         use aweos_kernel::compat::wlin::WlinBridge;
 
-        // Windows
+        // Windows PE32+
         let mut win = Win32SyscallDispatcher::new();
         assert_eq!(win.dispatch(0x0055, 0x9999, 0x01, 0), NtStatus::Success);
+        // Unsupported NT syscall fails closed
+        assert_eq!(win.dispatch(0xFFFF, 0, 0, 0), NtStatus::NotImplemented);
+        // Invalid PE image parsing fails closed
+        assert!(matches!(PeImage::parse(b"NOT_A_PE_HEADER"), Err(NtStatus::InvalidParameter)));
 
-        // Linux
+        // Linux ELF64
         let mut lin = LinuxSyscallDispatcher::new();
         assert_eq!(lin.dispatch(1, 1, 0, 0).unwrap(), 0);
+        // Unsupported Linux syscall fails closed
+        assert_eq!(lin.dispatch(9999, 0, 0, 0), Err(LinuxErrno::ENOSYS));
+        // Invalid ELF image parsing fails closed
+        assert!(matches!(Elf64Image::parse(b"NOT_A_VALID_ELF_HEADER"), Err(LinuxErrno::EINVAL)));
 
-        // Android Binder
+        // Android Binder & DEX
         let mut binder = AndroidBinderEmulator::new();
         let ch = binder.register_service_channel(0x1122).unwrap();
         assert_eq!(ch, 1);
+        // Invalid DEX magic parsing fails closed
+        assert!(matches!(DexHeader::parse(b"INVALID_DEX_MAGIC"), Err(AndroidError::InvalidDexMagic)));
 
         // WLIN Bridge
         let mut wlin = WlinBridge::new();
