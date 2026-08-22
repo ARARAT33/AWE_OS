@@ -14,6 +14,7 @@ import sys
 import struct
 import shutil
 import zlib
+import subprocess
 from pathlib import Path
 
 SECTOR_SIZE_ISO = 2048
@@ -285,7 +286,20 @@ def main():
 
     efi_path.write_bytes(efi_loader_bytes)
 
-    build_iso(kernel_bytes, efi_loader_bytes, grub_cfg, str(iso_path))
+    if shutil.which('grub-mkrescue') and kernel_path.exists():
+        iso_root = out_dir / 'iso'
+        grub_dir = iso_root / 'boot' / 'grub'
+        grub_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(kernel_path, iso_root / 'boot' / 'aweos')
+        shutil.copyfile(root / 'kernel-bin' / 'grub.cfg', grub_dir / 'grub.cfg')
+        try:
+            subprocess.run(['grub-mkrescue', '-o', str(iso_path), str(iso_root)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print(f"Created GRUB ISO image: {iso_path} ({iso_path.stat().st_size} bytes)")
+        except Exception:
+            build_iso(kernel_bytes, efi_loader_bytes, grub_cfg, str(iso_path))
+    else:
+        build_iso(kernel_bytes, efi_loader_bytes, grub_cfg, str(iso_path))
+
     build_gpt_fat_img(kernel_bytes, efi_loader_bytes, grub_cfg, str(img_path))
     build_gpt_fat_img(kernel_bytes, efi_loader_bytes, grub_cfg, str(uefi_img_path))
     build_gpt_fat_img(kernel_bytes, efi_loader_bytes, grub_cfg, str(bios_img_path))
