@@ -122,7 +122,9 @@ impl<const N: usize> ExecutionCore<N> {
             match action {
                 DispatchAction::SwitchTo(id) => {
                     if let Some(proc) = self.find(id) {
-                        if proc.state == ProcessState::Runnable || proc.state == ProcessState::Running {
+                        if proc.state == ProcessState::Runnable
+                            || proc.state == ProcessState::Running
+                        {
                             self.set_running(id);
                             return action;
                         }
@@ -132,7 +134,9 @@ impl<const N: usize> ExecutionCore<N> {
                 DispatchAction::KeepCurrent => {
                     if let Some(curr) = self.current() {
                         if let Some(proc) = self.find(curr) {
-                            if proc.state == ProcessState::Runnable || proc.state == ProcessState::Running {
+                            if proc.state == ProcessState::Runnable
+                                || proc.state == ProcessState::Running
+                            {
                                 return action;
                             }
                         }
@@ -158,7 +162,10 @@ impl<const N: usize> ExecutionCore<N> {
 
     pub fn exit(&mut self, id: ProcessId) -> Result<(), CoreError> {
         let process = self.find_mut(id).ok_or(CoreError::InvalidTransition)?;
-        if process.state != ProcessState::Running && process.state != ProcessState::Runnable && process.state != ProcessState::Blocked {
+        if process.state != ProcessState::Running
+            && process.state != ProcessState::Runnable
+            && process.state != ProcessState::Blocked
+        {
             return Err(CoreError::InvalidTransition);
         }
         if process.state == ProcessState::Runnable {
