@@ -122,25 +122,28 @@ impl<const N: usize> ExecutionCore<N> {
             let action = self.scheduler.schedule_boundary();
             match action {
                 DispatchAction::SwitchTo(id) => {
-                    if let Some(proc) = self.find(id) {
-                        if proc.state == ProcessState::Runnable
-                            || proc.state == ProcessState::Running
-                        {
-                            self.set_running(id);
-                            return action;
-                        }
-                        // Skip blocked / exited processes that remain in queue
+                    let is_active = self
+                        .find(id)
+                        .map(|p| {
+                            p.state == ProcessState::Runnable || p.state == ProcessState::Running
+                        })
+                        .unwrap_or(false);
+                    if is_active {
+                        self.set_running(id);
+                        return action;
                     }
+                    // Skip blocked / exited processes that remain in queue
                 }
                 DispatchAction::KeepCurrent => {
-                    if let Some(curr) = self.current() {
-                        if let Some(proc) = self.find(curr) {
-                            if proc.state == ProcessState::Runnable
-                                || proc.state == ProcessState::Running
-                            {
-                                return action;
-                            }
-                        }
+                    let is_active = self
+                        .current()
+                        .and_then(|curr| self.find(curr))
+                        .map(|p| {
+                            p.state == ProcessState::Runnable || p.state == ProcessState::Running
+                        })
+                        .unwrap_or(false);
+                    if is_active {
+                        return action;
                     }
                     return DispatchAction::KeepCurrent;
                 }
