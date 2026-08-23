@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(clippy::collapsible_if)]
 
 use crate::process::{ProcessDescriptor, ProcessId, ProcessState, ResourceBudget};
 use crate::scheduler::{DispatchAction, Scheduler};
@@ -286,6 +287,6 @@ mod tests {
         assert!(core.unblock_process(p1).is_ok());
         assert_eq!(core.schedule(), DispatchAction::SwitchTo(p1));
         assert!(core.exit(p1).is_ok());
-        assert!(core.trace_records().len() > 0);
+        assert!(!core.trace_records().is_empty());
     }
 }
