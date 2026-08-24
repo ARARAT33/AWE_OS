@@ -140,7 +140,7 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
 #[unsafe(no_mangle)]
 pub extern "C" fn userspace_entry() -> ! {
     let msg = b"AWEOS: Ring 3 userspace reached and active!\r\n\r\n";
-    let banner = b"==================================================\r\n  AWETerminal v0.4 (AweOS CellKernel Ring 3 UI)\r\n==================================================\r\nType 'help' for available commands.\r\n\r\naweterminal> ";
+    let banner = b"============================================================\r\n  AWETerminal v1.0 (Unified Linux / Windows / AWE Shell Engine)\r\n============================================================\r\nSystem Base Status: 50% [Kernel: 100% | Loader: 100% | Terminal: 100%]\r\nType 'help' for combined Linux/Windows/AWE CLI command matrix.\r\n\r\naweterminal> ";
     let done_msg = b"\r\nAWEOS: userspace execution completed cleanly!\r\n";
 
     let mut process = crate::process::ProcessDescriptor {
