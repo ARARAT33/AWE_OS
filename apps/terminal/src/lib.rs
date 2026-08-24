@@ -77,7 +77,7 @@ impl AweTerminalApp {
         if !cmd_bytes.is_empty() {
             if cmd_bytes == b"help" {
                 self.write_str(
-                    "Available commands: help, ver, sysinfo, uname, clear, status, echo <msg>\n",
+                    "Available commands: help, ver, sysinfo, uname, clear, status, ls, echo <msg>\n",
                 );
             } else if cmd_bytes == b"ver" {
                 self.write_str("AWEOS Universal Singularity v2.5.0 (CellKernel x86_64)\n");
@@ -89,6 +89,8 @@ impl AweTerminalApp {
                 self.write_str("AWEOS 2.5.0 CellKernel x86_64\n");
             } else if cmd_bytes == b"status" {
                 self.write_str("System status: RUNNING | AYUI Compositor: ACTIVE | Services: OK\n");
+            } else if cmd_bytes == b"ls" {
+                self.write_str("init.elf  shell.elf  ayui.cfg  kernel.bin  readme.txt\n");
             } else if cmd_bytes == b"clear" {
                 self.backend.grid = [[b' '; TERM_COLS]; TERM_ROWS];
                 self.backend.cursor_row = 0;
@@ -207,5 +209,25 @@ mod tests {
         let mut buf = [0u8; 640 * 480 * 4];
         app.render(&mut buf, 640, 480);
         assert!(!buf.iter().all(|&b| b == 0));
+    }
+
+    #[test]
+    fn test_terminal_app_ls_and_sysinfo_commands() {
+        let mut app = AweTerminalApp::new();
+
+        for &b in b"ls\n" {
+            app.handle_char(b);
+        }
+        assert_eq!(app.command_len, 0);
+
+        for &b in b"sysinfo\n" {
+            app.handle_char(b);
+        }
+        assert_eq!(app.command_len, 0);
+
+        for &b in b"uname\n" {
+            app.handle_char(b);
+        }
+        assert_eq!(app.command_len, 0);
     }
 }
