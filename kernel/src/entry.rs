@@ -77,12 +77,22 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
         let stack_top = core::ptr::addr_of_mut!(KERNEL_STACK) as u64 + 65536;
         let user_stack_top = core::ptr::addr_of_mut!(USER_STACK) as u64 + 16384;
 
-        use crate::arch::x86_64::gdt::KERNEL_CODE_SELECTOR;
+        use crate::arch::x86_64::gdt::{KERNEL_CODE_SELECTOR, USER_CODE_SELECTOR};
         use crate::arch::x86_64::idt::IDT;
         use crate::arch::x86_64::isr_stubs::init_idt_stubs;
+        use crate::syscall::init_msr_syscall;
 
         init_gdt(stack_top);
         serial_write_str("AWEOS: GDT & TSS initialized\r\n");
+
+        unsafe {
+            init_msr_syscall(
+                userspace_entry as *const () as usize as u64,
+                KERNEL_CODE_SELECTOR,
+                USER_CODE_SELECTOR,
+            );
+        }
+        serial_write_str("AWEOS: SYSCALL/SYSRET MSRs initialized\r\n");
 
         let idt_ptr = core::ptr::addr_of_mut!(IDT);
         unsafe {

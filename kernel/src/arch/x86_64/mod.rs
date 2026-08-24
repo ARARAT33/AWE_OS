@@ -58,6 +58,25 @@ pub unsafe fn write_cr3(value: u64) {
 }
 
 #[inline(always)]
+pub unsafe fn read_msr(msr: u32) -> u64 {
+    unsafe {
+        let low: u32;
+        let high: u32;
+        core::arch::asm!("rdmsr", in("ecx") msr, out("eax") low, out("edx") high, options(nomem, nostack, preserves_flags));
+        ((high as u64) << 32) | (low as u64)
+    }
+}
+
+#[inline(always)]
+pub unsafe fn write_msr(msr: u32, value: u64) {
+    unsafe {
+        let low = value as u32;
+        let high = (value >> 32) as u32;
+        core::arch::asm!("wrmsr", in("ecx") msr, in("eax") low, in("edx") high, options(nomem, nostack, preserves_flags));
+    }
+}
+
+#[inline(always)]
 pub unsafe fn read_rflags() -> u64 {
     unsafe {
         let value: u64;
