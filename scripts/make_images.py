@@ -2,10 +2,10 @@
 """
 AWEOS Image Builder
 Generates:
-1. dist/aweos-x86_64.iso (ISO-9660 bootable hybrid image)
-2. dist/aweos-x86_64.img (GPT + FAT partitioned raw disk image)
+1. dist/aweos-x86_64.iso (ISO-9660 El Torito bootable hybrid image)
+2. dist/aweos-x86_64.img (GPT + FAT partitioned raw disk image with MBR bootloader)
 3. dist/aweos-uefi.img (UEFI ESP disk image)
-4. dist/aweos-bios.img (BIOS MBR disk image)
+4. dist/aweos-bios.img (BIOS MBR disk image with kernel bootloader)
 And copies them to build/ directory.
 """
 
@@ -19,6 +19,69 @@ from pathlib import Path
 
 SECTOR_SIZE_ISO = 2048
 SECTOR_SIZE_DISK = 512
+
+STAGE1_FALLBACK = (
+    b'\xea\x05|\x00\x00\xfa1\xc0\x8e\xd8\x8e\xc0\x8e\xd0\xbc\x00|\xfb'
+    b'\x88\x16\x94|\xbe\x95|\xac\x08\xc0t\t\xb4\x0e\xbb\x07\x00\xcd\x10'
+    b'\xeb\xf2\xbe\xa8|\x8a\x16\x94|\xb4B\xcd\x13s\t\xb8E\x0e\xcd\x10'
+    b'\xfa\xf4\xeb\xfc\xe4\x92\x0c\x02\xe6\x92\x0f\x01\x16\xd0|\x0f \xc0'
+    b'f\x83\xc8\x01\x0f"\xc0\xeaW|\x08\x00f\xb8\x10\x00\x8e\xd8\x8e\xc0'
+    b'\x8e\xe0\x8e\xe8\x8e\xd0\xbc\x00\x00\t\x00\xbe\x00\x00\x01\x00\xbf'
+    b'\x00\x00\x10\x00\x0f\xb6\r\xaa|\x00\x00\xc1\xe1\t\xc1\xe9\x02\xf3'
+    b'\xa5\xb8\x89b\xd761\xdb\xb9\x00\x10\x10\x00\xff\xe1\x8dv\x00\x00'
+    b'Booting AWEOS...\r\n\x00\x10\x00\x00\x02\x00\x00\x00\x10\x10\x00'
+    b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\x00'
+    b'\x00\x00\x9a\xcf\x00\xff\xff\x00\x00\x00\x92\xcf\x00\17\x00\xb8|\x00\x00'
+)
+
+def assemble_stage1():
+    root = Path(__file__).resolve().parent.parent
+    stage1_s = root / 'boot' / 'x86' / 'bios' / 'stage1.s'
+    build_dir = root / 'build'
+    stage1_o = build_dir / 'stage1.o'
+    stage1_elf = build_dir / 'stage1.elf'
+    stage1_bin = build_dir / 'stage1.bin'
+
+    if stage1_s.exists() and shutil.which('as') and shutil.which('ld') and shutil.which('objcopy'):
+        try:
+            subprocess.run(['as', '--32', str(stage1_s), '-o', str(stage1_o)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(['ld', '-m', 'elf_i386', '--Ttext', '0x7C00', str(stage1_o), '-o', str(stage1_elf)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(['objcopy', '-O', 'binary', str(stage1_elf), str(stage1_bin)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            nm_out = subprocess.check_output(['nm', str(stage1_elf)], text=True)
+            sec_off, lba_off = None, None
+            for line in nm_out.splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 3:
+                    addr = int(parts[0], 16) - 0x7C00
+                    if parts[2] == 'dap_sectors':
+                        sec_off = addr
+                    elif parts[2] == 'dap_lba':
+                        lba_off = addr
+
+            if stage1_bin.exists() and sec_off is not None and lba_off is not None:
+                bin_bytes = stage1_bin.read_bytes()
+                stage1_o.unlink(missing_ok=True)
+                stage1_elf.unlink(missing_ok=True)
+                stage1_bin.unlink(missing_ok=True)
+                return bin_bytes, sec_off, lba_off
+        except Exception:
+            pass
+
+    return STAGE1_FALLBACK, 170, 176
+
+def make_stage1_bootsector(start_lba: int, sector_count: int) -> bytearray:
+    code_bytes, sec_off, lba_off = assemble_stage1()
+    code = bytearray(code_bytes)
+    if len(code) < 512:
+        code.extend(b'\x00' * (512 - len(code)))
+
+    # Patch DAP sector count and DAP LBA at dynamic symbol offsets
+    struct.pack_into('<H', code, sec_off, min(sector_count, 65535))
+    struct.pack_into('<Q', code, lba_off, start_lba)
+
+    code[510:512] = b'\x55\xAA'
+    return code
 
 def pad_to_sector(data: bytearray, sector_size: int) -> bytearray:
     rem = len(data) % sector_size
@@ -60,12 +123,17 @@ def make_directory_record(extent_sector: int, data_len: int, name: str, is_dir: 
     return bytes(rec)
 
 def build_iso(kernel_bytes: bytes, efi_loader_bytes: bytes, grub_cfg_bytes: bytes, out_path: str):
-    iso = bytearray(32768)
-    current_sector = 22
+    iso = bytearray(32768) # Sectors 0-15 reserved
+    current_sector = 23 # Sector 23 is Stage1 El Torito Boot Sector
+
+    stage1_sector = current_sector
+    current_sector += 1
 
     kernel_sector = current_sector
     kernel_len = len(kernel_bytes)
-    current_sector += (kernel_len + SECTOR_SIZE_ISO - 1) // SECTOR_SIZE_ISO
+    kernel_disk_sectors = (kernel_len + SECTOR_SIZE_DISK - 1) // SECTOR_SIZE_DISK
+    kernel_iso_sectors = (kernel_len + SECTOR_SIZE_ISO - 1) // SECTOR_SIZE_ISO
+    current_sector += kernel_iso_sectors
 
     efi_sector = current_sector
     efi_len = len(efi_loader_bytes)
@@ -77,26 +145,7 @@ def build_iso(kernel_bytes: bytes, efi_loader_bytes: bytes, grub_cfg_bytes: byte
 
     total_sectors = current_sector
 
-    root_dir_data = bytearray()
-    root_dir_data.extend(make_directory_record(19, SECTOR_SIZE_ISO, '\x00', is_dir=True))
-    root_dir_data.extend(make_directory_record(19, SECTOR_SIZE_ISO, '\x01', is_dir=True))
-    root_dir_data.extend(make_directory_record(20, SECTOR_SIZE_ISO, 'BOOT', is_dir=True))
-    root_dir_data.extend(make_directory_record(21, SECTOR_SIZE_ISO, 'EFI', is_dir=True))
-    pad_to_sector(root_dir_data, SECTOR_SIZE_ISO)
-
-    boot_dir_data = bytearray()
-    boot_dir_data.extend(make_directory_record(20, SECTOR_SIZE_ISO, '\x00', is_dir=True))
-    boot_dir_data.extend(make_directory_record(19, SECTOR_SIZE_ISO, '\x01', is_dir=True))
-    boot_dir_data.extend(make_directory_record(kernel_sector, kernel_len, 'AWEOS;1'))
-    boot_dir_data.extend(make_directory_record(grub_sector, grub_len, 'GRUB.CFG;1'))
-    pad_to_sector(boot_dir_data, SECTOR_SIZE_ISO)
-
-    efi_dir_data = bytearray()
-    efi_dir_data.extend(make_directory_record(21, SECTOR_SIZE_ISO, '\x00', is_dir=True))
-    efi_dir_data.extend(make_directory_record(19, SECTOR_SIZE_ISO, '\x01', is_dir=True))
-    efi_dir_data.extend(make_directory_record(efi_sector, efi_len, 'BOOTX64.EFI;1'))
-    pad_to_sector(efi_dir_data, SECTOR_SIZE_ISO)
-
+    # Sector 16: Primary Volume Descriptor
     pvd = bytearray(SECTOR_SIZE_ISO)
     pvd[0] = 1
     pvd[1:6] = b'CD001'
@@ -108,23 +157,87 @@ def build_iso(kernel_bytes: bytes, efi_loader_bytes: bytes, grub_cfg_bytes: byte
     pvd[132:140] = u32_both(10)
     pvd[140:144] = struct.pack('<I', 18)
     pvd[148:152] = struct.pack('>I', 18)
-    pvd[156:190] = make_directory_record(19, SECTOR_SIZE_ISO, '\x00', is_dir=True)
+    pvd[156:190] = make_directory_record(20, SECTOR_SIZE_ISO, '\x00', is_dir=True)
     pvd[190:318] = b'AWEOS_PUBLISHER                 '.ljust(128, b' ')
 
+    # Sector 17: El Torito Boot Record Volume Descriptor
+    boot_rec = bytearray(SECTOR_SIZE_ISO)
+    boot_rec[0] = 0
+    boot_rec[1:6] = b'CD001'
+    boot_rec[6] = 1
+    boot_rec[7:39] = b'EL TORITO SPECIFICATION'.ljust(32, b'\x00')
+    boot_rec[71:75] = struct.pack('<I', 19) # Boot Catalog LBA = sector 19
+
+    # Sector 18: Volume Descriptor Set Terminator
     term = bytearray(SECTOR_SIZE_ISO)
     term[0] = 255
     term[1:6] = b'CD001'
     term[6] = 1
 
-    lpath = bytearray(SECTOR_SIZE_ISO)
-    lpath[0:10] = struct.pack('<IBH', 19, 0, 1) + b'\x00'
+    # Sector 19: Boot Catalog
+    boot_catalog = bytearray(SECTOR_SIZE_ISO)
+    val_entry = bytearray(32)
+    val_entry[0] = 0x01
+    val_entry[1] = 0x00
+    val_entry[4:28] = b'AWEOS BOOT              '
+    val_entry[30] = 0x55
+    val_entry[31] = 0xAA
 
+    word_sum = 0
+    for i in range(0, 32, 2):
+        if i != 28:
+            word = struct.unpack_from('<H', val_entry, i)[0]
+            word_sum += word
+    checksum = (0x10000 - (word_sum & 0xFFFF)) & 0xFFFF
+    struct.pack_into('<H', val_entry, 28, checksum)
+
+    init_entry = bytearray(32)
+    init_entry[0] = 0x88 # Bootable
+    init_entry[1] = 0x00 # No Emulation
+    struct.pack_into('<H', init_entry, 6, 4) # 4 512-byte sectors (2KB)
+    struct.pack_into('<I', init_entry, 8, stage1_sector) # Load RBA = sector 23
+
+    boot_catalog[0:32] = val_entry
+    boot_catalog[32:64] = init_entry
+
+    # Sector 20: Root Directory
+    root_dir_data = bytearray()
+    root_dir_data.extend(make_directory_record(20, SECTOR_SIZE_ISO, '\x00', is_dir=True))
+    root_dir_data.extend(make_directory_record(20, SECTOR_SIZE_ISO, '\x01', is_dir=True))
+    root_dir_data.extend(make_directory_record(21, SECTOR_SIZE_ISO, 'BOOT', is_dir=True))
+    root_dir_data.extend(make_directory_record(22, SECTOR_SIZE_ISO, 'EFI', is_dir=True))
+    pad_to_sector(root_dir_data, SECTOR_SIZE_ISO)
+
+    # Sector 21: BOOT Directory
+    boot_dir_data = bytearray()
+    boot_dir_data.extend(make_directory_record(21, SECTOR_SIZE_ISO, '\x00', is_dir=True))
+    boot_dir_data.extend(make_directory_record(20, SECTOR_SIZE_ISO, '\x01', is_dir=True))
+    boot_dir_data.extend(make_directory_record(kernel_sector, kernel_len, 'AWEOS;1'))
+    boot_dir_data.extend(make_directory_record(grub_sector, grub_len, 'GRUB.CFG;1'))
+    pad_to_sector(boot_dir_data, SECTOR_SIZE_ISO)
+
+    # Sector 22: EFI Directory
+    efi_dir_data = bytearray()
+    efi_dir_data.extend(make_directory_record(22, SECTOR_SIZE_ISO, '\x00', is_dir=True))
+    efi_dir_data.extend(make_directory_record(20, SECTOR_SIZE_ISO, '\x01', is_dir=True))
+    efi_dir_data.extend(make_directory_record(efi_sector, efi_len, 'BOOTX64.EFI;1'))
+    pad_to_sector(efi_dir_data, SECTOR_SIZE_ISO)
+
+    # Sector 23: Stage1 Boot sector (El Torito No-Emulation)
+    # LBA in DAP for ISO = kernel_sector * 4 (512-byte sectors)
+    kernel_disk_lba = kernel_sector * 4
+    stage1_boot = make_stage1_bootsector(kernel_disk_lba, kernel_disk_sectors)
+    pad_to_sector(stage1_boot, SECTOR_SIZE_ISO)
+
+    # Assembly of ISO image
     iso.extend(pvd)
+    iso.extend(boot_rec)
     iso.extend(term)
-    iso.extend(lpath)
+    iso.extend(boot_catalog)
     iso.extend(root_dir_data)
     iso.extend(boot_dir_data)
     iso.extend(efi_dir_data)
+    iso.extend(stage1_boot)
 
     k_data = bytearray(kernel_bytes)
     pad_to_sector(k_data, SECTOR_SIZE_ISO)
@@ -146,15 +259,26 @@ def build_gpt_fat_img(kernel_bytes: bytes, efi_loader_bytes: bytes, grub_cfg_byt
     total_sectors = 65536
     image = bytearray(total_sectors * SECTOR_SIZE_DISK)
 
-    mbr = bytearray(512)
-    mbr[446] = 0x00
-    mbr[447:450] = b'\x00\x02\x00'
-    mbr[450] = 0xEE
-    mbr[451:454] = b'\xFF\xFF\xFF'
-    mbr[454:458] = struct.pack('<I', 1)
-    mbr[458:462] = struct.pack('<I', total_sectors - 1)
-    mbr[510:512] = b'\x55\xAA'
-    image[0:512] = mbr
+    kernel_len = len(kernel_bytes)
+    kernel_disk_sectors = (kernel_len + SECTOR_SIZE_DISK - 1) // SECTOR_SIZE_DISK
+    kernel_lba = 64
+
+    # Sector 0: MBR + Stage1 Boot Sector
+    stage1 = make_stage1_bootsector(kernel_lba, kernel_disk_sectors)
+
+    # Protective GPT partition entry at 0x1BE (446)
+    stage1[446] = 0x00
+    stage1[447:450] = b'\x00\x02\x00'
+    stage1[450] = 0xEE
+    stage1[451:454] = b'\xFF\xFF\xFF'
+    stage1[454:458] = struct.pack('<I', 1)
+    stage1[458:462] = struct.pack('<I', total_sectors - 1)
+    stage1[510:512] = b'\x55\xAA'
+    image[0:512] = stage1
+
+    # Embed Kernel Payload at LBA 64
+    kernel_offset = kernel_lba * SECTOR_SIZE_DISK
+    image[kernel_offset:kernel_offset + len(kernel_bytes)] = kernel_bytes
 
     part_start_lba = 2048
     part_end_lba = total_sectors - 34
