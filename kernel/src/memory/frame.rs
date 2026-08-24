@@ -96,6 +96,53 @@ impl PhysicalFrameAllocator {
     }
 }
 
+/// Bitwise Bitmap Physical Frame Allocator managing 4 KiB physical RAM pages.
+pub struct BitmapFrameAllocator<const MAX_FRAMES: usize> {
+    bitmap: [u64; MAX_FRAMES],
+    base_address: u64,
+    total_frames: usize,
+}
+
+impl<const MAX_FRAMES: usize> BitmapFrameAllocator<MAX_FRAMES> {
+    pub const fn new(base_address: u64, total_frames: usize) -> Self {
+        Self {
+            bitmap: [0u64; MAX_FRAMES],
+            base_address,
+            total_frames,
+        }
+    }
+
+    /// Allocates a 4 KiB physical page frame using bitwise scan operations.
+    pub fn allocate_frame(&mut self) -> Option<Frame> {
+        for word_idx in 0..self.bitmap.len() {
+            if self.bitmap[word_idx] != u64::MAX {
+                let bit_idx = (!self.bitmap[word_idx]).trailing_zeros() as usize;
+                let frame_idx = word_idx * 64 + bit_idx;
+                if frame_idx < self.total_frames {
+                    self.bitmap[word_idx] |= 1u64 << bit_idx;
+                    return Some(Frame {
+                        start: self.base_address + (frame_idx as u64 * PAGE_SIZE),
+                    });
+                }
+            }
+        }
+        None
+    }
+
+    /// Releases a physical page frame back to the allocator.
+    pub fn free_frame(&mut self, frame: Frame) {
+        if frame.start >= self.base_address {
+            let offset = frame.start - self.base_address;
+            let frame_idx = (offset / PAGE_SIZE) as usize;
+            if frame_idx < self.total_frames {
+                let word_idx = frame_idx / 64;
+                let bit_idx = frame_idx % 64;
+                self.bitmap[word_idx] &= !(1u64 << bit_idx);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,5 +200,18 @@ mod tests {
         assert_eq!(allocator.allocate().unwrap().start, 0x5000);
         assert_eq!(allocator.allocate().unwrap().start, 0x6000);
         assert!(allocator.allocate().is_none());
+    }
+
+    #[test]
+    fn bitmap_frame_allocator_allocates_and_frees_with_bitwise_ops() {
+        let mut bitmap_alloc = BitmapFrameAllocator::<4>::new(0x100000, 10);
+        let f1 = bitmap_alloc.allocate_frame().unwrap();
+        let f2 = bitmap_alloc.allocate_frame().unwrap();
+        assert_eq!(f1.start, 0x100000);
+        assert_eq!(f2.start, 0x101000);
+
+        bitmap_alloc.free_frame(f1);
+        let f1_reused = bitmap_alloc.allocate_frame().unwrap();
+        assert_eq!(f1_reused.start, 0x100000);
     }
 }
