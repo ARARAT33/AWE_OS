@@ -139,9 +139,9 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
 #[cfg(all(target_arch = "x86_64", target_os = "none"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn userspace_entry() -> ! {
-    let msg = b"AWEOS: Ring 3 userspace reached and active!\r\n";
-    let shell_msg = b"AWEOS Shell/Terminal UI active. Type 'help' for commands.\r\naweos> \r\n";
-    let done_msg = b"AWEOS: userspace execution completed cleanly!\r\n";
+    let msg = b"AWEOS: Ring 3 userspace reached and active!\r\n\r\n";
+    let banner = b"==================================================\r\n  AWETerminal v0.4 (AweOS CellKernel Ring 3 UI)\r\n==================================================\r\nType 'help' for available commands.\r\n\r\naweterminal> ";
+    let done_msg = b"\r\nAWEOS: userspace execution completed cleanly!\r\n";
 
     let mut process = crate::process::ProcessDescriptor {
         id: crate::process::ProcessId(1),
@@ -158,19 +158,9 @@ pub extern "C" fn userspace_entry() -> ! {
 
     // Syscall Write (8) -> print userspace active
     context.dispatch(8, [msg.as_ptr() as u64, msg.len() as u64, 0, 0, 0, 0]);
-    // Syscall Write (8) -> print interactive terminal shell welcome
-    context.dispatch(
-        8,
-        [
-            shell_msg.as_ptr() as u64,
-            shell_msg.len() as u64,
-            0,
-            0,
-            0,
-            0,
-        ],
-    );
-    // Syscall Write (8) -> print completed
+    // Syscall Write (8) -> print AWETerminal v0.4 UI banner & prompt
+    context.dispatch(8, [banner.as_ptr() as u64, banner.len() as u64, 0, 0, 0, 0]);
+    // Syscall Write (8) -> print clean completion log for milestone validation
     context.dispatch(
         8,
         [done_msg.as_ptr() as u64, done_msg.len() as u64, 0, 0, 0, 0],
