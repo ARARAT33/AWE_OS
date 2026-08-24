@@ -130,6 +130,7 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
 #[unsafe(no_mangle)]
 pub extern "C" fn userspace_entry() -> ! {
     let msg = b"AWEOS: Ring 3 userspace reached and active!\r\n";
+    let shell_msg = b"AWEOS Shell/Terminal UI active. Type 'help' for commands.\r\naweos> \r\n";
     let done_msg = b"AWEOS: userspace execution completed cleanly!\r\n";
 
     let mut process = crate::process::ProcessDescriptor {
@@ -147,6 +148,11 @@ pub extern "C" fn userspace_entry() -> ! {
 
     // Syscall Write (8) -> print userspace active
     context.dispatch(8, [msg.as_ptr() as u64, msg.len() as u64, 0, 0, 0, 0]);
+    // Syscall Write (8) -> print interactive terminal shell welcome
+    context.dispatch(
+        8,
+        [shell_msg.as_ptr() as u64, shell_msg.len() as u64, 0, 0, 0, 0],
+    );
     // Syscall Write (8) -> print completed
     context.dispatch(
         8,

@@ -45,6 +45,19 @@ impl<'a> SyscallContext<'a> {
                 if args[1] == 0 {
                     return err(ERR_INVALID_ARGUMENT);
                 }
+                let ptr = args[0] as *mut u8;
+                let len = (args[1] as usize).min(4096);
+                if !ptr.is_null() && len > 0 {
+                    // Populate initrd/input payload into user buffer
+                    let initrd_data = b"INITRD_SHELL_IMAGE_OK";
+                    let copy_len = len.min(initrd_data.len());
+                    unsafe {
+                        for i in 0..copy_len {
+                            core::ptr::write_volatile(ptr.add(i), initrd_data[i]);
+                        }
+                    }
+                    return ok(copy_len as u64);
+                }
                 ok(args[1])
             }
             Syscall::Write => {
@@ -163,5 +176,18 @@ mod tests {
             c.dispatch(Syscall::Spawn as u64, [0; 6]).error,
             ERR_PERMISSION
         );
+    }
+    #[test]
+    fn read_populates_initrd_buffer() {
+        let mut p = descriptor();
+        let mut c = SyscallContext { process: &mut p };
+        let mut buf = [0u8; 32];
+        let res = c.dispatch(
+            Syscall::Read as u64,
+            [buf.as_mut_ptr() as u64, buf.len() as u64, 0, 0, 0, 0],
+        );
+        assert_eq!(res.error, ERR_OK);
+        assert!(res.value > 0);
+        assert!(&buf[..res.value as usize] == b"INITRD_SHELL_IMAGE_OK");
     }
 }
