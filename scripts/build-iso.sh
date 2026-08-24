@@ -31,6 +31,9 @@ if command -v grub-mkrescue >/dev/null 2>&1; then
     grub-mkrescue -o "$ISO" "$OUT/iso" 2>/dev/null || true
 fi
 
+cp "$ISO" "$BUILD/aweos-x86_64.iso" 2>/dev/null || true
+cp "$IMG" "$BUILD/aweos-x86_64.img" 2>/dev/null || true
+
 printf 'AWEOS ISO: %s\n' "$ISO"
 printf 'AWEOS IMG: %s\n' "$IMG"
 printf 'AWEOS UEFI IMG: %s/aweos-uefi.img\n' "$OUT"

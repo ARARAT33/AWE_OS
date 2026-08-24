@@ -151,7 +151,14 @@ pub extern "C" fn userspace_entry() -> ! {
     // Syscall Write (8) -> print interactive terminal shell welcome
     context.dispatch(
         8,
-        [shell_msg.as_ptr() as u64, shell_msg.len() as u64, 0, 0, 0, 0],
+        [
+            shell_msg.as_ptr() as u64,
+            shell_msg.len() as u64,
+            0,
+            0,
+            0,
+            0,
+        ],
     );
     // Syscall Write (8) -> print completed
     context.dispatch(
