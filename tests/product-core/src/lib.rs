@@ -10,6 +10,8 @@ mod product_core {
         validate_asd,
     };
     use awe_update::{Slot, SlotState, UpdateManager, UpdateManifest, Version};
+    use aweos_kernel::ac_boot_gate::AcBootGate;
+    use aweos_kernel::ac_runtime::AcRuntime;
     use aweos_kernel::compat::android::{
         ANDROID_PERM_INTERNET, ANDROID_PERM_READ_STORAGE, AndroidBinderEmulator,
         BinderTransactionHeader, DexHeader, map_android_permissions_to_awe_capabilities,
@@ -17,6 +19,8 @@ mod product_core {
     use aweos_kernel::compat::linux::{Elf64Image, LinuxSyscallDispatcher};
     use aweos_kernel::compat::windows::{NtStatus, PeImage, Win32SyscallDispatcher};
     use aweos_kernel::compat::wlin::WlinBridge;
+    use aweos_kernel::process::ResourceBudget;
+    use aweos_kernel::scheduler::DispatchAction;
     use aweos_kernel::storage::{
         BLOCK_SIZE, BlockDevice, NodeKind, RamBlockDevice, RecoveryAction, Vfs,
     };
@@ -78,6 +82,61 @@ mod product_core {
             payload_digest: [0xA5; 32],
             min_generation: generation,
         }
+    }
+
+    #[test]
+    fn stage_c_cellkernel_execution_core_invariants_certified() {
+        // 1. Bring-up Boot Gate
+        let mut gate = AcBootGate::new();
+        gate.validate_cpu(4, 0x1000).expect("validate cpu");
+        gate.validate_memory(4096, 64 * 1024 * 1024)
+            .expect("validate memory");
+        gate.activate().expect("activate kernel");
+
+        let mut rt: AcRuntime<4> = AcRuntime::new();
+        let budget = ResourceBudget {
+            cpu_ticks: 100,
+            memory_bytes: 65536,
+            ipc_messages: 16,
+        };
+
+        // 2. Process Lifecycle & Admission
+        let p1 = gate.admit_process(&mut rt, budget).expect("admit p1");
+        let p2 = gate.admit_process(&mut rt, budget).expect("admit p2");
+
+        // 3. Address Space Mapping & Buffer Validation
+        rt.map_user_range(p1, 0x0040_0000, 0x0001_0000)
+            .expect("map p1 user range");
+        assert!(rt.validate_user_buffer(p1, 0x0040_1000, 0x800).is_ok());
+        assert!(rt.validate_user_buffer(p1, 0x0050_0000, 0x100).is_err());
+
+        // 4. Scheduling & Preemption Execution
+        assert_eq!(rt.schedule(), DispatchAction::SwitchTo(p1));
+        assert_eq!(rt.schedule(), DispatchAction::SwitchTo(p2));
+
+        // 5. Syscall Validation
+        assert!(rt.validate_syscall(2, 2, 8, 4).is_ok());
+        assert!(rt.validate_syscall(99, 0, 8, 4).is_err());
+
+        // 6. Bounded IPC
+        rt.send_ipc(p1, 0x10, 0xDEADBEEF).expect("send IPC");
+        let msg = rt.recv_ipc().expect("recv IPC");
+        assert_eq!(msg.sender, p1);
+        assert_eq!(msg.opcode, 0x10);
+
+        // 7. Capability Revocation
+        rt.grant_capability(p1, 101, 0b11).expect("grant cap");
+        assert!(rt.check_capability(p1, 101, 0b01).is_ok());
+        rt.revoke_capability(p1, 101).expect("revoke cap");
+        assert!(rt.check_capability(p1, 101, 0b01).is_err());
+
+        // 8. Monotonic Time & Timers
+        rt.arm_timer(p1, 10, 1).expect("arm timer");
+        assert_eq!(rt.advance_time(5).expect("advance time"), 0);
+        assert_eq!(rt.advance_time(5).expect("advance time"), 1);
+
+        // 9. Structured Tracing & Diagnostics
+        assert!(rt.trace_len() > 0);
     }
 
     #[test]
