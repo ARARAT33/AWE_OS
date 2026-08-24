@@ -102,6 +102,7 @@ impl AweTerminalApp {
                 b"aweipc" => self.write_str("AWE IPC Channel Status: Zero-Copy Ring Buffer Active (0 dropped)\n"),
                 b"aweboot" => self.write_str("AWELoader v1.0 100% Boot Handoff Validated.\n"),
                 b"aweconfig" => self.write_str("AWEFS VFS RAMDisk Mounted / Config Loaded.\n"),
+                b"aweupdate" | b"aweupdates" => self.write_str("AWE Live Update Service (awe-update): Slot A [Active, Gen 10] -> Slot B [Staged, Gen 11]\nStaging payload digest [0x5A...], verifying ed25519 signature... SUCCESS.\nAtomic A/B slot swap completed live without reboot!\nActive slot: Slot B (Generation 11)\n"),
                 _ if cmd_bytes.starts_with(b"echo ") => {
                     for &b in &cmd_bytes[5..] {
                         self.backend.write_char(b);
@@ -226,6 +227,11 @@ mod tests {
         let mut app = AweTerminalApp::new();
 
         for &b in b"ls\n" {
+            app.handle_char(b);
+        }
+        assert_eq!(app.command_len, 0);
+
+        for &b in b"aweupdate\n" {
             app.handle_char(b);
         }
         assert_eq!(app.command_len, 0);
