@@ -90,6 +90,7 @@ ISR_NOERR 18
 ISR_NOERR 19
 ISR_NOERR 20
 ISR_NOERR 32
+ISR_NOERR 33
 
 .att_syntax prefix
 "#
@@ -118,6 +119,7 @@ unsafe extern "C" {
     pub fn awe_isr_19();
     pub fn awe_isr_20();
     pub fn awe_isr_32();
+    pub fn awe_isr_33();
 }
 
 pub fn init_idt_stubs(idt: &mut super::idt::Idt, cs: u16) {
@@ -143,6 +145,7 @@ pub fn init_idt_stubs(idt: &mut super::idt::Idt, cs: u16) {
     idt.set_handler(19, awe_isr_19 as *const () as usize as u64, cs);
     idt.set_handler(20, awe_isr_20 as *const () as usize as u64, cs);
     idt.set_handler(32, awe_isr_32 as *const () as usize as u64, cs);
+    idt.set_handler(33, awe_isr_33 as *const () as usize as u64, cs);
 }
 
 fn print_u64_hex(mut val: u64) {
@@ -168,6 +171,11 @@ pub extern "C" fn awe_interrupt_handler(frame: &mut InterruptFrame) {
         }
         TIMER_IRQ_COUNT.fetch_add(1, Ordering::Relaxed);
         super::timer::interrupt_tick();
+    } else if vector == 33 {
+        unsafe {
+            let _scancode = super::io_in8(0x60);
+            pic_send_eoi(1);
+        }
     } else {
         serial_write_str("AWEOS EXCEPTION vector=");
         print_u64_hex(frame.vector);
