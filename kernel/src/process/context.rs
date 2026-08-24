@@ -46,6 +46,9 @@ pub struct ProcessContext {
     pub process_id: super::ProcessId,
     pub cpu: CpuContext,
 }
+
+/// AweOS Cell Control Block (CCB) representing a microprocess unit.
+pub type CellControlBlock = ProcessContext;
 impl ProcessContext {
     pub const fn new(process_id: super::ProcessId, cpu: CpuContext) -> Self {
         Self { process_id, cpu }
