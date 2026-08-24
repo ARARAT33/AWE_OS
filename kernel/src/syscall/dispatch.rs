@@ -52,8 +52,8 @@ impl<'a> SyscallContext<'a> {
                     let initrd_data = b"INITRD_SHELL_IMAGE_OK";
                     let copy_len = len.min(initrd_data.len());
                     unsafe {
-                        for i in 0..copy_len {
-                            core::ptr::write_volatile(ptr.add(i), initrd_data[i]);
+                        for (i, &byte) in initrd_data.iter().take(copy_len).enumerate() {
+                            core::ptr::write_volatile(ptr.add(i), byte);
                         }
                     }
                     return ok(copy_len as u64);
