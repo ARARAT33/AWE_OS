@@ -683,7 +683,9 @@ mod product_core {
         let vol_id = storaged
             .register_volume(VolumeType::AweFsVolume, 4096, 0, false)
             .unwrap();
-        let _mount_id = storaged.mount_volume(vol_id, 0x4157_4546_5300_0000).unwrap();
+        let _mount_id = storaged
+            .mount_volume(vol_id, 0x4157_4546_5300_0000)
+            .unwrap();
 
         let mut awefs = AweFs::<16, 8>::new();
         awefs.format().unwrap();

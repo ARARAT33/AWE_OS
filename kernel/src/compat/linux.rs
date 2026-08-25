@@ -285,23 +285,23 @@ impl LinuxSyscallDispatcher {
         _arg3: u64,
     ) -> Result<u64, LinuxErrno> {
         match sys_nr {
-            0 => self.sys_read(arg1 as i32),                 // sys_read
-            1 => self.sys_write(arg1 as i32),                // sys_write
-            2 => self.sys_open(arg1),                        // sys_open
-            3 => self.sys_close(arg1 as i32),                // sys_close
-            9 => Ok(0x7FFFF7FF0000),                         // sys_mmap
-            11 => Ok(0),                                     // sys_munmap
+            0 => self.sys_read(arg1 as i32),                     // sys_read
+            1 => self.sys_write(arg1 as i32),                    // sys_write
+            2 => self.sys_open(arg1),                            // sys_open
+            3 => self.sys_close(arg1 as i32),                    // sys_close
+            9 => Ok(0x7FFFF7FF0000),                             // sys_mmap
+            11 => Ok(0),                                         // sys_munmap
             12 => Ok(if arg1 == 0 { 0x00408000 } else { arg1 }), // sys_brk
-            14 => Ok(0),                                     // sys_rt_sigaction
-            39 => Ok(self.current_pid as u64),               // sys_getpid
-            41 => self.sys_socket(arg1 as i32, arg2 as i32), // sys_socket
-            42 => Ok(0),                                     // sys_connect
-            56 => self.sys_clone(arg1),                      // sys_clone / sys_fork
-            59 => Ok(0),                                     // sys_execve
-            60 => self.sys_exit(arg1 as i32),                // sys_exit
-            202 => Ok(0),                                    // sys_futex
-            217 => Ok(0),                                    // sys_getdents64
-            231 => self.sys_exit(arg1 as i32),               // sys_exit_group
+            14 => Ok(0),                                         // sys_rt_sigaction
+            39 => Ok(self.current_pid as u64),                   // sys_getpid
+            41 => self.sys_socket(arg1 as i32, arg2 as i32),     // sys_socket
+            42 => Ok(0),                                         // sys_connect
+            56 => self.sys_clone(arg1),                          // sys_clone / sys_fork
+            59 => Ok(0),                                         // sys_execve
+            60 => self.sys_exit(arg1 as i32),                    // sys_exit
+            202 => Ok(0),                                        // sys_futex
+            217 => Ok(0),                                        // sys_getdents64
+            231 => self.sys_exit(arg1 as i32),                   // sys_exit_group
             _ => Err(LinuxErrno::ENOSYS),
         }
     }

@@ -114,8 +114,16 @@ impl PackageCenterApp {
             fb.draw_text(30, y + 10, pkg, Color::WHITE);
 
             let is_installed = (self.installed_mask & (1 << i)) != 0;
-            let status_str = if is_installed { "[INSTALLED]" } else { "[INSTALL]" };
-            let status_color = if is_installed { Color::GREEN } else { Color::BLUE };
+            let status_str = if is_installed {
+                "[INSTALLED]"
+            } else {
+                "[INSTALL]"
+            };
+            let status_color = if is_installed {
+                Color::GREEN
+            } else {
+                Color::BLUE
+            };
             fb.draw_text((width as i32) - 120, y + 10, status_str, status_color);
         }
     }

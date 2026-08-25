@@ -896,7 +896,12 @@ impl Compositor {
                     a: 255,
                 },
             );
-            fb.draw_text(20, (fb.height as i32) - 250, "AWE_OS Applications", Color::WHITE);
+            fb.draw_text(
+                20,
+                (fb.height as i32) - 250,
+                "AWE_OS Applications",
+                Color::WHITE,
+            );
             let apps = [
                 "1. Terminal",
                 "2. FileManager",

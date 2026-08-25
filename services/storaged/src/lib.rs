@@ -237,7 +237,12 @@ impl StorageDaemon {
 
     pub fn trigger_self_healing_repair(&mut self, volume_id: u32) -> bool {
         // Trigger self-healing repair from snapshots for damaged blocks
-        if self.snapshots.iter().flatten().any(|s| s.volume_id == volume_id) {
+        if self
+            .snapshots
+            .iter()
+            .flatten()
+            .any(|s| s.volume_id == volume_id)
+        {
             self.self_healed_events += 1;
             true
         } else {

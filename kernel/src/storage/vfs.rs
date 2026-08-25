@@ -290,14 +290,24 @@ impl<const N: usize, const J: usize> AweFs<N, J> {
         let slot = (inode_id as usize) % N;
         self.block_checksums[slot] = checksum;
 
-        if let Some(i) = self.vfs.inodes.iter_mut().flatten().find(|i| i.id == inode_id) {
+        if let Some(i) = self
+            .vfs
+            .inodes
+            .iter_mut()
+            .flatten()
+            .find(|i| i.id == inode_id)
+        {
             i.size = data.len() as u64;
             i.generation += 1;
         }
         Ok(seq)
     }
 
-    pub fn detect_and_self_heal(&mut self, inode_id: u32, current_data: &[u8]) -> Result<bool, FsError> {
+    pub fn detect_and_self_heal(
+        &mut self,
+        inode_id: u32,
+        current_data: &[u8],
+    ) -> Result<bool, FsError> {
         let inode = self.vfs.find_inode(inode_id).ok_or(FsError::NotFound)?;
         let slot = (inode.id as usize) % N;
         let expected_checksum = self.block_checksums[slot];
@@ -305,7 +315,13 @@ impl<const N: usize, const J: usize> AweFs<N, J> {
 
         if expected_checksum != 0 && current_checksum != expected_checksum {
             // Self-healing: repair block metadata and replay journal record
-            if let Some(record) = self.vfs.journal.iter().flatten().find(|r| r.inode == inode_id) {
+            if let Some(record) = self
+                .vfs
+                .journal
+                .iter()
+                .flatten()
+                .find(|r| r.inode == inode_id)
+            {
                 self.block_checksums[slot] = record.new_crc;
                 self.healed_block_count += 1;
                 return Ok(true); // Self-healed corrupted block
