@@ -169,17 +169,16 @@ impl AweTerminalApp {
             a: 255,
         };
 
-        for r in 0..TERM_ROWS {
+        for (r, row) in self.backend.grid.iter().enumerate().take(TERM_ROWS) {
             let row_y = 38 + (r as i32) * 16;
             if row_y + 12 > height as i32 {
                 break;
             }
-            for c in 0..TERM_COLS {
+            for (c, &ch) in row.iter().enumerate().take(TERM_COLS) {
                 let col_x = 10 + (c as i32) * 9;
                 if col_x + 8 > width as i32 {
                     break;
                 }
-                let ch = self.backend.grid[r][c];
                 if ch != b' ' {
                     fb.draw_char(col_x, row_y, ch, text_color);
                 }

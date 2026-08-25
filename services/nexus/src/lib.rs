@@ -135,8 +135,8 @@ impl PubSubTopic {
         if (capability_mask & self.required_capability) != self.required_capability {
             return Err("Insufficient capability for topic subscription");
         }
-        for i in 0..self.subscriber_count {
-            if self.subscribers[i] == service_id {
+        for subscriber in self.subscribers.iter().take(self.subscriber_count) {
+            if *subscriber == service_id {
                 return Ok(());
             }
         }
@@ -252,10 +252,9 @@ impl NexusRouter {
         };
 
         let mut delivered = 0;
-        for i in 0..topic.subscriber_count {
-            let target_id = topic.subscribers[i];
+        for target_id in topic.subscribers.iter().take(topic.subscriber_count) {
             let mut msg = NexusMessage::new(header, data)?;
-            msg.header.receiver_id = target_id;
+            msg.header.receiver_id = *target_id;
             if self.send_message(sender_id, msg).is_ok() {
                 delivered += 1;
             }
