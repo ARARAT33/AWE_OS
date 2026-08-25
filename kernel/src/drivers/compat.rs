@@ -71,6 +71,21 @@ impl<const N: usize> CompatibilityRegistry<N> {
         }
         None
     }
+
+    pub fn unregister(&mut self, vendor: u16, device: u16) -> bool {
+        let mut i = 0;
+        while i < N {
+            if let Some(m) = self.entries[i]
+                && m.vendor == vendor
+                && m.device == device
+            {
+                self.entries[i] = None;
+                return true;
+            }
+            i += 1;
+        }
+        false
+    }
 }
 
 impl<const N: usize> Default for CompatibilityRegistry<N> {
@@ -175,5 +190,10 @@ mod tests {
             contract()
         ));
         assert_eq!(bus.len(), 1);
+
+        let mut r: CompatibilityRegistry<4> = CompatibilityRegistry::new();
+        assert!(r.register(m));
+        assert!(r.unregister(0x1af4, 1));
+        assert!(r.find(0x1af4, 1, 0x0200).is_none());
     }
 }

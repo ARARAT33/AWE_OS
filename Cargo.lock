@@ -140,6 +140,8 @@ version = "0.1.0"
 name = "awe-product-core-tests"
 version = "0.1.0"
 dependencies = [
+ "awe-app-filemanager",
+ "awe-app-pkgcenter",
  "awe-appd",
  "awe-awosa",
  "awe-ayui",

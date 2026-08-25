@@ -17,3 +17,5 @@ awe-netd = { path = "../../services/netd" }
 awe-storaged = { path = "../../services/storaged" }
 awe-securityd = { path = "../../services/securityd" }
 aweos-kernel = { path = "../../kernel" }
+awe-app-pkgcenter = { path = "../../apps/pkgcenter" }
+awe-app-filemanager = { path = "../../apps/filemanager" }

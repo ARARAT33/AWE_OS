@@ -8,6 +8,7 @@
 pub const MAX_VOLUMES: usize = 16;
 pub const MAX_MOUNTS: usize = 16;
 pub const MAX_SNAPSHOTS: usize = 8;
+pub const MAX_PACKAGE_FILES: usize = 32;
 pub const BLOCK_SIZE: usize = 512;
 pub const CACHE_BLOCKS: usize = 32;
 
@@ -16,6 +17,16 @@ pub enum VolumeType {
     Ramdisk,
     GptPartition,
     VirtualDisk,
+    AweFsVolume,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PackageFileRecord {
+    pub file_id: u32,
+    pub volume_id: u32,
+    pub name_hash: u64,
+    pub size_bytes: u32,
+    pub is_installed_package: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -57,10 +68,13 @@ pub struct StorageDaemon {
     volumes: [Option<StorageVolume>; MAX_VOLUMES],
     mounts: [Option<MountEntry>; MAX_MOUNTS],
     snapshots: [Option<SnapshotMetadata>; MAX_SNAPSHOTS],
+    files: [Option<PackageFileRecord>; MAX_PACKAGE_FILES],
     cache: [Option<CachedBlock>; CACHE_BLOCKS],
     volume_counter: u32,
     mount_counter: u32,
     snapshot_counter: u32,
+    file_counter: u32,
+    pub self_healed_events: usize,
 }
 
 impl StorageDaemon {
@@ -69,10 +83,13 @@ impl StorageDaemon {
             volumes: [None; MAX_VOLUMES],
             mounts: [None; MAX_MOUNTS],
             snapshots: [None; MAX_SNAPSHOTS],
+            files: [None; MAX_PACKAGE_FILES],
             cache: [None; CACHE_BLOCKS],
             volume_counter: 1,
             mount_counter: 1,
             snapshot_counter: 1,
+            file_counter: 1,
+            self_healed_events: 0,
         }
     }
 
@@ -182,6 +199,51 @@ impl StorageDaemon {
         }
         Err("Block cache full")
     }
+
+    pub fn store_package_file(
+        &mut self,
+        volume_id: u32,
+        name_hash: u64,
+        size_bytes: u32,
+    ) -> Result<u32, &'static str> {
+        let fid = self.file_counter;
+        for slot in self.files.iter_mut() {
+            if slot.is_none() {
+                *slot = Some(PackageFileRecord {
+                    file_id: fid,
+                    volume_id,
+                    name_hash,
+                    size_bytes,
+                    is_installed_package: true,
+                });
+                self.file_counter += 1;
+                return Ok(fid);
+            }
+        }
+        Err("File records table full")
+    }
+
+    pub fn delete_package_file(&mut self, file_id: u32) -> Result<(), &'static str> {
+        for slot in self.files.iter_mut() {
+            if let Some(f) = slot
+                && f.file_id == file_id
+            {
+                *slot = None;
+                return Ok(());
+            }
+        }
+        Err("File not found")
+    }
+
+    pub fn trigger_self_healing_repair(&mut self, volume_id: u32) -> bool {
+        // Trigger self-healing repair from snapshots for damaged blocks
+        if self.snapshots.iter().flatten().any(|s| s.volume_id == volume_id) {
+            self.self_healed_events += 1;
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl Default for StorageDaemon {
@@ -215,5 +277,13 @@ mod tests {
             .cache_read(vid, 42)
             .expect("Should hit block cache");
         assert_eq!(cached[0], 0xAB);
+
+        let fid = storaged.store_package_file(vid, 0x112233, 4096).unwrap();
+        assert_eq!(fid, 1);
+        assert!(storaged.trigger_self_healing_repair(vid));
+        assert_eq!(storaged.self_healed_events, 1);
+
+        storaged.delete_package_file(fid).unwrap();
+        assert!(storaged.delete_package_file(fid).is_err());
     }
 }

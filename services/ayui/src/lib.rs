@@ -118,6 +118,8 @@ pub struct Window {
     pub bounds: Rect,
     pub visible: bool,
     pub focused: bool,
+    pub minimized: bool,
+    pub maximized: bool,
     pub bg_color: Color,
     pub app_type: AppType,
     pub title_len: usize,
@@ -595,6 +597,8 @@ pub struct Compositor {
     pub pointer_x: i32,
     pub pointer_y: i32,
     pub pointer_buttons: u8,
+    pub start_menu_open: bool,
+    pub installed_apps_mask: u32,
 }
 
 impl Compositor {
@@ -613,6 +617,32 @@ impl Compositor {
             pointer_x: 400,
             pointer_y: 300,
             pointer_buttons: 0,
+            start_menu_open: false,
+            installed_apps_mask: 0b1111_1111, // Standard AWE apps pre-installed
+        }
+    }
+
+    pub fn toggle_start_menu(&mut self) {
+        self.start_menu_open = !self.start_menu_open;
+    }
+
+    pub fn install_app_package(&mut self, app_id: u8) {
+        if app_id < 32 {
+            self.installed_apps_mask |= 1 << app_id;
+        }
+    }
+
+    pub fn remove_app_package(&mut self, app_id: u8) {
+        if app_id < 32 {
+            self.installed_apps_mask &= !(1 << app_id);
+        }
+    }
+
+    pub fn is_app_installed(&self, app_id: u8) -> bool {
+        if app_id < 32 {
+            (self.installed_apps_mask & (1 << app_id)) != 0
+        } else {
+            false
         }
     }
 
@@ -666,6 +696,8 @@ impl Compositor {
             bounds,
             visible: true,
             focused: false,
+            minimized: false,
+            maximized: false,
             bg_color: self.theme.bg_color,
             app_type,
             title_len,
@@ -714,13 +746,40 @@ impl Compositor {
                 self.pointer_y = y;
                 self.pointer_buttons = buttons;
 
-                // Handle window focus on mouse click
+                // Handle Start Menu button click in taskbar (x: 5..100, y: height-35..height-5)
+                if buttons & 1 != 0 && y >= 560 && x <= 120 {
+                    self.toggle_start_menu();
+                }
+
+                // Handle window focus & window titlebar buttons (Close/Minimize/Maximize) on click
                 if buttons & 1 != 0 {
-                    for win in self.windows.iter().flatten() {
+                    let mut win_to_destroy = None;
+                    for win in self.windows.iter_mut().flatten() {
                         if win.visible && win.bounds.contains(x, y) {
                             let wid = win.id;
-                            let _ = self.focus(wid);
-                            break;
+                            // Check titlebar control buttons: Close [X] at top-right
+                            let close_x = win.bounds.x + (win.bounds.width as i32) - 20;
+                            let min_x = win.bounds.x + (win.bounds.width as i32) - 40;
+                            if y >= win.bounds.y && y <= win.bounds.y + 24 {
+                                if x >= close_x {
+                                    win_to_destroy = Some(wid);
+                                    break;
+                                } else if x >= min_x {
+                                    win.minimized = !win.minimized;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if let Some(wid) = win_to_destroy {
+                        let _ = self.destroy_window(wid);
+                    } else {
+                        for win in self.windows.iter().flatten() {
+                            if win.visible && win.bounds.contains(x, y) {
+                                let wid = win.id;
+                                let _ = self.focus(wid);
+                                break;
+                            }
                         }
                     }
                 }
@@ -782,9 +841,9 @@ impl Compositor {
             self.theme.text_color,
         );
 
-        // Render visible windows
+        // Render visible windows (non-minimized)
         for win in self.windows.iter().flatten() {
-            if win.visible {
+            if win.visible && !win.minimized {
                 // Window Title Bar
                 let titlebar_color = if win.focused {
                     self.theme.titlebar_active
@@ -808,10 +867,56 @@ impl Compositor {
                 };
                 fb.fill_rect(content_rect, win.bg_color);
 
-                // Render App Title
+                // Render App Title & Control Buttons [-] [X]
                 let title_str =
                     core::str::from_utf8(&win.title_bytes[..win.title_len]).unwrap_or("App");
                 fb.draw_text(win.bounds.x + 8, win.bounds.y + 6, title_str, Color::WHITE);
+
+                let close_x = win.bounds.x + (win.bounds.width as i32) - 18;
+                let min_x = win.bounds.x + (win.bounds.width as i32) - 36;
+                fb.draw_text(min_x, win.bounds.y + 6, "-", Color::WHITE);
+                fb.draw_text(close_x, win.bounds.y + 6, "X", Color::RED);
+            }
+        }
+
+        // Render Start Menu Popup if active
+        if self.start_menu_open {
+            let menu_rect = Rect {
+                x: 10,
+                y: (fb.height as i32) - 260,
+                width: 220,
+                height: 215,
+            };
+            fb.fill_rect(
+                menu_rect,
+                Color {
+                    r: 30,
+                    g: 34,
+                    b: 44,
+                    a: 255,
+                },
+            );
+            fb.draw_text(20, (fb.height as i32) - 250, "AWE_OS Applications", Color::WHITE);
+            let apps = [
+                "1. Terminal",
+                "2. FileManager",
+                "3. PackageCenter",
+                "4. Settings",
+                "5. SysMon",
+                "6. TextEditor",
+            ];
+            for (idx, app) in apps.iter().enumerate() {
+                fb.draw_text(
+                    25,
+                    (fb.height as i32) - 220 + (idx as i32) * 26,
+                    app,
+                    Color {
+                        r: 180,
+                        g: 190,
+                        b: 210,
+                        a: 255,
+                    },
+                );
             }
         }
 
@@ -955,5 +1060,33 @@ mod tests {
         // 'A' row 0 has bits 0x18 at cols 3 and 4 -> x = 13, 14, y = 10
         let offset_13_10 = ((10 * 100 + 13) * 4) as usize;
         assert_eq!(buf[offset_13_10], 255); // Color::WHITE b = 255
+    }
+
+    #[test]
+    fn test_start_menu_controls_and_app_installer() {
+        let mut c = Compositor::new();
+        assert!(!c.start_menu_open);
+        c.toggle_start_menu();
+        assert!(c.start_menu_open);
+
+        c.install_app_package(10);
+        assert!(c.is_app_installed(10));
+        c.remove_app_package(10);
+        assert!(!c.is_app_installed(10));
+
+        let _win_id = c
+            .create_window(Rect {
+                x: 10,
+                y: 10,
+                width: 200,
+                height: 150,
+            })
+            .unwrap();
+        let _ = c.push_input(InputEvent::Pointer {
+            x: 195,
+            y: 15,
+            buttons: 1,
+        });
+        assert_eq!(c.window_count(), 0); // Closed window via titlebar button
     }
 }

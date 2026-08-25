@@ -304,13 +304,33 @@ impl Win32SyscallDispatcher {
     pub fn dispatch(&mut self, syscall_nr: u32, arg1: u64, arg2: u64, _arg3: u64) -> NtStatus {
         match syscall_nr {
             0x0055 => self.nt_create_file(arg1, arg2), // NtCreateFile
+            0x0011 => self.nt_read_file(arg1 as u32),  // NtReadFile
+            0x0012 => self.nt_write_file(arg1 as u32), // NtWriteFile
             0x002A => NtStatus::Success,               // NtAllocateVirtualMemory
             0x002B => NtStatus::Success,               // NtFreeVirtualMemory
             0x002C => NtStatus::Success,               // NtTerminateProcess
+            0x0028 => NtStatus::Success,               // NtMapViewOfSection
+            0x0050 => NtStatus::Success,               // NtCreateSection
             0x0033 => self.nt_open_key(arg1),          // NtOpenKey (Registry)
             0x0036 => self.nt_query_value_key(arg1 as u32), // NtQueryValueKey
             0x007C => NtStatus::Success,               // NtQuerySystemInformation
             _ => NtStatus::NotImplemented,
+        }
+    }
+
+    fn nt_read_file(&self, handle_id: u32) -> NtStatus {
+        match self.handle_table.lookup(handle_id) {
+            Ok(entry) if entry.object_type == ObjectType::File => NtStatus::Success,
+            Ok(_) => NtStatus::AccessDenied,
+            Err(st) => st,
+        }
+    }
+
+    fn nt_write_file(&self, handle_id: u32) -> NtStatus {
+        match self.handle_table.lookup(handle_id) {
+            Ok(entry) if entry.object_type == ObjectType::File => NtStatus::Success,
+            Ok(_) => NtStatus::AccessDenied,
+            Err(st) => st,
         }
     }
 
@@ -385,6 +405,8 @@ mod tests {
             disp.handle_table.lookup(4).unwrap().native_fd_or_pid,
             0x1234
         );
+        assert_eq!(disp.dispatch(0x0011, 4, 0, 0), NtStatus::Success);
+        assert_eq!(disp.dispatch(0x0012, 4, 0, 0), NtStatus::Success);
         assert_eq!(
             disp.dispatch(0x0033, 0x484B_4C4D_534F_4654, 0, 0),
             NtStatus::Success

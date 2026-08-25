@@ -291,6 +291,8 @@ impl LinuxSyscallDispatcher {
             3 => self.sys_close(arg1 as i32),                // sys_close
             9 => Ok(0x7FFFF7FF0000),                         // sys_mmap
             11 => Ok(0),                                     // sys_munmap
+            12 => Ok(if arg1 == 0 { 0x00408000 } else { arg1 }), // sys_brk
+            14 => Ok(0),                                     // sys_rt_sigaction
             39 => Ok(self.current_pid as u64),               // sys_getpid
             41 => self.sys_socket(arg1 as i32, arg2 as i32), // sys_socket
             42 => Ok(0),                                     // sys_connect
@@ -298,6 +300,8 @@ impl LinuxSyscallDispatcher {
             59 => Ok(0),                                     // sys_execve
             60 => self.sys_exit(arg1 as i32),                // sys_exit
             202 => Ok(0),                                    // sys_futex
+            217 => Ok(0),                                    // sys_getdents64
+            231 => self.sys_exit(arg1 as i32),               // sys_exit_group
             _ => Err(LinuxErrno::ENOSYS),
         }
     }
@@ -398,8 +402,10 @@ mod tests {
         let new_fd = disp.dispatch(2, 0x1234_5678, 0, 0).unwrap(); // sys_open
         assert_eq!(new_fd, 3);
         assert_eq!(disp.dispatch(3, 3, 0, 0).unwrap(), 0); // sys_close fd=3
+        assert_eq!(disp.dispatch(12, 0, 0, 0).unwrap(), 0x00408000); // sys_brk
         assert_eq!(disp.dispatch(39, 0, 0, 0).unwrap(), 1); // sys_getpid
         let child = disp.dispatch(56, 0, 0, 0).unwrap(); // sys_clone
         assert_eq!(child, 2);
+        assert_eq!(disp.dispatch(231, 0, 0, 0).unwrap(), 0); // sys_exit_group
     }
 }

@@ -15,7 +15,7 @@ pub use gpt::{
 };
 pub use journal::{JournalError, JournalState, JournalTxn, RecoveryDecision, decide_recovery};
 pub use ramdisk::{RAMDISK_BLOCKS, RamBlockDevice};
-pub use vfs::{FileName, FsError, Inode, JournalRecord, NodeKind, RecoveryAction, Vfs};
+pub use vfs::{AweFs, FileName, FsError, Inode, JournalRecord, NodeKind, RecoveryAction, Vfs};
 
 pub const BLOCK_SIZE: usize = 4096;
 

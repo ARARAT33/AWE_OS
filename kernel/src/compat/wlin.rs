@@ -73,6 +73,10 @@ impl WlinBridge {
         win32_hash ^ 0x5749_4E33_3200_0000
     }
 
+    pub fn translate_posix_to_win32_path_hash(posix_hash: u64) -> u64 {
+        posix_hash ^ 0x5749_4E33_3200_0000
+    }
+
     pub fn lookup_linux_fd(&self, win32_handle: u32) -> Option<i32> {
         for h in self.shared_handles.iter().flatten() {
             if h.win32_handle == win32_handle {
@@ -80,6 +84,27 @@ impl WlinBridge {
             }
         }
         None
+    }
+
+    pub fn lookup_win32_handle(&self, linux_fd: i32) -> Option<u32> {
+        for h in self.shared_handles.iter().flatten() {
+            if h.linux_fd == linux_fd {
+                return Some(h.win32_handle);
+            }
+        }
+        None
+    }
+
+    pub fn unmap_cross_runtime_resource(&mut self, resource_id: u32) -> Result<(), &'static str> {
+        for slot in self.shared_handles.iter_mut() {
+            if let Some(h) = slot
+                && h.resource_id == resource_id
+            {
+                *slot = None;
+                return Ok(());
+            }
+        }
+        Err("Resource ID not found")
     }
 }
 
@@ -105,5 +130,13 @@ mod tests {
         let win_path_hash = 0x1122_3344_5566_7788;
         let posix_path_hash = WlinBridge::translate_win32_to_posix_path_hash(win_path_hash);
         assert_ne!(win_path_hash, posix_path_hash);
+        assert_eq!(
+            WlinBridge::translate_posix_to_win32_path_hash(posix_path_hash),
+            win_path_hash
+        );
+
+        assert_eq!(bridge.lookup_win32_handle(3), Some(4));
+        assert!(bridge.unmap_cross_runtime_resource(rid).is_ok());
+        assert_eq!(bridge.lookup_linux_fd(4), None);
     }
 }
