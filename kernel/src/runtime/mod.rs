@@ -4,6 +4,13 @@
 
 #![allow(dead_code)]
 
+mod end_user;
+
+pub use end_user::{
+    AppRecord, AppState, EndUserRuntime, EndUserRuntimeError, FramebufferInfo, InputEvent,
+    RuntimeEvent, ServiceRecord, ServiceState,
+};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CapabilitySet(pub u64);
 
