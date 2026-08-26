@@ -3,7 +3,9 @@
 use awe_boot_protocol::{validate, BootInfo};
 use crate::boot_phase::{BootPhase, BootProgress};
 use crate::memory::PhysicalFrameAllocator;
-use crate::runtime::{CapabilitySet, FramebufferInfo, SystemRuntime};
+use crate::runtime::SystemRuntime;
+#[cfg(all(target_arch = "x86_64", target_os = "none"))]
+use crate::runtime::FramebufferInfo;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -83,7 +85,9 @@ pub extern "C" fn userspace_entry() -> ! {
 #[cfg(all(target_arch = "x86_64", target_os = "none"))]
 pub unsafe fn enter_userspace(user_rip: u64, user_rsp: u64) {
     use crate::arch::x86_64::gdt::{USER_CODE_SELECTOR, USER_DATA_SELECTOR};
-    let user_cs = USER_CODE_SELECTOR as u64; let user_ss = USER_DATA_SELECTOR as u64; let rflags = 0x0202u64;
+    let user_cs = USER_CODE_SELECTOR as u64;
+    let user_ss = USER_DATA_SELECTOR as u64;
+    let rflags = 0x0202u64;
     unsafe { core::arch::asm!("push {0}", "push {1}", "push {2}", "push {3}", "push {4}", "iretq", in(reg) user_ss, in(reg) user_rsp, in(reg) rflags, in(reg) user_cs, in(reg) user_rip, options(noreturn)); }
 }
 
