@@ -139,11 +139,7 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
 #[cfg(all(target_arch = "x86_64", target_os = "none"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn userspace_entry() -> ! {
-    use crate::arch::x86_64::serial_write_str;
     use awe_ayui::{AppType, Compositor, Framebuffer, Rect};
-
-    let msg = b"AWEOS: Ring 3 userspace reached and active!\r\n";
-    serial_write_str("AWEOS: Ring 3 userspace reached and active!\r\n");
 
     let mut process = crate::process::ProcessDescriptor {
         id: crate::process::ProcessId(1),
@@ -158,10 +154,14 @@ pub extern "C" fn userspace_entry() -> ! {
         process: &mut process,
     };
 
-    // Syscall Write (8) -> log Ring 3 status
-    context.dispatch(8, [msg.as_ptr() as u64, msg.len() as u64, 0, 0, 0, 0]);
+    // Helper macro for logging from Ring 3 via kernel Syscall::Write (8)
+    let mut sys_log = |msg: &[u8]| {
+        context.dispatch(8, [msg.as_ptr() as u64, msg.len() as u64, 0, 0, 0, 0]);
+    };
 
-    serial_write_str("AWEOS: Initializing AWE-Compositor & Graphical Desktop Shell...\r\n");
+    sys_log(b"AWEOS: Ring 3 userspace reached and active!\r\n");
+    sys_log(b"AWEOS: Initializing AWE-Compositor & Graphical Desktop Shell...\r\n");
+
     let mut compositor = Compositor::new();
 
     // Launch Desktop Shell Applications (Terminal, System Info, About AWEOS)
@@ -208,7 +208,7 @@ pub extern "C" fn userspace_entry() -> ! {
     compositor.focus(sysinfo_win).ok();
     compositor.focus(term_win).ok();
 
-    serial_write_str("AWEOS: Desktop GUI initialized automatically with 3 active windows\r\n");
+    sys_log(b"AWEOS: Desktop GUI initialized automatically with 3 active windows\r\n");
 
     static mut BACK_BUFFER: [u8; 800 * 600 * 4] = [0; 800 * 600 * 4];
     let back_buf = unsafe { &mut *core::ptr::addr_of_mut!(BACK_BUFFER) };
@@ -221,13 +221,8 @@ pub extern "C" fn userspace_entry() -> ! {
         gpu_accel: true,
     };
 
-    serial_write_str("AWEOS: Entering interactive AWE-Compositor Main Event Loop...\r\n");
-
-    let done_msg = b"AWEOS: userspace execution completed cleanly!\r\n";
-    context.dispatch(
-        8,
-        [done_msg.as_ptr() as u64, done_msg.len() as u64, 0, 0, 0, 0],
-    );
+    sys_log(b"AWEOS: Entering interactive AWE-Compositor Main Event Loop...\r\n");
+    sys_log(b"AWEOS: userspace execution completed cleanly!\r\n");
 
     let mut tick = 0u64;
     loop {
