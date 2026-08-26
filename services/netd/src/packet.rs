@@ -27,11 +27,12 @@ impl Ipv4Header {
         if header_len < IPV4_MIN_HEADER || header_len > bytes.len() { return Err(PacketError::InvalidIpv4); }
         let total_length = u16::from_be_bytes([bytes[2], bytes[3]]);
         if total_length as usize > bytes.len() || total_length as usize < header_len { return Err(PacketError::InvalidLength); }
-        let mut header = [0u8; IPV4_MIN_HEADER];
-        header.copy_from_slice(&bytes[..IPV4_MIN_HEADER]);
+        let expected = u16::from_be_bytes([bytes[10], bytes[11]]);
+        let mut header = [0u8; 60];
+        header[..header_len].copy_from_slice(&bytes[..header_len]);
         header[10] = 0; header[11] = 0;
-        if checksum16(&bytes[..header_len]) != u16::from_be_bytes([bytes[10], bytes[11]]) { return Err(PacketError::InvalidChecksum); }
-        Ok(Self { source: bytes[12..16].try_into().unwrap_or([0;4]), destination: bytes[16..20].try_into().unwrap_or([0;4]), total_length, protocol: bytes[9], header_len })
+        if checksum16(&header[..header_len]) != expected { return Err(PacketError::InvalidChecksum); }
+        Ok(Self { source: bytes[12..16].try_into().map_err(|_| PacketError::InvalidIpv4)?, destination: bytes[16..20].try_into().map_err(|_| PacketError::InvalidIpv4)?, total_length, protocol: bytes[9], header_len })
     }
 }
 
@@ -49,33 +50,26 @@ impl UdpHeader {
 pub fn checksum16(bytes: &[u8]) -> u16 {
     let mut sum: u32 = 0;
     let mut i = 0;
-    while i + 1 < bytes.len() {
-        sum = sum.wrapping_add(u16::from_be_bytes([bytes[i], bytes[i + 1]]) as u32);
-        i += 2;
-    }
+    while i + 1 < bytes.len() { sum = sum.wrapping_add(u16::from_be_bytes([bytes[i], bytes[i + 1]]) as u32); i += 2; }
     if i < bytes.len() { sum = sum.wrapping_add((bytes[i] as u32) << 8); }
     while (sum >> 16) != 0 { sum = (sum & 0xffff) + (sum >> 16); }
     !(sum as u16)
 }
 
-pub fn build_udp_ipv4(
-    out: &mut [u8],
-    source_mac: [u8; 6],
-    destination_mac: [u8; 6],
-    source_ip: [u8; 4],
-    destination_ip: [u8; 4],
-    source_port: u16,
-    destination_port: u16,
-    payload: &[u8],
-) -> Result<usize, PacketError> {
+pub fn build_udp_ipv4(out: &mut [u8], source_mac: [u8; 6], destination_mac: [u8; 6], source_ip: [u8; 4], destination_ip: [u8; 4], source_port: u16, destination_port: u16, payload: &[u8]) -> Result<usize, PacketError> {
     let total = ETH_HEADER.checked_add(IPV4_MIN_HEADER).and_then(|v| v.checked_add(UDP_HEADER)).and_then(|v| v.checked_add(payload.len())).ok_or(PacketError::InvalidLength)?;
     if total > MAX_PACKET || out.len() < total { return Err(PacketError::OutputTooSmall); }
     out[0..6].copy_from_slice(&destination_mac); out[6..12].copy_from_slice(&source_mac); out[12..14].copy_from_slice(&0x0800u16.to_be_bytes());
-    let ip = ETH_HEADER; out[ip] = 0x45; out[ip+1] = 0; (out[ip+2..ip+4]).copy_from_slice(&(total - ETH_HEADER as usize).try_into().map_err(|_| PacketError::InvalidLength)?.to_be_bytes());
-    out[ip+4..ip+6].copy_from_slice(&0u16.to_be_bytes()); out[ip+6..ip+8].copy_from_slice(&0x4000u16.to_be_bytes()); out[ip+8] = 64; out[ip+9] = 17; out[ip+10..ip+12].fill(0);
-    out[ip+12..ip+16].copy_from_slice(&source_ip); out[ip+16..ip+20].copy_from_slice(&destination_ip); let c = checksum16(&out[ip..ip+20]); out[ip+10..ip+12].copy_from_slice(&c.to_be_bytes());
-    let udp = ip + IPV4_MIN_HEADER; out[udp..udp+2].copy_from_slice(&source_port.to_be_bytes()); out[udp+2..udp+4].copy_from_slice(&destination_port.to_be_bytes());
-    let udp_len = (UDP_HEADER + payload.len()) as u16; out[udp+4..udp+6].copy_from_slice(&udp_len.to_be_bytes()); out[udp+6..udp+8].fill(0); out[udp+8..udp+8+payload.len()].copy_from_slice(payload);
+    let ip = ETH_HEADER;
+    out[ip] = 0x45; out[ip+1] = 0;
+    out[ip+2..ip+4].copy_from_slice(&((total - ETH_HEADER) as u16).to_be_bytes());
+    out[ip+4..ip+6].fill(0); out[ip+6..ip+8].copy_from_slice(&0x4000u16.to_be_bytes()); out[ip+8] = 64; out[ip+9] = 17; out[ip+10..ip+12].fill(0);
+    out[ip+12..ip+16].copy_from_slice(&source_ip); out[ip+16..ip+20].copy_from_slice(&destination_ip);
+    let c = checksum16(&out[ip..ip+20]); out[ip+10..ip+12].copy_from_slice(&c.to_be_bytes());
+    let udp = ip + IPV4_MIN_HEADER;
+    out[udp..udp+2].copy_from_slice(&source_port.to_be_bytes()); out[udp+2..udp+4].copy_from_slice(&destination_port.to_be_bytes());
+    let udp_len = u16::try_from(UDP_HEADER + payload.len()).map_err(|_| PacketError::InvalidLength)?;
+    out[udp+4..udp+6].copy_from_slice(&udp_len.to_be_bytes()); out[udp+6..udp+8].fill(0); out[udp+8..udp+8+payload.len()].copy_from_slice(payload);
     Ok(total)
 }
 
