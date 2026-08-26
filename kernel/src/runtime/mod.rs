@@ -1,15 +1,17 @@
 //! Native AWEOS runtime kernel contract.
-//! A runtime handle is intentionally capability-scoped: callers receive only
-//! the operations represented by the supplied capability set.
+//! Runtime handles are capability-scoped and all privileged operations remain
+//! behind explicit validation boundaries.
 
 #![allow(dead_code)]
 
 mod end_user;
+pub mod graphics;
 
 pub use end_user::{
     AppRecord, AppState, EndUserRuntime, EndUserRuntimeError, FramebufferInfo, InputEvent,
     RuntimeEvent, ServiceRecord, ServiceState,
 };
+pub use graphics::{DoubleBuffer, Rect as RuntimeRect, Window, WindowError, WindowManager};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CapabilitySet(pub u64);
