@@ -9,6 +9,7 @@ pub struct AweFileManagerApp {
     pub window_height: u32,
     pub current_path: &'static str,
     pub entries: [&'static str; 5],
+    pub awefs_mounted: bool,
 }
 
 impl AweFileManagerApp {
@@ -16,7 +17,7 @@ impl AweFileManagerApp {
         Self {
             window_width: 680,
             window_height: 440,
-            current_path: "awe://storage/root",
+            current_path: "awefs://system/root",
             entries: [
                 "System",
                 "Applications",
@@ -24,6 +25,7 @@ impl AweFileManagerApp {
                 "Downloads",
                 "Media",
             ],
+            awefs_mounted: true,
         }
     }
 
@@ -110,6 +112,9 @@ impl AweFileManagerApp {
             },
         );
         fb.draw_text(220, 18, self.current_path, Color::WHITE);
+        if self.awefs_mounted {
+            fb.draw_text((width as i32) - 150, 18, "[AWEFS Active]", Color::GREEN);
+        }
 
         // Entries list
         for (i, entry) in self.entries.iter().enumerate() {

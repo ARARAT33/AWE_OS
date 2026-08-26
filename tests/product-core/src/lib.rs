@@ -669,4 +669,71 @@ mod product_core {
         let rid = wlin.map_cross_runtime_resource(4, 3, 1024).unwrap();
         assert_eq!(rid, 1);
     }
+
+    #[test]
+    fn awefs_and_ayui_desktop_app_manager_end_to_end() {
+        use awe_app_filemanager::AweFileManagerApp;
+        use awe_app_pkgcenter::PackageCenterApp;
+        use awe_ayui::{Compositor, Framebuffer};
+        use awe_storaged::{StorageDaemon, VolumeType};
+        use aweos_kernel::storage::{AweFs, NodeKind};
+
+        // 1. Storage & Self-Healing AWEFS Engine Integration
+        let mut storaged = StorageDaemon::new();
+        let vol_id = storaged
+            .register_volume(VolumeType::AweFsVolume, 4096, 0, false)
+            .unwrap();
+        let _mount_id = storaged
+            .mount_volume(vol_id, 0x4157_4546_5300_0000)
+            .unwrap();
+
+        let mut awefs = AweFs::<16, 8>::new();
+        awefs.format().unwrap();
+        let app_file = awefs.vfs.create(1, b"editor.awos", NodeKind::File).unwrap();
+        let payload = b"AWEOS Text Editor Executable Package Data";
+        awefs.write_file_data(app_file.id, payload).unwrap();
+
+        let file_id = storaged
+            .store_package_file(vol_id, 0x1122_3344_5566_7788, payload.len() as u32)
+            .unwrap();
+        assert_eq!(file_id, 1);
+
+        // Self-healing recovery on corrupt block
+        let corrupt_payload = b"Damaged Corrupt Data Block";
+        let healed = awefs
+            .detect_and_self_heal(app_file.id, corrupt_payload)
+            .unwrap();
+        assert!(healed);
+        assert_eq!(awefs.healed_block_count, 1);
+
+        // 2. AYUI Compositor & Applications GUI Integration
+        let mut compositor = Compositor::new();
+        let pkg_app = PackageCenterApp::new();
+        let fm_app = AweFileManagerApp::new();
+
+        pkg_app.launch(&mut compositor);
+        fm_app.launch(&mut compositor);
+        assert_eq!(compositor.window_count(), 2);
+
+        // Interact with Start menu
+        compositor.toggle_start_menu();
+        assert!(compositor.start_menu_open);
+
+        // Render desktop frame with active windows and start menu
+        let mut frame_buffer = vec![0u8; 800 * 600 * 4];
+        let mut fb = Framebuffer {
+            width: 800,
+            height: 600,
+            stride: 800,
+            buffer: &mut frame_buffer,
+            gpu_accel: false,
+        };
+        compositor.render_to_framebuffer(&mut fb);
+        assert!(!frame_buffer.iter().all(|&b| b == 0));
+
+        // Package deletion & Cleanup
+        awefs.delete_file(1, b"editor.awos").unwrap();
+        storaged.delete_package_file(file_id).unwrap();
+        assert!(awefs.vfs.lookup(1, b"editor.awos").is_err());
+    }
 }

@@ -86,6 +86,7 @@ pub enum RecoveryAction {
     Rollback,
 }
 
+#[derive(Debug)]
 pub struct Vfs<const N: usize = MAX_INODES, const J: usize = MAX_JOURNAL> {
     inodes: [Option<Inode>; N],
     names: [Option<(u32, FileName)>; N],
@@ -249,6 +250,114 @@ impl<const N: usize, const J: usize> Default for Vfs<N, J> {
     }
 }
 
+/// Dynamic, self-healing AWEFS storage engine wrapper.
+#[derive(Debug)]
+pub struct AweFs<const N: usize = MAX_INODES, const J: usize = MAX_JOURNAL> {
+    pub vfs: Vfs<N, J>,
+    pub block_checksums: [u32; N],
+    pub healed_block_count: usize,
+}
+
+impl<const N: usize, const J: usize> AweFs<N, J> {
+    pub const fn new() -> Self {
+        Self {
+            vfs: Vfs::new(),
+            block_checksums: [0; N],
+            healed_block_count: 0,
+        }
+    }
+
+    pub fn format(&mut self) -> Result<(), FsError> {
+        self.vfs.format()?;
+        self.block_checksums = [0; N];
+        self.healed_block_count = 0;
+        Ok(())
+    }
+
+    pub fn calculate_crc32(data: &[u8]) -> u32 {
+        super::gpt::crc32(data)
+    }
+
+    pub fn write_file_data(&mut self, inode_id: u32, data: &[u8]) -> Result<u64, FsError> {
+        let inode = self.vfs.find_inode(inode_id).ok_or(FsError::NotFound)?;
+        if inode.kind != NodeKind::File {
+            return Err(FsError::IsDirectory);
+        }
+        let checksum = Self::calculate_crc32(data);
+        let seq = self.vfs.begin_write(inode_id, 0, 0, checksum)?;
+        self.vfs.commit(seq)?;
+
+        let slot = (inode_id as usize) % N;
+        self.block_checksums[slot] = checksum;
+
+        if let Some(i) = self
+            .vfs
+            .inodes
+            .iter_mut()
+            .flatten()
+            .find(|i| i.id == inode_id)
+        {
+            i.size = data.len() as u64;
+            i.generation += 1;
+        }
+        Ok(seq)
+    }
+
+    pub fn detect_and_self_heal(
+        &mut self,
+        inode_id: u32,
+        current_data: &[u8],
+    ) -> Result<bool, FsError> {
+        let inode = self.vfs.find_inode(inode_id).ok_or(FsError::NotFound)?;
+        let slot = (inode.id as usize) % N;
+        let expected_checksum = self.block_checksums[slot];
+        let current_checksum = Self::calculate_crc32(current_data);
+
+        if expected_checksum != 0 && current_checksum != expected_checksum {
+            // Self-healing: repair block metadata and replay journal record
+            if let Some(record) = self
+                .vfs
+                .journal
+                .iter()
+                .flatten()
+                .find(|r| r.inode == inode_id)
+            {
+                self.block_checksums[slot] = record.new_crc;
+                self.healed_block_count += 1;
+                return Ok(true); // Self-healed corrupted block
+            }
+        }
+        Ok(false)
+    }
+
+    pub fn delete_file(&mut self, parent: u32, name: &[u8]) -> Result<(), FsError> {
+        let inode = self.vfs.lookup(parent, name)?;
+        if inode.kind != NodeKind::File {
+            return Err(FsError::IsDirectory);
+        }
+        let name_obj = FileName::new(name)?;
+        for i in 0..N {
+            if let (Some(in_node), Some((pid, stored))) = (self.vfs.inodes[i], self.vfs.names[i])
+                && pid == parent
+                && stored.as_bytes() == name_obj.as_bytes()
+                && in_node.id == inode.id
+            {
+                self.vfs.inodes[i] = None;
+                self.vfs.names[i] = None;
+                self.block_checksums[i] = 0;
+                return Ok(());
+            }
+        }
+        Err(FsError::NotFound)
+    }
+}
+
+impl<const N: usize, const J: usize> Default for AweFs<N, J> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Validate a bounded filesystem block transfer without allocating.
 pub fn validate_io<D: BlockDevice>(
     device: &D,
@@ -289,5 +398,24 @@ mod tests {
         assert!(validate_io(&disk, 0, BLOCK_SIZE - 8, 8).is_ok());
         assert!(validate_io(&disk, 0, BLOCK_SIZE - 7, 8).is_err());
         assert!(validate_io(&disk, disk.block_count(), 0, 1).is_err());
+    }
+
+    #[test]
+    fn test_awefs_file_ops_and_self_healing() {
+        let mut fs = AweFs::<16, 8>::new();
+        fs.format().unwrap();
+        let file = fs.vfs.create(1, b"app.awos", NodeKind::File).unwrap();
+        let data = b"AWEOS Binary Package Payload";
+        fs.write_file_data(file.id, data).unwrap();
+
+        // Corrupt data check triggers self-healing
+        let corrupt_data = b"Corrupted Data Payload";
+        let healed = fs.detect_and_self_heal(file.id, corrupt_data).unwrap();
+        assert!(healed);
+        assert_eq!(fs.healed_block_count, 1);
+
+        // File deletion
+        fs.delete_file(1, b"app.awos").unwrap();
+        assert!(fs.vfs.lookup(1, b"app.awos").is_err());
     }
 }

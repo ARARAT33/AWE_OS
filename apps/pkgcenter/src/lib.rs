@@ -8,6 +8,7 @@ pub struct PackageCenterApp {
     pub window_width: u32,
     pub window_height: u32,
     pub installed_count: u32,
+    pub installed_mask: u32,
 }
 
 impl PackageCenterApp {
@@ -16,6 +17,27 @@ impl PackageCenterApp {
             window_width: 640,
             window_height: 480,
             installed_count: 12,
+            installed_mask: 0b0000_1111,
+        }
+    }
+
+    pub fn install_package(&mut self, pkg_index: u8) -> bool {
+        if pkg_index < 32 {
+            self.installed_mask |= 1 << pkg_index;
+            self.installed_count += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn remove_package(&mut self, pkg_index: u8) -> bool {
+        if pkg_index < 32 && (self.installed_mask & (1 << pkg_index)) != 0 {
+            self.installed_mask &= !(1 << pkg_index);
+            self.installed_count = self.installed_count.saturating_sub(1);
+            true
+        } else {
+            false
         }
     }
 
@@ -90,6 +112,19 @@ impl PackageCenterApp {
                 },
             );
             fb.draw_text(30, y + 10, pkg, Color::WHITE);
+
+            let is_installed = (self.installed_mask & (1 << i)) != 0;
+            let status_str = if is_installed {
+                "[INSTALLED]"
+            } else {
+                "[INSTALL]"
+            };
+            let status_color = if is_installed {
+                Color::GREEN
+            } else {
+                Color::BLUE
+            };
+            fb.draw_text((width as i32) - 120, y + 10, status_str, status_color);
         }
     }
 }
@@ -107,9 +142,12 @@ mod tests {
     #[test]
     fn test_package_center_app() {
         let mut compositor = Compositor::new();
-        let app = PackageCenterApp::new();
+        let mut app = PackageCenterApp::new();
         app.launch(&mut compositor);
         assert_eq!(compositor.window_count(), 1);
+
+        assert!(app.remove_package(0));
+        assert!(app.install_package(4));
 
         extern crate alloc;
         use alloc::vec;
