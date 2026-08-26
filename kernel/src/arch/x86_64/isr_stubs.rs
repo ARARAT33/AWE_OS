@@ -8,6 +8,8 @@ use core::arch::global_asm;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 static TIMER_IRQ_COUNT: AtomicU64 = AtomicU64::new(0);
+static KEYBOARD_IRQ_COUNT: AtomicU64 = AtomicU64::new(0);
+static MOUSE_IRQ_COUNT: AtomicU64 = AtomicU64::new(0);
 
 global_asm!(
     r#".intel_syntax noprefix
@@ -30,10 +32,8 @@ awe_isr_common:
     push r13
     push r14
     push r15
-
     mov rdi, rsp
     call awe_interrupt_handler
-
     pop r15
     pop r14
     pop r13
@@ -49,7 +49,6 @@ awe_isr_common:
     pop rcx
     pop rbx
     pop rax
-
     add rsp, 16
     iretq
 
@@ -91,35 +90,19 @@ ISR_NOERR 19
 ISR_NOERR 20
 ISR_NOERR 32
 ISR_NOERR 33
+ISR_NOERR 44
 
 .att_syntax prefix
 "#
 );
 
 unsafe extern "C" {
-    pub fn awe_isr_0();
-    pub fn awe_isr_1();
-    pub fn awe_isr_2();
-    pub fn awe_isr_3();
-    pub fn awe_isr_4();
-    pub fn awe_isr_5();
-    pub fn awe_isr_6();
-    pub fn awe_isr_7();
-    pub fn awe_isr_8();
-    pub fn awe_isr_9();
-    pub fn awe_isr_10();
-    pub fn awe_isr_11();
-    pub fn awe_isr_12();
-    pub fn awe_isr_13();
-    pub fn awe_isr_14();
-    pub fn awe_isr_15();
-    pub fn awe_isr_16();
-    pub fn awe_isr_17();
-    pub fn awe_isr_18();
-    pub fn awe_isr_19();
-    pub fn awe_isr_20();
-    pub fn awe_isr_32();
-    pub fn awe_isr_33();
+    pub fn awe_isr_0(); pub fn awe_isr_1(); pub fn awe_isr_2(); pub fn awe_isr_3();
+    pub fn awe_isr_4(); pub fn awe_isr_5(); pub fn awe_isr_6(); pub fn awe_isr_7();
+    pub fn awe_isr_8(); pub fn awe_isr_9(); pub fn awe_isr_10(); pub fn awe_isr_11();
+    pub fn awe_isr_12(); pub fn awe_isr_13(); pub fn awe_isr_14(); pub fn awe_isr_15();
+    pub fn awe_isr_16(); pub fn awe_isr_17(); pub fn awe_isr_18(); pub fn awe_isr_19();
+    pub fn awe_isr_20(); pub fn awe_isr_32(); pub fn awe_isr_33(); pub fn awe_isr_44();
 }
 
 pub fn init_idt_stubs(idt: &mut super::idt::Idt, cs: u16) {
@@ -146,53 +129,44 @@ pub fn init_idt_stubs(idt: &mut super::idt::Idt, cs: u16) {
     idt.set_handler(20, awe_isr_20 as *const () as usize as u64, cs);
     idt.set_handler(32, awe_isr_32 as *const () as usize as u64, cs);
     idt.set_handler(33, awe_isr_33 as *const () as usize as u64, cs);
+    idt.set_handler(44, awe_isr_44 as *const () as usize as u64, cs);
 }
 
 fn print_u64_hex(mut val: u64) {
     let hex = b"0123456789ABCDEF";
-    let mut buf = [b'0'; 18];
-    buf[0] = b'0';
-    buf[1] = b'x';
-    for i in (2..18).rev() {
-        buf[i] = hex[(val & 0xF) as usize];
-        val >>= 4;
-    }
-    for b in buf {
-        super::serial_write_byte(b);
-    }
+    let mut buf = [b'0'; 18]; buf[0] = b'0'; buf[1] = b'x';
+    for i in (2..18).rev() { buf[i] = hex[(val & 0xF) as usize]; val >>= 4; }
+    for b in buf { super::serial_write_byte(b); }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn awe_interrupt_handler(frame: &mut InterruptFrame) {
     let vector = frame.vector as u8;
     if vector == 32 {
-        unsafe {
-            pic_send_eoi(0);
-        }
+        unsafe { pic_send_eoi(0); }
         TIMER_IRQ_COUNT.fetch_add(1, Ordering::Relaxed);
         super::timer::interrupt_tick();
     } else if vector == 33 {
-        unsafe {
-            let _scancode = super::io_in8(0x60);
-            pic_send_eoi(1);
-        }
+        let scancode = unsafe { super::io_in8(0x60) };
+        super::input::irq_keyboard_byte(scancode);
+        KEYBOARD_IRQ_COUNT.fetch_add(1, Ordering::Relaxed);
+        unsafe { pic_send_eoi(1); }
+    } else if vector == 44 {
+        let byte = unsafe { super::io_in8(0x60) };
+        super::input::irq_mouse_byte(byte);
+        MOUSE_IRQ_COUNT.fetch_add(1, Ordering::Relaxed);
+        unsafe { pic_send_eoi(12); }
     } else {
-        serial_write_str("AWEOS EXCEPTION vector=");
-        print_u64_hex(frame.vector);
-        serial_write_str(" err=");
-        print_u64_hex(frame.error_code);
-        serial_write_str(" rip=");
-        print_u64_hex(frame.rip);
-        serial_write_str(" cs=");
-        print_u64_hex(frame.cs);
-        serial_write_str(" rsp=");
-        print_u64_hex(frame.rsp);
-        serial_write_str(" ss=");
-        print_u64_hex(frame.ss);
+        serial_write_str("AWEOS EXCEPTION vector="); print_u64_hex(frame.vector);
+        serial_write_str(" err="); print_u64_hex(frame.error_code);
+        serial_write_str(" rip="); print_u64_hex(frame.rip);
+        serial_write_str(" cs="); print_u64_hex(frame.cs);
+        serial_write_str(" rsp="); print_u64_hex(frame.rsp);
+        serial_write_str(" ss="); print_u64_hex(frame.ss);
         serial_write_str("\r\n");
     }
 }
 
-pub fn timer_irq_count() -> u64 {
-    TIMER_IRQ_COUNT.load(Ordering::Acquire)
-}
+pub fn timer_irq_count() -> u64 { TIMER_IRQ_COUNT.load(Ordering::Acquire) }
+pub fn keyboard_irq_count() -> u64 { KEYBOARD_IRQ_COUNT.load(Ordering::Acquire) }
+pub fn mouse_irq_count() -> u64 { MOUSE_IRQ_COUNT.load(Ordering::Acquire) }
