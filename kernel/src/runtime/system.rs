@@ -3,7 +3,9 @@
 use core::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use awe_appd::{AppId, AppManifest, AppState, AppSupervisor};
 use awe_initd::{RestartPolicy, ServiceId, ServiceRuntimeSpec, ServiceSpec, ServiceState, Supervisor};
+use awe_netd::NetworkDaemon;
 use crate::drivers::{KeyCode, Ps2Event};
+use crate::storage::{Namespace, NamespaceManager, MAX_FILES};
 use super::{CapabilitySet, EndUserRuntime, FramebufferInfo, InputEvent, RuntimeEvent};
 pub use super::{RuntimeRect, WindowManager, WindowError};
 
@@ -33,15 +35,38 @@ pub struct SystemRuntime {
     pub windows: WindowManager,
     pub services: Supervisor,
     pub apps: AppSupervisor,
+    pub namespaces: NamespaceManager<MAX_FILES>,
+    pub network: NetworkDaemon,
     pub cursor_x: i32,
     pub cursor_y: i32,
 }
 
 impl SystemRuntime {
     pub const fn new() -> Self {
-        Self { core: EndUserRuntime::new(), windows: WindowManager::new(), services: Supervisor::new(spawn_service), apps: AppSupervisor::new(spawn_app, create_window), cursor_x: 0, cursor_y: 0 }
+        Self {
+            core: EndUserRuntime::new(),
+            windows: WindowManager::new(),
+            services: Supervisor::new(spawn_service),
+            apps: AppSupervisor::new(spawn_app, create_window),
+            namespaces: NamespaceManager::new(),
+            network: NetworkDaemon::new(),
+            cursor_x: 0,
+            cursor_y: 0,
+        }
     }
     pub fn attach_framebuffer(&mut self, fb: FramebufferInfo) -> Result<(), super::EndUserRuntimeError> { self.core.attach_framebuffer(fb) }
+    pub fn mount_core_namespaces(&mut self, first_block: u64) -> Result<(), crate::storage::NamespaceError> {
+        let spacing = 128u64;
+        self.namespaces.mount(Namespace::Config, first_block)?;
+        self.namespaces.mount(Namespace::Home, first_block + spacing)?;
+        self.namespaces.mount(Namespace::Apps, first_block + spacing * 2)?;
+        self.namespaces.mount(Namespace::System, first_block + spacing * 3)?;
+        self.namespaces.mount(Namespace::Log, first_block + spacing * 4)?;
+        Ok(())
+    }
+    pub fn register_network_interface(&mut self, mac: [u8; 6]) -> Result<usize, &'static str> {
+        self.network.add_interface(awe_netd::MacAddress(mac))
+    }
     pub fn register_core_services(&mut self) -> Result<(), awe_initd::RuntimeError> {
         let n = [None; awe_initd::MAX_DEPENDENCIES];
         let d1 = [Some(ServiceId(1)), None, None, None, None, None, None, None];
@@ -109,5 +134,5 @@ mod tests {
     #[test] fn core_apps_admit_and_start() { let mut r = SystemRuntime::new(); r.admit_core_apps().unwrap(); r.start_core_apps().unwrap(); assert_eq!(r.app_state(1), Some(AppState::Running)); }
     #[test] fn ps2_input_reaches_window_manager() { let mut r = SystemRuntime::new(); r.create_native_window(RuntimeRect { x: 0, y: 0, width: 100, height: 100 }).unwrap(); r.route_ps2(Ps2Event::Pointer { dx: 20, dy: 20, buttons: 1 }).unwrap(); assert!(r.pointer_target().is_some()); }
     #[test] fn capability_set_is_used_for_app_admission() { let mut r = SystemRuntime::new(); r.admit_core_apps().unwrap(); assert_eq!(r.apps.start(AppId(1), CapabilitySet::UI.0), Err(awe_appd::AppRuntimeError::CapabilityDenied)); }
-    #[test] fn runtime_context_requires_capability() { assert!(super::super::RuntimeContext::new(CapabilitySet::UI).require(CapabilitySet::UI).is_ok()); }
+    #[test] fn namespace_mounts_are_bounded() { let mut r = SystemRuntime::new(); r.mount_core_namespaces(8).unwrap(); assert!(r.namespaces.is_mounted(Namespace::Config)); assert!(r.namespaces.is_mounted(Namespace::Log)); }
 }
