@@ -86,6 +86,7 @@ impl SystemRuntime {
         Ok(RuntimeEvent::Input(translated))
     }
     pub fn create_native_window(&mut self, rect: RuntimeRect) -> Result<u16, WindowError> { self.windows.create(rect) }
+    pub fn pointer_target(&mut self) -> Option<u16> { self.windows.hit_test(self.cursor_x, self.cursor_y) }
     pub fn service_state(&self, id: u16) -> Option<ServiceState> { self.services.state(ServiceId(id)) }
     pub fn app_state(&self, id: u64) -> Option<AppState> { self.apps.state(AppId(id)) }
 }
@@ -108,5 +109,5 @@ mod tests {
     #[test] fn core_apps_admit_and_start() { let mut r = SystemRuntime::new(); r.admit_core_apps().unwrap(); r.start_core_apps().unwrap(); assert_eq!(r.app_state(1), Some(AppState::Running)); }
     #[test] fn ps2_input_reaches_window_manager() { let mut r = SystemRuntime::new(); r.create_native_window(RuntimeRect { x: 0, y: 0, width: 100, height: 100 }).unwrap(); r.route_ps2(Ps2Event::Pointer { dx: 20, dy: 20, buttons: 1 }).unwrap(); assert!(r.pointer_target().is_some()); }
     #[test] fn capability_set_is_used_for_app_admission() { let mut r = SystemRuntime::new(); r.admit_core_apps().unwrap(); assert_eq!(r.apps.start(AppId(1), CapabilitySet::UI.0), Err(awe_appd::AppRuntimeError::CapabilityDenied)); }
-    #[test] fn runtime_context_requires_capability() { assert!(RuntimeContext::new(CapabilitySet::UI).require(CapabilitySet::UI).is_ok()); }
+    #[test] fn runtime_context_requires_capability() { assert!(super::super::RuntimeContext::new(CapabilitySet::UI).require(CapabilitySet::UI).is_ok()); }
 }
