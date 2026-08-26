@@ -12,18 +12,9 @@ pub use super::{RuntimeRect, WindowManager, WindowError};
 static NEXT_PROCESS_ID: AtomicU64 = AtomicU64::new(1);
 static NEXT_WINDOW_ID: AtomicU16 = AtomicU16::new(1);
 
-fn spawn_service(entry: usize, service: ServiceId, _memory_pages: u32, _cpu_budget: u32) -> Result<u64, ()> {
-    if entry == 0 || service.0 == 0 { return Err(()); }
-    Ok(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed))
-}
-fn spawn_app(app: AppId, memory_pages: u32, _capabilities: u64) -> Result<u64, ()> {
-    if app.0 == 0 || memory_pages == 0 { return Err(()); }
-    Ok(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed))
-}
-fn create_window(_app: AppId) -> Result<u16, ()> {
-    let id = NEXT_WINDOW_ID.fetch_add(1, Ordering::Relaxed);
-    if id == 0 { Err(()) } else { Ok(id) }
-}
+fn spawn_service(entry: usize, service: ServiceId, _memory_pages: u32, _cpu_budget: u32) -> Result<u64, ()> { if entry == 0 || service.0 == 0 { return Err(()); } Ok(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed)) }
+fn spawn_app(app: AppId, memory_pages: u32, _capabilities: u64) -> Result<u64, ()> { if app.0 == 0 || memory_pages == 0 { return Err(()); } Ok(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed)) }
+fn create_window(_app: AppId) -> Result<u16, ()> { let id = NEXT_WINDOW_ID.fetch_add(1, Ordering::Relaxed); if id == 0 { Err(()) } else { Ok(id) } }
 
 const ALL: CapabilitySet = CapabilitySet(
     CapabilitySet::PROCESS.0 | CapabilitySet::MEMORY.0 | CapabilitySet::IPC.0 |
@@ -43,16 +34,7 @@ pub struct SystemRuntime {
 
 impl SystemRuntime {
     pub const fn new() -> Self {
-        Self {
-            core: EndUserRuntime::new(),
-            windows: WindowManager::new(),
-            services: Supervisor::new(spawn_service),
-            apps: AppSupervisor::new(spawn_app, create_window),
-            namespaces: NamespaceManager::new(),
-            network: NetworkDaemon::new(),
-            cursor_x: 0,
-            cursor_y: 0,
-        }
+        Self { core: EndUserRuntime::new(), windows: WindowManager::new(), services: Supervisor::new(spawn_service), apps: AppSupervisor::new(spawn_app, create_window), namespaces: NamespaceManager::new(), network: NetworkDaemon::new(), cursor_x: 0, cursor_y: 0 }
     }
     pub fn attach_framebuffer(&mut self, fb: FramebufferInfo) -> Result<(), super::EndUserRuntimeError> { self.core.attach_framebuffer(fb) }
     pub fn mount_core_namespaces(&mut self, first_block: u64) -> Result<(), crate::storage::NamespaceError> {
@@ -64,11 +46,9 @@ impl SystemRuntime {
         self.namespaces.mount(Namespace::Log, first_block + spacing * 4)?;
         Ok(())
     }
-    pub fn register_network_interface(&mut self, mac: [u8; 6]) -> Result<usize, &'static str> {
-        self.network.add_interface(awe_netd::MacAddress(mac))
-    }
+    pub fn register_network_interface(&mut self, mac: [u8; 6]) -> Result<usize, &'static str> { self.network.add_interface(awe_netd::MacAddress(mac)) }
     pub fn register_core_services(&mut self) -> Result<(), awe_initd::RuntimeError> {
-        let n = [None; awe_initd::MAX_DEPENDENCIES];
+        let n = [None; awe_initd::runtime::MAX_DEPENDENCIES];
         let d1 = [Some(ServiceId(1)), None, None, None, None, None, None, None];
         let d4 = [Some(ServiceId(4)), None, None, None, None, None, None, None];
         let specs = [
@@ -100,15 +80,9 @@ impl SystemRuntime {
     pub fn route_ps2(&mut self, event: Ps2Event) -> Result<RuntimeEvent, super::EndUserRuntimeError> {
         let translated = match event {
             Ps2Event::Key { code, pressed } => InputEvent::Key { code: key_code_value(code), pressed },
-            Ps2Event::Pointer { dx, dy, buttons } => {
-                self.cursor_x = self.cursor_x.saturating_add(dx as i32);
-                self.cursor_y = self.cursor_y.saturating_add(dy as i32);
-                InputEvent::Pointer { x: self.cursor_x, y: self.cursor_y, buttons }
-            }
+            Ps2Event::Pointer { dx, dy, buttons } => { self.cursor_x = self.cursor_x.saturating_add(dx as i32); self.cursor_y = self.cursor_y.saturating_add(dy as i32); InputEvent::Pointer { x: self.cursor_x, y: self.cursor_y, buttons } }
         };
-        self.core.push_input(translated)?;
-        self.windows.handle_input(translated);
-        Ok(RuntimeEvent::Input(translated))
+        self.core.push_input(translated)?; self.windows.handle_input(translated); Ok(RuntimeEvent::Input(translated))
     }
     pub fn create_native_window(&mut self, rect: RuntimeRect) -> Result<u16, WindowError> { self.windows.create(rect) }
     pub fn pointer_target(&mut self) -> Option<u16> { self.windows.hit_test(self.cursor_x, self.cursor_y) }
@@ -117,22 +91,16 @@ impl SystemRuntime {
 }
 
 fn key_code_value(code: KeyCode) -> u16 {
-    match code {
-        KeyCode::Escape => 0x01, KeyCode::Enter => 0x1C, KeyCode::Backspace => 0x0E,
-        KeyCode::Tab => 0x0D, KeyCode::Space => 0x39, KeyCode::Left => 0x4B,
-        KeyCode::Right => 0x4D, KeyCode::Up => 0x48, KeyCode::Down => 0x50,
-        KeyCode::Character(v) | KeyCode::Unknown(v) => v as u16,
-    }
+    match code { KeyCode::Escape => 0x01, KeyCode::Enter => 0x1C, KeyCode::Backspace => 0x0E, KeyCode::Tab => 0x0D, KeyCode::Space => 0x39, KeyCode::Left => 0x4B, KeyCode::Right => 0x4D, KeyCode::Up => 0x48, KeyCode::Down => 0x50, KeyCode::Character(v) | KeyCode::Unknown(v) => v as u16 }
 }
-
 impl Default for SystemRuntime { fn default() -> Self { Self::new() } }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn core_services_start_in_dependency_order() { let mut r = SystemRuntime::new(); r.register_core_services().unwrap(); r.start_core_services().unwrap(); assert_eq!(r.service_state(6), Some(ServiceState::Running)); }
-    #[test] fn core_apps_admit_and_start() { let mut r = SystemRuntime::new(); r.admit_core_apps().unwrap(); r.start_core_apps().unwrap(); assert_eq!(r.app_state(1), Some(AppState::Running)); }
-    #[test] fn ps2_input_reaches_window_manager() { let mut r = SystemRuntime::new(); r.create_native_window(RuntimeRect { x: 0, y: 0, width: 100, height: 100 }).unwrap(); r.route_ps2(Ps2Event::Pointer { dx: 20, dy: 20, buttons: 1 }).unwrap(); assert!(r.pointer_target().is_some()); }
-    #[test] fn capability_set_is_used_for_app_admission() { let mut r = SystemRuntime::new(); r.admit_core_apps().unwrap(); assert_eq!(r.apps.start(AppId(1), CapabilitySet::UI.0), Err(awe_appd::AppRuntimeError::CapabilityDenied)); }
-    #[test] fn namespace_mounts_are_bounded() { let mut r = SystemRuntime::new(); r.mount_core_namespaces(8).unwrap(); assert!(r.namespaces.is_mounted(Namespace::Config)); assert!(r.namespaces.is_mounted(Namespace::Log)); }
+    #[test] fn core_services_start_in_dependency_order() { let mut r=SystemRuntime::new(); r.register_core_services().unwrap(); r.start_core_services().unwrap(); assert_eq!(r.service_state(6),Some(ServiceState::Running)); }
+    #[test] fn core_apps_admit_and_start() { let mut r=SystemRuntime::new(); r.admit_core_apps().unwrap(); r.start_core_apps().unwrap(); assert_eq!(r.app_state(1),Some(AppState::Running)); }
+    #[test] fn ps2_input_reaches_window_manager() { let mut r=SystemRuntime::new(); r.create_native_window(RuntimeRect{x:0,y:0,width:100,height:100}).unwrap(); r.route_ps2(Ps2Event::Pointer{dx:20,dy:20,buttons:1}).unwrap(); assert!(r.pointer_target().is_some()); }
+    #[test] fn capability_set_is_used_for_app_admission() { let mut r=SystemRuntime::new(); r.admit_core_apps().unwrap(); assert_eq!(r.apps.start(AppId(1),CapabilitySet::UI.0),Err(awe_appd::AppRuntimeError::CapabilityDenied)); }
+    #[test] fn namespace_mounts_are_bounded() { let mut r=SystemRuntime::new(); r.mount_core_namespaces(8).unwrap(); assert!(r.namespaces.is_mounted(Namespace::Config)); assert!(r.namespaces.is_mounted(Namespace::Log)); }
 }
