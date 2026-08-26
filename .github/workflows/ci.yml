@@ -2,7 +2,7 @@ name: AWEOS CI Pipeline
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, 'feat/**' ]
   pull_request:
     branches: [ main, master ]
 
@@ -16,31 +16,41 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Install Rust Toolchain
         run: |
           rustup show
           rustup target add x86_64-unknown-none
           rustup target add x86_64-unknown-uefi
-
       - name: Check Workspace Compilation
         run: cargo check --workspace --all-targets
-
       - name: Run Workspace Tests
-        run: cargo test --workspace
-
+        run: cargo test --workspace --all-targets
       - name: Validate Formatting
         run: cargo fmt --all --check
-
+      - name: Validate Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Install QEMU
+        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86
       - name: Build Boot Images
         run: ./scripts/build-images.sh
-
       - name: Verify Image Artifacts
         run: |
           test -f dist/aweos-x86_64.iso
           test -f dist/aweos-x86_64.img
           test -f dist/aweos-uefi.img
           test -f dist/aweos-bios.img
-          test -f build/aweos-x86_64.iso
-          test -f build/aweos-x86_64.img
-          echo "All boot artifacts successfully generated and verified."
+      - name: Headless QEMU Smoke Test
+        timeout-minutes: 3
+        run: |
+          qemu-system-x86_64 --version
+          timeout 20s qemu-system-x86_64 -display none -serial stdio -no-reboot -no-shutdown -kernel target/x86_64-unknown-none/debug/aweos > qemu-serial.log 2>&1 || test $? -eq 124
+          cat qemu-serial.log
+          grep -q "AWEOS: kernel state = RUNNING" qemu-serial.log
+          grep -q "AWEOS: entering Ring 3" qemu-serial.log
+      - name: Upload QEMU Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aweos-qemu-evidence
+          path: qemu-serial.log
+          if-no-files-found: warn
