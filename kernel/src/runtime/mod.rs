@@ -1,14 +1,16 @@
-//! Native AWEOS runtime kernel contract.
+//! Native AWEOS runtime control plane.
 //! Runtime handles are capability-scoped and all privileged operations remain
 //! behind explicit validation boundaries.
 
 #![allow(dead_code)]
 
+mod desktop;
 mod end_user;
 pub mod graphics;
 pub mod system;
 pub mod ui_adapter;
 
+pub use desktop::{DesktopApp, DesktopError, DesktopShell};
 pub use end_user::{
     AppRecord, AppState, EndUserRuntime, EndUserRuntimeError, FramebufferInfo, InputEvent,
     RuntimeEvent, ServiceRecord, ServiceState,
