@@ -19,8 +19,8 @@ pub unsafe fn init_pic() {
         io_out8(0xA1, 0x02);
         io_out8(0x21, 0x01);
         io_out8(0xA1, 0x01);
-        // Enable timer IRQ0, keyboard IRQ1, and mouse IRQ12 (slave IRQ4).
-        io_out8(0x21, mask1 & !0x03);
+        // Enable IRQ0 timer, IRQ1 keyboard, and IRQ2 cascade for slave IRQ12 mouse.
+        io_out8(0x21, mask1 & !0x07);
         io_out8(0xA1, mask2 & !0x10);
     }
 }
