@@ -80,10 +80,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "awe-awosa"
-version = "0.1.0"
-
-[[package]]
 name = "awe-ayui"
 version = "0.1.0"
 
@@ -143,7 +139,6 @@ dependencies = [
  "awe-app-filemanager",
  "awe-app-pkgcenter",
  "awe-appd",
- "awe-awosa",
  "awe-ayui",
  "awe-driverd",
  "awe-identityd",
@@ -189,6 +184,7 @@ dependencies = [
 name = "aweos-kernel"
 version = "0.2.1"
 dependencies = [
+ "awe-ayui",
  "awe-boot-protocol",
 ]
 
@@ -199,10 +195,6 @@ dependencies = [
  "awe-boot-protocol",
  "aweos-kernel",
 ]
-
-[[package]]
-name = "aweosa-builder"
-version = "0.1.0"
 
 [[package]]
 name = "base64ct"

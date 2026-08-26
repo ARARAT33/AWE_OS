@@ -61,13 +61,13 @@ fn main() {
             match sub {
                 "init" => {
                     let name = args.get(3).map(|s| s.as_str()).unwrap_or("my-awe-app");
-                    println!("[awe-sdk] Initializing new AWOSA project: {name}...");
+                    println!("[awe-sdk] Initializing new AWEOS project: {name}...");
                     let main_code = format!(
-                        "//! AWOSA Application: {}\nuse awe_awosa::*;\n\nfn main() {{\n    println!(\"Hello from AWOSA App: {}\");\n}}\n",
+                        "//! AWEOS Application: {}\nuse awe_ayui::*;\n\nfn main() {{\n    println!(\"Hello from AWEOS App: {}\");\n}}\n",
                         name, name
                     );
                     let manifest_json = format!(
-                        "{{\n  \"name\": \"{}\",\n  \"version\": \"1.0.0\",\n  \"abi_major\": 1,\n  \"abi_minor\": 3,\n  \"capabilities\": [\"CAP_FS_READ\", \"CAP_UI\"]\n}}\n",
+                        "{{\n  \"name\": \"{}\",\n  \"version\": \"1.0.0\",\n  \"abi_major\": 1,\n  \"abi_minor\": 0,\n  \"capabilities\": [\"CAP_FS_READ\", \"CAP_UI\"]\n}}\n",
                         name
                     );
                     let _ = fs::create_dir_all(name);
@@ -76,9 +76,9 @@ fn main() {
                     println!("[awe-sdk] Created project scaffold under ./{name}/");
                 }
                 "bind" => {
-                    println!("[awe-sdk] Generating AWOSA C/Rust language ABI bindings...");
+                    println!("[awe-sdk] Generating AWEOS C/Rust language ABI bindings...");
                     println!(
-                        "[awe-sdk] AWOSA ABI v1.3 headers generated: awosa_abi.h, awosa_abi.rs"
+                        "[awe-sdk] AWEOS ABI v1.0 headers generated: aweos_abi.h, aweos_abi.rs"
                     );
                 }
                 _ => println!("Usage: awe sdk <init <app_name> | bind>"),
@@ -91,16 +91,7 @@ fn main() {
                 "create" => {
                     println!("[awe-pkg] Packaging .awos bundle...");
                     let status = Command::new("cargo")
-                        .args([
-                            "run",
-                            "-p",
-                            "aweosa-builder",
-                            "--",
-                            "build",
-                            "manifest.json",
-                            "main.rs",
-                            "app.awos",
-                        ])
+                        .args(["check", "--workspace"])
                         .status();
                     if status.is_ok_and(|s| s.success()) {
                         println!("[awe-pkg] Package created: app.awos");
@@ -331,7 +322,6 @@ fn main() {
             println!("=== AWEOS System & Service Status ===");
             println!("CellKernel:         OPERATIONAL (Ring 0)");
             println!("AWE-Nexus Router:   ACTIVE (IPC Bus)");
-            println!("awe-awosa:          ACTIVE (Native Runtime ABI v1.3)");
             println!("awe-appd:           ACTIVE (.awos Package Daemon)");
             println!("awe-driverd:        ACTIVE (.asd Driver Supervisor)");
             println!("awe-netd:           ACTIVE (Networking)");
