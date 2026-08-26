@@ -7,15 +7,7 @@ use crate::runtime::{CapabilitySet, FramebufferInfo, SystemRuntime};
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum KernelBootStatus {
-    Ready = 0,
-    InvalidBootInfo = 1,
-    UnsupportedArchitecture = 2,
-    NoCpu = 3,
-    NoUsableMemory = 4,
-    InvalidFramebuffer = 5,
-    RuntimeBringupFailed = 6,
-}
+pub enum KernelBootStatus { Ready = 0, InvalidBootInfo = 1, UnsupportedArchitecture = 2, NoCpu = 3, NoUsableMemory = 4, InvalidFramebuffer = 5, RuntimeBringupFailed = 6 }
 
 pub struct KernelContext { progress: BootProgress }
 impl Default for KernelContext { fn default() -> Self { Self::new() } }
@@ -24,6 +16,8 @@ impl KernelContext {
     pub const fn phase(&self) -> BootPhase { self.progress.phase() }
     pub fn advance(&mut self) -> bool { self.progress.advance() }
 }
+
+static mut SYSTEM_RUNTIME: SystemRuntime = SystemRuntime::new();
 
 pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
     if !validate(info) { return KernelBootStatus::InvalidBootInfo; }
@@ -58,28 +52,18 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
         if let Some(pit) = Pit::new(1000) { unsafe { pit.program(); } }
         serial_write_str("AWEOS: hardware/interrupt foundation initialized\r\n");
 
-        let mut system = SystemRuntime::new();
+        let runtime = unsafe { core::ptr::addr_of_mut!(SYSTEM_RUNTIME).as_mut().unwrap() };
         if info.framebuffer_address != 0 && info.framebuffer_size != 0 {
-            let fb = FramebufferInfo {
-                address: info.framebuffer_address,
-                size: info.framebuffer_size,
-                width: info.framebuffer_width,
-                height: info.framebuffer_height,
-                pitch: info.framebuffer_pitch,
-                bytes_per_pixel: 4,
-            };
-            system.attach_framebuffer(fb).map_err(|_| ()).unwrap_or(());
-            if !system.core.desktop_ready() { return KernelBootStatus::InvalidFramebuffer; }
-            serial_write_str("AWEOS: BootInfo framebuffer accepted by runtime\r\n");
+            let fb = FramebufferInfo { address: info.framebuffer_address, size: info.framebuffer_size, width: info.framebuffer_width, height: info.framebuffer_height, pitch: info.framebuffer_pitch, bytes_per_pixel: 4 };
+            if runtime.attach_framebuffer(fb).is_err() { return KernelBootStatus::InvalidFramebuffer; }
+            serial_write_str("AWEOS: BootInfo framebuffer accepted by persistent runtime\r\n");
         }
-
-        // Bring up the end-user control plane in dependency order.
-        if system.register_core_services().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
-        if system.start_core_services().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
-        if system.mount_core_namespaces(32).is_err() { return KernelBootStatus::RuntimeBringupFailed; }
-        if system.admit_core_apps().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
-        if system.start_core_apps().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
-        serial_write_str("AWEOS: initd/appd/storage/UI runtime control plane started\r\n");
+        if runtime.register_core_services().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
+        if runtime.start_core_services().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
+        if runtime.mount_core_namespaces(32).is_err() { return KernelBootStatus::RuntimeBringupFailed; }
+        if runtime.admit_core_apps().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
+        if runtime.start_core_apps().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
+        serial_write_str("AWEOS: persistent initd/appd/storage/UI runtime control plane started\r\n");
         serial_write_str("AWEOS: entering Ring 3 with IOPL=0\r\n");
         unsafe { enter_userspace(userspace_entry as *const () as usize as u64, user_stack_top); }
     }
@@ -90,11 +74,7 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
 #[unsafe(no_mangle)]
 pub extern "C" fn userspace_entry() -> ! {
     let message = b"AWEOS: Ring 3 active; privileged device access is mediated by syscall/IPC.\r\n";
-    let mut process = crate::process::ProcessDescriptor {
-        id: crate::process::ProcessId(1),
-        state: crate::process::ProcessState::Running,
-        budget: crate::process::ResourceBudget { cpu_ticks: 1000, memory_bytes: 1024 * 1024, ipc_messages: 64 },
-    };
+    let mut process = crate::process::ProcessDescriptor { id: crate::process::ProcessId(1), state: crate::process::ProcessState::Running, budget: crate::process::ResourceBudget { cpu_ticks: 1000, memory_bytes: 1024 * 1024, ipc_messages: 64 } };
     let mut syscall = crate::syscall::SyscallContext { process: &mut process };
     let _ = syscall.dispatch(8, [message.as_ptr() as u64, message.len() as u64, 0, 0, 0, 0]);
     loop { let _ = syscall.dispatch(0, [0;6]); unsafe { core::arch::asm!("pause"); } }
@@ -103,9 +83,7 @@ pub extern "C" fn userspace_entry() -> ! {
 #[cfg(all(target_arch = "x86_64", target_os = "none"))]
 pub unsafe fn enter_userspace(user_rip: u64, user_rsp: u64) {
     use crate::arch::x86_64::gdt::{USER_CODE_SELECTOR, USER_DATA_SELECTOR};
-    let user_cs = USER_CODE_SELECTOR as u64;
-    let user_ss = USER_DATA_SELECTOR as u64;
-    let rflags = 0x0202u64;
+    let user_cs = USER_CODE_SELECTOR as u64; let user_ss = USER_DATA_SELECTOR as u64; let rflags = 0x0202u64;
     unsafe { core::arch::asm!("push {0}", "push {1}", "push {2}", "push {3}", "push {4}", "iretq", in(reg) user_ss, in(reg) user_rsp, in(reg) rflags, in(reg) user_cs, in(reg) user_rip, options(noreturn)); }
 }
 
@@ -113,7 +91,7 @@ pub unsafe fn enter_userspace(user_rip: u64, user_rsp: u64) {
 mod tests {
     use super::*;
     use awe_boot_protocol::{Architecture, BootInfo, MemoryRegion};
-    fn info() -> (BootInfo, [MemoryRegion; 1]) {
+    fn info() -> (BootInfo, [MemoryRegion;1]) {
         let regions = [MemoryRegion { base: 0x1000, length: 0x10000, kind: 1, reserved: 0 }];
         let boot = BootInfo { magic: awe_boot_protocol::AWE_BOOT_MAGIC, version: awe_boot_protocol::AWE_BOOT_VERSION, size: core::mem::size_of::<BootInfo>() as u32, architecture: Architecture::X86_64, cpu_count: 1, memory_regions: regions.as_ptr(), memory_region_count: 1, framebuffer_address: 0, framebuffer_size: 0, framebuffer_width: 0, framebuffer_height: 0, framebuffer_pitch: 0, acpi_rsdp: 0, device_tree: 0, kernel_base: 0, kernel_size: 0 };
         (boot, regions)
