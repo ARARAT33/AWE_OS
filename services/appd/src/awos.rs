@@ -62,8 +62,7 @@ pub fn validate_awos(bytes: &[u8]) -> Result<AwosHeader, AwosError> {
         return Err(AwosError::BadMagic);
     }
     let u16_at = |o: usize| u16::from_le_bytes([bytes[o], bytes[o + 1]]);
-    let u32_at =
-        |o: usize| u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]);
+    let u32_at = |o: usize| u32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]);
     let header = AwosHeader {
         version: u16_at(4),
         abi_major: u16_at(6),
@@ -75,71 +74,32 @@ pub fn validate_awos(bytes: &[u8]) -> Result<AwosHeader, AwosError> {
         entry_offset: u32_at(24),
         flags: u32_at(28),
     };
-    if header.version != AWOS_VERSION {
-        return Err(AwosError::UnsupportedVersion);
-    }
-    if header.manifest_len as usize > AWOS_MAX_MANIFEST {
-        return Err(AwosError::OversizedManifest);
-    }
-    if header.code_len as usize > AWOS_MAX_CODE {
-        return Err(AwosError::OversizedCode);
-    }
-    if header.data_len as usize > AWOS_MAX_DATA {
-        return Err(AwosError::OversizedData);
-    }
-    if (header.signature_len as usize) < AWOS_MIN_SIGNATURE {
-        return Err(AwosError::MissingSignature);
-    }
-    if header.flags & !AWOS_KNOWN_FLAGS != 0 {
-        return Err(AwosError::UnknownFlags);
-    }
-    if header.entry_offset >= header.code_len || header.code_len == 0 {
-        return Err(AwosError::InvalidEntry);
-    }
+    if header.version != AWOS_VERSION { return Err(AwosError::UnsupportedVersion); }
+    if header.manifest_len as usize > AWOS_MAX_MANIFEST { return Err(AwosError::OversizedManifest); }
+    if header.code_len as usize > AWOS_MAX_CODE { return Err(AwosError::OversizedCode); }
+    if header.data_len as usize > AWOS_MAX_DATA { return Err(AwosError::OversizedData); }
+    if (header.signature_len as usize) < AWOS_MIN_SIGNATURE { return Err(AwosError::MissingSignature); }
+    if header.flags & !AWOS_KNOWN_FLAGS != 0 { return Err(AwosError::UnknownFlags); }
+    if header.entry_offset >= header.code_len || header.code_len == 0 { return Err(AwosError::InvalidEntry); }
     let expected = AWOS_HEADER_LEN
         .checked_add(header.manifest_len as usize)
         .and_then(|v| v.checked_add(header.code_len as usize))
         .and_then(|v| v.checked_add(header.data_len as usize))
         .and_then(|v| v.checked_add(header.signature_len as usize))
         .ok_or(AwosError::InvalidLength)?;
-    if expected != bytes.len() {
-        return Err(AwosError::InvalidLength);
-    }
+    if expected != bytes.len() { return Err(AwosError::InvalidLength); }
     Ok(header)
 }
 
-#[allow(dead_code, clippy::needless_lifetimes, clippy::type_complexity)]
-pub fn package_parts<'a>(
-    bytes: &'a [u8],
-    header: AwosHeader,
-) -> Result<(&'a [u8], &'a [u8], &'a [u8], &'a [u8]), AwosError> {
+pub fn package_parts<'a>(bytes: &'a [u8], header: AwosHeader) -> Result<(&'a [u8], &'a [u8], &'a [u8], &'a [u8]), AwosError> {
     let manifest_start = AWOS_HEADER_LEN;
-    let code_start = manifest_start
-        .checked_add(header.manifest_len as usize)
-        .ok_or(AwosError::InvalidLength)?;
-    let data_start = code_start
-        .checked_add(header.code_len as usize)
-        .ok_or(AwosError::InvalidLength)?;
-    let sig_start = data_start
-        .checked_add(header.data_len as usize)
-        .ok_or(AwosError::InvalidLength)?;
-    let end = sig_start
-        .checked_add(header.signature_len as usize)
-        .ok_or(AwosError::InvalidLength)?;
-    if end != bytes.len() {
-        return Err(AwosError::InvalidLength);
-    }
-    Ok((
-        &bytes[manifest_start..code_start],
-        &bytes[code_start..data_start],
-        &bytes[data_start..sig_start],
-        &bytes[sig_start..end],
-    ))
+    let code_start = manifest_start.checked_add(header.manifest_len as usize).ok_or(AwosError::InvalidLength)?;
+    let data_start = code_start.checked_add(header.code_len as usize).ok_or(AwosError::InvalidLength)?;
+    let sig_start = data_start.checked_add(header.data_len as usize).ok_or(AwosError::InvalidLength)?;
+    let end = sig_start.checked_add(header.signature_len as usize).ok_or(AwosError::InvalidLength)?;
+    if end != bytes.len() { return Err(AwosError::InvalidLength); }
+    Ok((&bytes[manifest_start..code_start], &bytes[code_start..data_start], &bytes[data_start..sig_start], &bytes[sig_start..end]))
 }
-
-// ============================================================================
-// Publisher Identity & Cryptographic Signature Verification
-// ============================================================================
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PublisherIdentity {
@@ -149,29 +109,12 @@ pub struct PublisherIdentity {
 }
 
 impl PublisherIdentity {
-    pub fn verify_signature(
-        &self,
-        payload_bytes: &[u8],
-        signature_bytes: &[u8],
-    ) -> Result<(), AwosError> {
-        if signature_bytes.len() < AWOS_MIN_SIGNATURE {
-            return Err(AwosError::MissingSignature);
-        }
-        let sig_bytes: &[u8; 64] = signature_bytes[..64]
-            .try_into()
-            .map_err(|_| AwosError::MissingSignature)?;
-
-        if awe_securityd::ed25519_verify(&self.public_key, payload_bytes, sig_bytes) {
-            Ok(())
-        } else {
-            Err(AwosError::InvalidSignature)
-        }
+    pub fn verify_signature(&self, payload_bytes: &[u8], signature_bytes: &[u8]) -> Result<(), AwosError> {
+        if signature_bytes.len() < AWOS_MIN_SIGNATURE { return Err(AwosError::MissingSignature); }
+        let sig_bytes: &[u8; 64] = signature_bytes[..64].try_into().map_err(|_| AwosError::MissingSignature)?;
+        if awe_securityd::ed25519_verify(&self.public_key, payload_bytes, sig_bytes) { Ok(()) } else { Err(AwosError::InvalidSignature) }
     }
 }
-
-// ============================================================================
-// Sandboxing & Permission Constraints
-// ============================================================================
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SandboxProfile {
@@ -184,39 +127,17 @@ pub struct SandboxProfile {
 
 impl SandboxProfile {
     pub const fn strict_default(package_id: u64) -> Self {
-        Self {
-            package_id,
-            capability_mask: 0x0003, // Read/Write
-            max_memory_pages: 1024,
-            max_fds: 16,
-            allow_raw_sockets: false,
-        }
+        Self { package_id, capability_mask: 0x0003, max_memory_pages: 1024, max_fds: 16, allow_raw_sockets: false }
     }
-
-    pub fn validate_access(
-        &self,
-        required_cap: u64,
-        pages_requested: u32,
-    ) -> Result<(), AwosError> {
-        if (self.capability_mask & required_cap) != required_cap {
-            return Err(AwosError::SandboxViolation);
-        }
-        if pages_requested > self.max_memory_pages {
-            return Err(AwosError::SandboxViolation);
-        }
+    pub fn validate_access(&self, required_cap: u64, pages_requested: u32) -> Result<(), AwosError> {
+        if (self.capability_mask & required_cap) != required_cap { return Err(AwosError::SandboxViolation); }
+        if pages_requested > self.max_memory_pages { return Err(AwosError::SandboxViolation); }
         Ok(())
     }
 }
 
-// ============================================================================
-// Dependency Resolution & Repository Index
-// ============================================================================
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PackageDependency {
-    pub dep_package_id: u64,
-    pub min_version: u16,
-}
+pub struct PackageDependency { pub dep_package_id: u64, pub min_version: u16 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PackageMeta {
@@ -228,120 +149,67 @@ pub struct PackageMeta {
     pub dep_count: usize,
 }
 
-pub struct RepositoryIndex {
-    entries: [Option<PackageMeta>; MAX_INDEX_ENTRIES],
-}
+pub struct RepositoryIndex { entries: [Option<PackageMeta>; MAX_INDEX_ENTRIES] }
 
 impl RepositoryIndex {
-    pub const fn new() -> Self {
-        Self {
-            entries: [None; MAX_INDEX_ENTRIES],
-        }
-    }
-
+    pub const fn new() -> Self { Self { entries: [None; MAX_INDEX_ENTRIES] } }
     pub fn register(&mut self, meta: PackageMeta) -> Result<(), AwosError> {
         for existing in self.entries.iter_mut().flatten() {
-            if existing.package_id == meta.package_id && existing.version == meta.version {
-                *existing = meta;
-                return Ok(());
-            }
+            if existing.package_id == meta.package_id && existing.version == meta.version { *existing = meta; return Ok(()); }
         }
         for slot in self.entries.iter_mut() {
-            if slot.is_none() {
-                *slot = Some(meta);
-                return Ok(());
-            }
+            if slot.is_none() { *slot = Some(meta); return Ok(()); }
         }
         Err(AwosError::StorageFull)
     }
-
     pub fn find(&self, package_id: u64) -> Option<PackageMeta> {
-        for slot in self.entries.iter().flatten() {
-            if slot.package_id == package_id {
-                return Some(*slot);
-            }
-        }
+        for slot in self.entries.iter().flatten() { if slot.package_id == package_id { return Some(*slot); } }
         None
     }
-
     pub fn resolve_dependencies(&self, root_id: u64) -> Result<[u64; MAX_PACKAGE_DEPS], AwosError> {
         let mut resolved = [0u64; MAX_PACKAGE_DEPS];
         let mut count = 0;
-
         let mut stack = [0u64; MAX_PACKAGE_DEPS];
         let mut stack_top = 0;
-
         stack[0] = root_id;
         stack_top += 1;
-
         while stack_top > 0 {
             stack_top -= 1;
             let current_id = stack[stack_top];
-
             let meta = self.find(current_id).ok_or(AwosError::DependencyMissing)?;
-
             let mut already_added = false;
-            for r in resolved.iter().take(count) {
-                if *r == current_id {
-                    already_added = true;
-                    break;
-                }
-            }
-
+            for r in resolved.iter().take(count) { if *r == current_id { already_added = true; break; } }
             if !already_added {
-                if count >= MAX_PACKAGE_DEPS {
-                    return Err(AwosError::StorageFull);
-                }
+                if count >= MAX_PACKAGE_DEPS { return Err(AwosError::StorageFull); }
                 resolved[count] = current_id;
                 count += 1;
-
                 for dep in meta.dependencies.iter().flatten() {
-                    if stack_top >= MAX_PACKAGE_DEPS {
-                        return Err(AwosError::DependencyCycle);
-                    }
+                    if stack_top >= MAX_PACKAGE_DEPS { return Err(AwosError::DependencyCycle); }
                     stack[stack_top] = dep.dep_package_id;
                     stack_top += 1;
                 }
             }
         }
-
         Ok(resolved)
     }
 }
 
-impl Default for RepositoryIndex {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// ============================================================================
-// Package State Transitions & Package Manager Lifecycle
-// ============================================================================
+impl Default for RepositoryIndex { fn default() -> Self { Self::new() } }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AppPackageState {
-    Installed,
-    Running,
-    Staged,
-    Failed,
-    Quarantined,
-    Removed,
-}
+pub enum AppPackageState { Installed, Running, Staged, Failed, Quarantined, Removed }
 
 pub const fn package_transition(from: AppPackageState, to: AppPackageState) -> bool {
-    matches!(
-        (from, to),
+    matches!((from, to),
         (AppPackageState::Installed, AppPackageState::Running)
-            | (AppPackageState::Installed, AppPackageState::Staged)
-            | (AppPackageState::Running, AppPackageState::Staged)
-            | (AppPackageState::Running, AppPackageState::Failed)
-            | (AppPackageState::Staged, AppPackageState::Running)
-            | (AppPackageState::Staged, AppPackageState::Failed)
-            | (AppPackageState::Failed, AppPackageState::Staged)
-            | (AppPackageState::Failed, AppPackageState::Quarantined)
-            | (AppPackageState::Installed, AppPackageState::Removed)
-    )
+        | (AppPackageState::Installed, AppPackageState::Staged)
+        | (AppPackageState::Running, AppPackageState::Staged)
+        | (AppPackageState::Running, AppPackageState::Failed)
+        | (AppPackageState::Staged, AppPackageState::Running)
+        | (AppPackageState::Staged, AppPackageState::Failed)
+        | (AppPackageState::Failed, AppPackageState::Staged)
+        | (AppPackageState::Failed, AppPackageState::Quarantined)
+        | (AppPackageState::Installed, AppPackageState::Removed))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -358,50 +226,40 @@ pub struct AppPackageManager {
 }
 
 impl AppPackageManager {
-    pub const fn new() -> Self {
-        Self {
-            repository: RepositoryIndex::new(),
-            installed: [None; MAX_INSTALLED_PACKAGES],
+    pub const fn new() -> Self { Self { repository: RepositoryIndex::new(), installed: [None; MAX_INSTALLED_PACKAGES] } }
+
+    fn verify_package(&self, bytes: &[u8], meta: PackageMeta) -> Result<AwosHeader, AwosError> {
+        if meta.publisher.publisher_id == 0 || !meta.publisher.is_official { return Err(AwosError::PublisherUntrusted); }
+        let header = validate_awos(bytes)?;
+        let (manifest, code, data, sig) = package_parts(bytes, header)?;
+        let mut payload = [0u8; 768];
+        let mut used = 0usize;
+        for segment in [&bytes[..AWOS_HEADER_LEN], manifest, code, data] {
+            if used.checked_add(segment.len()).ok_or(AwosError::InvalidLength)? > payload.len() { return Err(AwosError::InvalidLength); }
+            payload[used..used + segment.len()].copy_from_slice(segment);
+            used += segment.len();
         }
+        meta.publisher.verify_signature(&payload[..used], sig)?;
+        Ok(header)
     }
 
     pub fn install_package(&mut self, bytes: &[u8], meta: PackageMeta) -> Result<u64, AwosError> {
-        let header = validate_awos(bytes)?;
-        let (_manifest, code, _data, sig) = package_parts(bytes, header)?;
-
-        // Verify cryptographic signature
-        meta.publisher.verify_signature(code, sig)?;
-
-        // Register meta in repository index before dependency check
+        self.verify_package(bytes, meta)?;
         self.repository.register(meta)?;
-
-        // Resolve dependencies
         self.repository.resolve_dependencies(meta.package_id)?;
-
-        // Store into installed table
         for slot in self.installed.iter_mut() {
             if slot.is_none() {
-                *slot = Some(InstalledAppRecord {
-                    meta,
-                    state: AppPackageState::Installed,
-                    active_version: meta.version,
-                    backup_version: None,
-                });
+                *slot = Some(InstalledAppRecord { meta, state: AppPackageState::Installed, active_version: meta.version, backup_version: None });
                 return Ok(meta.package_id);
             }
         }
-
         Err(AwosError::StorageFull)
     }
 
     pub fn uninstall_package(&mut self, package_id: u64) -> Result<(), AwosError> {
         for slot in self.installed.iter_mut() {
-            if let Some(rec) = slot
-                && rec.meta.package_id == package_id
-            {
-                if !package_transition(rec.state, AppPackageState::Removed) {
-                    return Err(AwosError::SandboxViolation);
-                }
+            if let Some(rec) = slot && rec.meta.package_id == package_id {
+                if !package_transition(rec.state, AppPackageState::Removed) { return Err(AwosError::SandboxViolation); }
                 *slot = None;
                 return Ok(());
             }
@@ -409,15 +267,8 @@ impl AppPackageManager {
         Err(AwosError::PackageNotFound)
     }
 
-    pub fn update_package(
-        &mut self,
-        new_meta: PackageMeta,
-        new_bytes: &[u8],
-    ) -> Result<(), AwosError> {
-        let header = validate_awos(new_bytes)?;
-        let (_manifest, code, _data, sig) = package_parts(new_bytes, header)?;
-        new_meta.publisher.verify_signature(code, sig)?;
-
+    pub fn update_package(&mut self, new_meta: PackageMeta, new_bytes: &[u8]) -> Result<(), AwosError> {
+        self.verify_package(new_bytes, new_meta)?;
         for slot in self.installed.iter_mut().flatten() {
             if slot.meta.package_id == new_meta.package_id {
                 let old_version = slot.active_version;
@@ -425,7 +276,7 @@ impl AppPackageManager {
                 slot.active_version = new_meta.version;
                 slot.meta = new_meta;
                 slot.state = AppPackageState::Installed;
-                let _ = self.repository.register(new_meta);
+                self.repository.register(new_meta)?;
                 return Ok(());
             }
         }
@@ -440,33 +291,20 @@ impl AppPackageManager {
                     slot.backup_version = None;
                     slot.state = AppPackageState::Installed;
                     return Ok(backup);
-                } else {
-                    return Err(AwosError::RollbackFailed);
                 }
+                return Err(AwosError::RollbackFailed);
             }
         }
         Err(AwosError::PackageNotFound)
     }
 
     pub fn get_installed_record(&self, package_id: u64) -> Result<InstalledAppRecord, AwosError> {
-        for slot in self.installed.iter().flatten() {
-            if slot.meta.package_id == package_id {
-                return Ok(*slot);
-            }
-        }
+        for slot in self.installed.iter().flatten() { if slot.meta.package_id == package_id { return Ok(*slot); } }
         Err(AwosError::PackageNotFound)
     }
 }
 
-impl Default for AppPackageManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// ============================================================================
-// Unit Tests
-// ============================================================================
+impl Default for AppPackageManager { fn default() -> Self { Self::new() } }
 
 #[cfg(test)]
 mod tests {
@@ -475,13 +313,7 @@ mod tests {
     use std::vec;
     use std::vec::Vec;
 
-    fn build_awos_bytes(
-        manifest: usize,
-        code: usize,
-        data: usize,
-        sig: usize,
-        sig_byte0: u8,
-    ) -> Vec<u8> {
+    fn build_awos_bytes(manifest: usize, code: usize, data: usize, sig: usize) -> Vec<u8> {
         let mut b = Vec::with_capacity(AWOS_HEADER_LEN + manifest + code + data + sig);
         b.extend_from_slice(&AWOS_MAGIC);
         b.extend_from_slice(&AWOS_VERSION.to_le_bytes());
@@ -493,79 +325,58 @@ mod tests {
         b.extend_from_slice(&(sig as u16).to_le_bytes());
         b.extend_from_slice(&0u32.to_le_bytes());
         b.extend_from_slice(&0u32.to_le_bytes());
-
-        // Manifest
         b.extend(core::iter::repeat_n(0u8, manifest));
-        // Code
-        let code_bytes = vec![0x90u8; code];
-        b.extend_from_slice(&code_bytes);
-        // Data
+        b.extend(core::iter::repeat_n(0x90u8, code));
         b.extend(core::iter::repeat_n(0u8, data));
-
-        // Sig
-        let mut sig_vec = vec![0u8; sig];
-        sig_vec[0] = sig_byte0;
-        b.extend_from_slice(&sig_vec);
-
+        b.extend(core::iter::repeat_n(0u8, sig));
         b
+    }
+
+    fn sign_payload(bytes: &[u8], meta: usize) -> Vec<u8> {
+        let seed = [0x77u8; 32];
+        let (_pk, sk) = awe_securityd::ed25519_keypair_from_seed(&seed);
+        let payload = &bytes[..bytes.len() - meta];
+        awe_securityd::ed25519_sign(&sk, payload).to_vec()
     }
 
     #[test]
     fn test_awos_package_install_update_rollback_uninstall() {
         let seed = [0x77u8; 32];
         let (pk, sk) = awe_securityd::ed25519_keypair_from_seed(&seed);
-
-        let pub_id = PublisherIdentity {
-            publisher_id: 100,
-            public_key: pk,
-            is_official: true,
-        };
-
-        let code_bytes = vec![0x90u8; 8];
-        let real_sig = awe_securityd::ed25519_sign(&sk, &code_bytes);
-
-        let mut bytes_v1 = build_awos_bytes(4, 8, 2, 64, 0);
-        let sig_offset_v1 = AWOS_HEADER_LEN + 4 + 8 + 2;
-        bytes_v1[sig_offset_v1..sig_offset_v1 + 64].copy_from_slice(&real_sig);
-
-        let meta_v1 = PackageMeta {
-            package_id: 1001,
-            version: 1,
-            publisher: pub_id,
-            sandbox: SandboxProfile::strict_default(1001),
-            dependencies: [None; MAX_PACKAGE_DEPS],
-            dep_count: 0,
-        };
-
+        let pub_id = PublisherIdentity { publisher_id: 100, public_key: pk, is_official: true };
+        let mut bytes_v1 = build_awos_bytes(4, 8, 2, 64);
+        let payload_len_v1 = bytes_v1.len() - 64;
+        let sig_v1 = awe_securityd::ed25519_sign(&sk, &bytes_v1[..payload_len_v1]);
+        bytes_v1[payload_len_v1..].copy_from_slice(&sig_v1);
+        let meta_v1 = PackageMeta { package_id: 1001, version: 1, publisher: pub_id, sandbox: SandboxProfile::strict_default(1001), dependencies: [None; MAX_PACKAGE_DEPS], dep_count: 0 };
         let mut mgr = AppPackageManager::new();
         mgr.install_package(&bytes_v1, meta_v1).expect("install v1");
-
-        let rec = mgr.get_installed_record(1001).unwrap();
-        assert_eq!(rec.active_version, 1);
-
-        // Update to v2
-        let meta_v2 = PackageMeta {
-            version: 2,
-            ..meta_v1
-        };
-        let mut bytes_v2 = build_awos_bytes(4, 8, 2, 64, 0);
-        bytes_v2[sig_offset_v1..sig_offset_v1 + 64].copy_from_slice(&real_sig);
-
+        assert_eq!(mgr.get_installed_record(1001).unwrap().active_version, 1);
+        let meta_v2 = PackageMeta { version: 2, ..meta_v1 };
+        let mut bytes_v2 = build_awos_bytes(4, 8, 2, 64);
+        let sig_v2 = awe_securityd::ed25519_sign(&sk, &bytes_v2[..bytes_v2.len() - 64]);
+        bytes_v2[bytes_v2.len() - 64..].copy_from_slice(&sig_v2);
         mgr.update_package(meta_v2, &bytes_v2).expect("update v2");
         let rec2 = mgr.get_installed_record(1001).unwrap();
         assert_eq!(rec2.active_version, 2);
         assert_eq!(rec2.backup_version, Some(1));
-
-        // Rollback
-        let rolled = mgr.rollback_package(1001).expect("rollback");
-        assert_eq!(rolled, 1);
-        assert_eq!(mgr.get_installed_record(1001).unwrap().active_version, 1);
-
-        // Uninstall
+        assert_eq!(mgr.rollback_package(1001).unwrap(), 1);
         mgr.uninstall_package(1001).expect("uninstall");
-        assert_eq!(
-            mgr.get_installed_record(1001),
-            Err(AwosError::PackageNotFound)
-        );
+        assert_eq!(mgr.get_installed_record(1001), Err(AwosError::PackageNotFound));
+    }
+
+    #[test]
+    fn rejects_tampered_manifest_or_data() {
+        let seed = [0x55u8; 32];
+        let (pk, sk) = awe_securityd::ed25519_keypair_from_seed(&seed);
+        let publisher = PublisherIdentity { publisher_id: 9, public_key: pk, is_official: true };
+        let mut bytes = build_awos_bytes(4, 8, 2, 64);
+        let payload_len = bytes.len() - 64;
+        let sig = awe_securityd::ed25519_sign(&sk, &bytes[..payload_len]);
+        bytes[payload_len..].copy_from_slice(&sig);
+        bytes[32] ^= 1;
+        let mut mgr = AppPackageManager::new();
+        let meta = PackageMeta { package_id: 7, version: 1, publisher, sandbox: SandboxProfile::strict_default(7), dependencies: [None; MAX_PACKAGE_DEPS], dep_count: 0 };
+        assert_eq!(mgr.install_package(&bytes, meta), Err(AwosError::InvalidSignature));
     }
 }
