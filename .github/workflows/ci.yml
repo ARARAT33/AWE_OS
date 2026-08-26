@@ -29,8 +29,8 @@ jobs:
         run: cargo fmt --all --check
       - name: Validate Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Install QEMU
-        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86
+      - name: Install QEMU and Xvfb
+        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86 xvfb
       - name: Build Boot Images
         run: ./scripts/build-images.sh
       - name: Verify Image Artifacts
@@ -43,14 +43,34 @@ jobs:
         timeout-minutes: 3
         run: |
           qemu-system-x86_64 --version
-          timeout 20s qemu-system-x86_64 -display none -serial stdio -no-reboot -no-shutdown -kernel target/x86_64-unknown-none/debug/aweos > qemu-serial.log 2>&1 || test $? -eq 124
+          set +e
+          timeout 20s qemu-system-x86_64 -display none -serial stdio -no-reboot -no-shutdown -kernel target/x86_64-unknown-none/debug/aweos > qemu-serial.log 2>&1
+          status=$?
+          set -e
           cat qemu-serial.log
+          test $status -eq 124 || test $status -eq 0
           grep -q "AWEOS: kernel state = RUNNING" qemu-serial.log
           grep -q "AWEOS: entering Ring 3" qemu-serial.log
+      - name: Graphical QEMU Startup Smoke Test
+        timeout-minutes: 3
+        run: |
+          set +e
+          timeout 15s xvfb-run -a qemu-system-x86_64 \
+            -display gtk \
+            -serial file:qemu-graphical.log \
+            -no-reboot \
+            -no-shutdown \
+            -kernel target/x86_64-unknown-none/debug/aweos
+          status=$?
+          set -e
+          cat qemu-graphical.log || true
+          test $status -eq 124 || test $status -eq 0
       - name: Upload QEMU Evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: aweos-qemu-evidence
-          path: qemu-serial.log
+          path: |
+            qemu-serial.log
+            qemu-graphical.log
           if-no-files-found: warn
