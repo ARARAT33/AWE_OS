@@ -1,6 +1,6 @@
 #![no_std]
 
-use awe_boot_protocol::{BootInfo, validate};
+use awe_boot_protocol::{validate, BootInfo};
 
 use crate::boot_phase::{BootPhase, BootProgress};
 use crate::memory::PhysicalFrameAllocator;
@@ -40,10 +40,6 @@ impl KernelContext {
 }
 
 /// Stable entry contract between AWE Loader and CellKernel.
-///
-/// The loader owns the lifetime of `BootInfo`; the kernel validates the
-/// structure and immediately exercises the physical-frame allocator against
-/// the loader-provided memory map before declaring itself ready.
 pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
     if !validate(info) {
         return KernelBootStatus::InvalidBootInfo;
@@ -122,11 +118,9 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
         serial_write_str("AWEOS: Interrupts & PIC/PIT initialized\r\n");
 
         serial_write_str("AWEOS: Preemptive Scheduler initialized\r\n");
-
         serial_write_str("AWEOS: boot protocol validated\r\n");
         serial_write_str("AWEOS: kernel state = RUNNING\r\n");
         serial_write_str("AWEOS: kernel is alive\r\n");
-
         serial_write_str("AWEOS: Entering Ring 3 Userspace...\r\n");
         unsafe {
             enter_userspace(userspace_entry as *const () as usize as u64, user_stack_top);
@@ -158,47 +152,27 @@ pub extern "C" fn userspace_entry() -> ! {
         process: &mut process,
     };
 
-    // Syscall Write (8) -> log Ring 3 status
     context.dispatch(8, [msg.as_ptr() as u64, msg.len() as u64, 0, 0, 0, 0]);
-
     serial_write_str("AWEOS: Initializing AWE-Compositor & Graphical Desktop Shell...\r\n");
-    let mut compositor = Compositor::new();
 
-    // Launch Desktop Shell Applications (Terminal, System Info, About AWEOS)
+    let mut compositor = Compositor::new();
     let term_win = compositor
         .create_app_window(
-            Rect {
-                x: 40,
-                y: 40,
-                width: 500,
-                height: 340,
-            },
+            Rect { x: 40, y: 40, width: 500, height: 340 },
             AppType::Terminal,
             b"AWETerminal v1.0",
         )
         .unwrap_or(awe_ayui::WindowId(1));
-
     let sysinfo_win = compositor
         .create_app_window(
-            Rect {
-                x: 300,
-                y: 100,
-                width: 440,
-                height: 320,
-            },
+            Rect { x: 300, y: 100, width: 440, height: 320 },
             AppType::SystemMonitor,
             b"System Information",
         )
         .unwrap_or(awe_ayui::WindowId(2));
-
     let about_win = compositor
         .create_app_window(
-            Rect {
-                x: 180,
-                y: 160,
-                width: 360,
-                height: 220,
-            },
+            Rect { x: 180, y: 160, width: 360, height: 220 },
             AppType::Generic,
             b"About AWEOS",
         )
@@ -212,7 +186,6 @@ pub extern "C" fn userspace_entry() -> ! {
 
     static mut BACK_BUFFER: [u8; 800 * 600 * 4] = [0; 800 * 600 * 4];
     let back_buf = unsafe { &mut *core::ptr::addr_of_mut!(BACK_BUFFER) };
-
     let mut fb = Framebuffer {
         width: 800,
         height: 600,
@@ -222,23 +195,24 @@ pub extern "C" fn userspace_entry() -> ! {
     };
 
     serial_write_str("AWEOS: Entering interactive AWE-Compositor Main Event Loop...\r\n");
-
-    let done_msg = b"AWEOS: userspace execution completed cleanly!\r\n";
     context.dispatch(
         8,
-        [done_msg.as_ptr() as u64, done_msg.len() as u64, 0, 0, 0, 0],
+        [
+            b"AWEOS: userspace execution completed cleanly!\r\n".as_ptr() as u64,
+            48,
+            0,
+            0,
+            0,
+            0,
+        ],
     );
 
     let mut tick = 0u64;
     loop {
         tick = tick.wrapping_add(1);
-
-        // Process hardware input polling simulation / queue
         if tick % 50 == 0 {
-            // Poll hardware mouse / keyboard input state
             compositor.render_to_framebuffer(&mut fb);
         }
-
         unsafe {
             core::arch::asm!("pause");
         }
@@ -251,7 +225,8 @@ pub unsafe fn enter_userspace(user_rip: u64, user_rsp: u64) {
 
     let user_cs = USER_CODE_SELECTOR as u64;
     let user_ss = USER_DATA_SELECTOR as u64;
-    let rflags = 0x3202u64; // IOPL = 3 + IF = 1
+    // IF=1, IOPL=0. Ring 3 must use syscalls/IPC for privileged operations.
+    let rflags = 0x0202u64;
 
     unsafe {
         core::arch::asm!(
