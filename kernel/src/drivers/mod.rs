@@ -38,6 +38,7 @@ pub mod linux_transaction_orchestrator;
 pub mod pci;
 pub mod pci_virtio_probe;
 pub mod product_gate;
+pub mod ps2;
 pub mod universal;
 pub mod virtio;
 pub mod virtio_block;
@@ -113,6 +114,7 @@ pub use pci_virtio_probe::{
     MAX_VIRTIO_PROBES, ProbeError as VirtioProbeError, VirtioDeviceKind, VirtioPciProbe,
 };
 pub use product_gate::{ProductGate, ProductGateError};
+pub use ps2::{Controller as Ps2Controller, EventQueue as Ps2EventQueue, KeyCode as Ps2KeyCode, MouseDecoder as Ps2MouseDecoder, KeyboardDecoder as Ps2KeyboardDecoder, Ps2Error, Ps2Event};
 pub use universal::{
     DriverAbi, DriverAction, DriverError, DriverOs, DriverRequest, DriverResult, validate_request,
 };
