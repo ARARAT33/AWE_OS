@@ -10,6 +10,7 @@ pub mod x86_64_backend;
 
 use core::sync::atomic::{AtomicU64, Ordering};
 use context::ProcessContext;
+use dispatch::DispatchTarget;
 use scheduler::{Scheduler, SchedulerError};
 
 #[repr(transparent)]
@@ -192,14 +193,16 @@ impl<const N: usize> ProcessManager<N> {
             .ok_or(ProcessManagerError::Full)?;
         self.processes[slot] = Some(descriptor);
         self.contexts[slot] = Some(context);
-        self.next_slot = (slot + 1) % N.max(1);
+        self.next_slot = if N == 0 { 0 } else { (slot + 1) % N };
         self.count += 1;
         Ok(slot)
     }
 
     pub fn make_runnable(&mut self, id: ProcessId) -> Result<(), ProcessManagerError> {
         let index = self.find_index(id).ok_or(ProcessManagerError::InvalidProcess)?;
-        let descriptor = self.processes[index].as_mut().ok_or(ProcessManagerError::InvalidProcess)?;
+        let descriptor = self.processes[index]
+            .as_mut()
+            .ok_or(ProcessManagerError::InvalidProcess)?;
         descriptor
             .transition(ProcessState::Runnable)
             .map_err(|_| ProcessManagerError::InvalidProcess)?;
@@ -210,7 +213,9 @@ impl<const N: usize> ProcessManager<N> {
 
     pub fn mark_running(&mut self, id: ProcessId) -> Result<(), ProcessManagerError> {
         let index = self.find_index(id).ok_or(ProcessManagerError::InvalidProcess)?;
-        let descriptor = self.processes[index].as_mut().ok_or(ProcessManagerError::InvalidProcess)?;
+        let descriptor = self.processes[index]
+            .as_mut()
+            .ok_or(ProcessManagerError::InvalidProcess)?;
         descriptor
             .transition(ProcessState::Running)
             .map_err(|_| ProcessManagerError::InvalidProcess)
@@ -218,13 +223,15 @@ impl<const N: usize> ProcessManager<N> {
 
     pub fn exit(&mut self, id: ProcessId) -> Result<(), ProcessManagerError> {
         let index = self.find_index(id).ok_or(ProcessManagerError::InvalidProcess)?;
-        let descriptor = self.processes[index].as_mut().ok_or(ProcessManagerError::InvalidProcess)?;
+        let descriptor = self.processes[index]
+            .as_mut()
+            .ok_or(ProcessManagerError::InvalidProcess)?;
         descriptor
             .transition(ProcessState::Exited)
             .map_err(|_| ProcessManagerError::InvalidProcess)
     }
 
-    pub fn next_dispatch(&mut self) -> Result<super::process::dispatch::DispatchTarget, ProcessManagerError> {
+    pub fn next_dispatch(&mut self) -> Result<DispatchTarget, ProcessManagerError> {
         let contexts = self.context_snapshot();
         self.scheduler
             .prepare_next(&contexts)
