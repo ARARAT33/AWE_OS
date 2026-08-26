@@ -51,7 +51,7 @@ jobs:
           test $status -eq 124 || test $status -eq 0
           grep -q "AWEOS: kernel state = RUNNING" qemu-serial.log
           grep -q "AWEOS: entering Ring 3" qemu-serial.log
-          grep -q "AWEOS: end-user runtime control plane started" qemu-serial.log
+          grep -q "AWEOS: persistent initd/appd/storage/UI runtime control plane started" qemu-serial.log
       - name: Graphical QEMU Startup Smoke Test
         timeout-minutes: 3
         run: |
