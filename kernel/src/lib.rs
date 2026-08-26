@@ -22,7 +22,7 @@ unsafe impl GlobalAlloc for EarlyAllocator {
             let end = match aligned.checked_add(layout.size()) { Some(v) => v, None => return core::ptr::null_mut() };
             if end > EARLY_HEAP_SIZE { return core::ptr::null_mut(); }
             if EARLY_NEXT.compare_exchange_weak(current, end, Ordering::AcqRel, Ordering::Relaxed).is_ok() {
-                return core::ptr::addr_of_mut!(EARLY_HEAP) as *mut u8 .wrapping_add(aligned);
+                return (core::ptr::addr_of_mut!(EARLY_HEAP) as *mut u8).wrapping_add(aligned);
             }
         }
     }
