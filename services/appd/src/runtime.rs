@@ -39,7 +39,10 @@ impl Supervisor {
             _ => { self.apps[index].as_mut().unwrap().state = AppState::Failed; return Err(RuntimeError::SpawnFailed); }
         };
         let record = self.apps[index].as_mut().unwrap();
-        record.process_id = pid; record.window_id = window; record.failures = 0; record.state = AppState::Running; Ok(pid)
+        record.process_id = pid;
+        record.window_id = window;
+        record.state = AppState::Running;
+        Ok(pid)
     }
     pub fn stop(&mut self, id: AppId) -> Result<(), RuntimeError> {
         let index = self.find(id).ok_or(RuntimeError::NotFound)?;
@@ -55,6 +58,13 @@ impl Supervisor {
         record.state = if record.failures > MAX_FAILURES { AppState::Quarantined } else { AppState::Failed };
         Ok(record.state)
     }
+    pub fn reset_failure_count(&mut self, id: AppId) -> Result<(), RuntimeError> {
+        let index = self.find(id).ok_or(RuntimeError::NotFound)?;
+        let record = self.apps[index].as_mut().unwrap();
+        if record.state == AppState::Running || record.state == AppState::Starting { return Err(RuntimeError::InvalidTransition); }
+        record.failures = 0;
+        Ok(())
+    }
     pub fn state(&self, id: AppId) -> Option<AppState> { self.find(id).and_then(|i| self.apps[i].map(|r| r.state)) }
     pub fn record(&self, id: AppId) -> Option<RuntimeApp> { self.find(id).and_then(|i| self.apps[i]) }
     fn find(&self, id: AppId) -> Option<usize> { self.apps.iter().position(|r| r.map(|a| a.manifest.id) == Some(id)) }
@@ -69,4 +79,5 @@ mod tests {
     #[test] fn admission_start_and_stop_are_real_lifecycle_steps() { let mut s = Supervisor::new(spawn, window); s.admit(manifest(1)).unwrap(); let pid = s.start(AppId(1), 0b111).unwrap(); assert_eq!(pid, 0x1001); assert_eq!(s.record(AppId(1)).unwrap().window_id, 1); assert_eq!(s.state(AppId(1)), Some(AppState::Running)); s.stop(AppId(1)).unwrap(); assert_eq!(s.state(AppId(1)), Some(AppState::Stopped)); }
     #[test] fn capability_admission_is_fail_closed() { let mut s = Supervisor::new(spawn, window); s.admit(manifest(2)).unwrap(); assert_eq!(s.start(AppId(2), 0b001), Err(RuntimeError::CapabilityDenied)); }
     #[test] fn repeated_failures_quarantine_app() { let mut s = Supervisor::new(spawn, window); s.admit(manifest(3)).unwrap(); s.start(AppId(3), 0b111).unwrap(); for _ in 0..MAX_FAILURES { assert_eq!(s.report_failure(AppId(3)).unwrap(), AppState::Failed); s.start(AppId(3), 0b111).unwrap(); } assert_eq!(s.report_failure(AppId(3)).unwrap(), AppState::Quarantined); }
+    #[test] fn intentional_reset_is_explicit() { let mut s = Supervisor::new(spawn, window); s.admit(manifest(4)).unwrap(); s.start(AppId(4), 0b111).unwrap(); s.report_failure(AppId(4)).unwrap(); s.start(AppId(4), 0b111).unwrap(); assert_eq!(s.record(AppId(4)).unwrap().failures, 1); s.reset_failure_count(AppId(4)).unwrap(); assert_eq!(s.record(AppId(4)).unwrap().failures, 0); }
 }
