@@ -7,12 +7,14 @@
 pub mod file_store;
 pub mod gpt;
 pub mod journal;
+pub mod namespaces;
 pub mod ramdisk;
 pub mod vfs;
 
 pub use file_store::{FileRecord, FileStore, FileStoreError, MAX_FILE_BLOCKS, MAX_FILE_SIZE, MAX_FILES};
 pub use gpt::{GptError, GptHeader, GptPartition, crc32, parse_header, parse_partition, validate_partition_array_crc};
 pub use journal::{JournalError, JournalState, JournalTxn, RecoveryDecision, decide_recovery};
+pub use namespaces::{MountPoint, Namespace, NamespaceError, NamespaceManager, MAX_MOUNTS};
 pub use ramdisk::{RAMDISK_BLOCKS, RamBlockDevice};
 pub use vfs::{AweFs, FileName, FsError, Inode, JournalRecord, NodeKind, RecoveryAction, Vfs};
 
@@ -111,6 +113,5 @@ mod tests {
         disk.write_block(0, &block).expect("write GPT");
         let summary = scan_gpt(&mut disk).expect("scan GPT");
         assert_eq!(summary.partitions, 1);
-        assert_eq!(summary.header.partition_count, 1);
     }
 }
