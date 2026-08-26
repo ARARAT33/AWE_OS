@@ -9,7 +9,6 @@ awe-driverd = { path = "../../services/driverd" }
 awe-appd = { path = "../../services/appd" }
 awe-update = { path = "../../services/update" }
 awe-ayui = { path = "../../services/ayui" }
-awe-awosa = { path = "../../services/awosa" }
 awe-identityd = { path = "../../services/identityd" }
 awe-initd = { path = "../../services/initd" }
 awe-nexus = { path = "../../services/nexus" }

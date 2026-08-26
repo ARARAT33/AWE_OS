@@ -1,4 +1,4 @@
-//! AWOSA runtime kernel contract.
+//! Native AWEOS runtime kernel contract.
 //! A runtime handle is intentionally capability-scoped: callers receive only
 //! the operations represented by the supplied capability set.
 

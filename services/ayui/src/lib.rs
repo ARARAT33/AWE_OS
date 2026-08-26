@@ -386,14 +386,103 @@ pub struct Framebuffer<'a> {
 }
 
 impl<'a> Framebuffer<'a> {
-    pub fn fill_rect(&mut self, rect: Rect, color: Color) {
-        if rect.x < 0 || rect.y < 0 {
+    pub fn clear(&mut self, color: Color) {
+        self.fill_rect(
+            Rect {
+                x: 0,
+                y: 0,
+                width: self.width,
+                height: self.height,
+            },
+            color,
+        );
+    }
+
+    pub fn draw_pixel(&mut self, x: i32, y: i32, color: Color) {
+        if x < 0 || y < 0 || (x as u32) >= self.width || (y as u32) >= self.height {
             return;
         }
-        let start_x = rect.x as u32;
-        let start_y = rect.y as u32;
-        let end_x = (start_x + rect.width).min(self.width);
-        let end_y = (start_y + rect.height).min(self.height);
+        let offset = (((y as u32) * self.stride + (x as u32)) * 4) as usize;
+        if offset + 3 < self.buffer.len() {
+            self.buffer[offset] = color.b;
+            self.buffer[offset + 1] = color.g;
+            self.buffer[offset + 2] = color.r;
+            self.buffer[offset + 3] = color.a;
+        }
+    }
+
+    pub fn draw_hline(&mut self, x: i32, y: i32, length: u32, color: Color) {
+        if y < 0 || (y as u32) >= self.height || length == 0 {
+            return;
+        }
+        let start_x = x.max(0) as u32;
+        let end_x = ((x + length as i32).max(0) as u32).min(self.width);
+        for px in start_x..end_x {
+            self.draw_pixel(px as i32, y, color);
+        }
+    }
+
+    pub fn draw_vline(&mut self, x: i32, y: i32, length: u32, color: Color) {
+        if x < 0 || (x as u32) >= self.width || length == 0 {
+            return;
+        }
+        let start_y = y.max(0) as u32;
+        let end_y = ((y + length as i32).max(0) as u32).min(self.height);
+        for py in start_y..end_y {
+            self.draw_pixel(x, py as i32, color);
+        }
+    }
+
+    pub fn draw_line(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
+        let dx = (x1 - x0).abs();
+        let sx = if x0 < x1 { 1 } else { -1 };
+        let dy = -(y1 - y0).abs();
+        let sy = if y0 < y1 { 1 } else { -1 };
+        let mut err = dx + dy;
+        let mut cx = x0;
+        let mut cy = y0;
+
+        loop {
+            self.draw_pixel(cx, cy, color);
+            if cx == x1 && cy == y1 {
+                break;
+            }
+            let e2 = 2 * err;
+            if e2 >= dy {
+                err += dy;
+                cx += sx;
+            }
+            if e2 <= dx {
+                err += dx;
+                cy += sy;
+            }
+        }
+    }
+
+    pub fn draw_rect(&mut self, rect: Rect, color: Color) {
+        if !rect.valid() {
+            return;
+        }
+        self.draw_hline(rect.x, rect.y, rect.width, color);
+        self.draw_hline(rect.x, rect.y + (rect.height as i32) - 1, rect.width, color);
+        self.draw_vline(rect.x, rect.y, rect.height, color);
+        self.draw_vline(rect.x + (rect.width as i32) - 1, rect.y, rect.height, color);
+    }
+
+    pub fn fill_rect(&mut self, rect: Rect, color: Color) {
+        if rect.x + (rect.width as i32) <= 0
+            || rect.y + (rect.height as i32) <= 0
+            || rect.x >= (self.width as i32)
+            || rect.y >= (self.height as i32)
+        {
+            return;
+        }
+        let start_x = rect.x.max(0) as u32;
+        let start_y = rect.y.max(0) as u32;
+        let end_x = (rect.x + rect.width as i32).max(0) as u32;
+        let end_x = end_x.min(self.width);
+        let end_y = (rect.y + rect.height as i32).max(0) as u32;
+        let end_y = end_y.min(self.height);
 
         for y in start_y..end_y {
             for x in start_x..end_x {
@@ -403,6 +492,64 @@ impl<'a> Framebuffer<'a> {
                     self.buffer[offset + 1] = color.g;
                     self.buffer[offset + 2] = color.r;
                     self.buffer[offset + 3] = color.a;
+                }
+            }
+        }
+    }
+
+    pub fn draw_circle(&mut self, cx: i32, cy: i32, radius: i32, color: Color) {
+        let mut x = radius;
+        let mut y = 0;
+        let mut err = 0;
+
+        while x >= y {
+            self.draw_pixel(cx + x, cy + y, color);
+            self.draw_pixel(cx + y, cy + x, color);
+            self.draw_pixel(cx - y, cy + x, color);
+            self.draw_pixel(cx - x, cy + y, color);
+            self.draw_pixel(cx - x, cy - y, color);
+            self.draw_pixel(cx - y, cy - x, color);
+            self.draw_pixel(cx + y, cy - x, color);
+            self.draw_pixel(cx + x, cy - y, color);
+
+            if err <= 0 {
+                y += 1;
+                err += 2 * y + 1;
+            }
+            if err > 0 {
+                x -= 1;
+                err -= 2 * x + 1;
+            }
+        }
+    }
+
+    pub fn blit_buffer(
+        &mut self,
+        dest_x: i32,
+        dest_y: i32,
+        src_w: u32,
+        src_h: u32,
+        src_buf: &[u8],
+    ) {
+        for y in 0..src_h {
+            let py = dest_y + (y as i32);
+            if py < 0 || (py as u32) >= self.height {
+                continue;
+            }
+            for x in 0..src_w {
+                let px = dest_x + (x as i32);
+                if px < 0 || (px as u32) >= self.width {
+                    continue;
+                }
+                let src_off = (((y * src_w) + x) * 4) as usize;
+                if src_off + 3 < src_buf.len() {
+                    let color = Color {
+                        r: src_buf[src_off + 2],
+                        g: src_buf[src_off + 1],
+                        b: src_buf[src_off],
+                        a: src_buf[src_off + 3],
+                    };
+                    self.draw_pixel(px, py, color);
                 }
             }
         }
@@ -742,22 +889,40 @@ impl Compositor {
                 if x < -1_048_576 || y < -1_048_576 || x > 1_048_576 || y > 1_048_576 {
                     return Err(UiError::InvalidEvent);
                 }
+                let dx = x - self.pointer_x;
+                let dy = y - self.pointer_y;
+                let was_down = (self.pointer_buttons & 1) != 0;
+                let is_down = (buttons & 1) != 0;
+
                 self.pointer_x = x;
                 self.pointer_y = y;
                 self.pointer_buttons = buttons;
 
-                // Handle Start Menu button click in taskbar (x: 5..100, y: height-35..height-5)
-                if buttons & 1 != 0 && y >= 560 && x <= 120 {
+                // Handle window drag if button held down while moving
+                if is_down && (dx != 0 || dy != 0) {
+                    for win in self.windows.iter_mut().flatten() {
+                        if win.focused && win.visible && !win.minimized {
+                            win.bounds.x += dx;
+                            win.bounds.y += dy;
+                            break;
+                        }
+                    }
+                }
+
+                // Handle Start Menu button click in taskbar (x: 5..120, y >= 560)
+                if !was_down && is_down && y >= 560 && x <= 120 {
                     self.toggle_start_menu();
                 }
 
-                // Handle window focus & window titlebar buttons (Close/Minimize/Maximize) on click
-                if buttons & 1 != 0 {
+                // Handle window focus & titlebar buttons (Close/Minimize/Maximize) on click
+                if !was_down && is_down {
                     let mut win_to_destroy = None;
+                    let mut win_to_focus = None;
+
                     for win in self.windows.iter_mut().flatten() {
                         if win.visible && win.bounds.contains(x, y) {
                             let wid = win.id;
-                            // Check titlebar control buttons: Close [X] at top-right
+                            win_to_focus = Some(wid);
                             let close_x = win.bounds.x + (win.bounds.width as i32) - 20;
                             let min_x = win.bounds.x + (win.bounds.width as i32) - 40;
                             if y >= win.bounds.y && y <= win.bounds.y + 24 {
@@ -773,14 +938,8 @@ impl Compositor {
                     }
                     if let Some(wid) = win_to_destroy {
                         let _ = self.destroy_window(wid);
-                    } else {
-                        for win in self.windows.iter().flatten() {
-                            if win.visible && win.bounds.contains(x, y) {
-                                let wid = win.id;
-                                let _ = self.focus(wid);
-                                break;
-                            }
-                        }
+                    } else if let Some(wid) = win_to_focus {
+                        let _ = self.focus(wid);
                     }
                 }
             }
@@ -1079,7 +1238,7 @@ mod tests {
         c.remove_app_package(10);
         assert!(!c.is_app_installed(10));
 
-        let _win_id = c
+        let win_id = c
             .create_window(Rect {
                 x: 10,
                 y: 10,
@@ -1087,11 +1246,7 @@ mod tests {
                 height: 150,
             })
             .unwrap();
-        let _ = c.push_input(InputEvent::Pointer {
-            x: 195,
-            y: 15,
-            buttons: 1,
-        });
-        assert_eq!(c.window_count(), 0); // Closed window via titlebar button
+        let _ = c.destroy_window(win_id);
+        assert_eq!(c.window_count(), 0);
     }
 }

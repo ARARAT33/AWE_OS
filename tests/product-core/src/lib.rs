@@ -412,7 +412,7 @@ mod product_core {
             "  [PASS] WLIN Hybrid Bridge Subset: Handle & FD Cross-Mapping, Path Translation Hash Engine"
         );
 
-        // 5. AWOSA Native Application Platform Lifecycle
+        // 5. AWEOS Native Application Platform Lifecycle
         let seed_app = [0x88u8; 32];
         let (pk_app, sk_app) = awe_securityd::ed25519_keypair_from_seed(&seed_app);
 
@@ -446,7 +446,7 @@ mod product_core {
             1
         );
         println!(
-            "  [PASS] AWOSA Native Application Engine: .awos Package Format, Signature Verification, App PackageManager Lifecycle"
+            "  [PASS] AWEOS Native Application Engine: .awos Package Format, Signature Verification, App PackageManager Lifecycle"
         );
 
         // 6. ASD Native Driver Supervisor Lifecycle
