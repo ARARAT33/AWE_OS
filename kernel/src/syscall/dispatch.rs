@@ -1,6 +1,18 @@
 #![no_std]
 use super::abi::{ERR_INVALID_ARGUMENT, ERR_OK, ERR_PERMISSION, Syscall, SyscallResult};
 use crate::process::{ProcessDescriptor, ProcessState};
+fn is_valid_user_ptr(ptr: u64, len: usize) -> bool {
+    if ptr == 0 {
+        return false;
+    }
+    let end = match ptr.checked_add(len as u64) {
+        Some(e) => e,
+        None => return false,
+    };
+    // canonical user address space check (< 0x0000_8000_0000_0000)
+    end < 0x0000_8000_0000_0000
+}
+
 pub struct SyscallContext<'a> {
     pub process: &'a mut ProcessDescriptor,
 }
@@ -42,36 +54,37 @@ impl<'a> SyscallContext<'a> {
             }
             Syscall::Unmap => ok(args[0]),
             Syscall::Read => {
-                if args[1] == 0 {
+                if args[1] == 0 || !is_valid_user_ptr(args[0], args[1] as usize) {
                     return err(ERR_INVALID_ARGUMENT);
                 }
                 let ptr = args[0] as *mut u8;
                 let len = (args[1] as usize).min(4096);
-                if !ptr.is_null() && len > 0 {
-                    // Populate initrd/input payload into user buffer
-                    let initrd_data = b"INITRD_SHELL_IMAGE_OK";
-                    let copy_len = len.min(initrd_data.len());
-                    unsafe {
-                        for (i, &byte) in initrd_data.iter().take(copy_len).enumerate() {
-                            core::ptr::write_volatile(ptr.add(i), byte);
-                        }
+                let initrd_data = b"INITRD_SHELL_IMAGE_OK";
+                let copy_len = len.min(initrd_data.len());
+                unsafe {
+                    for (i, &byte) in initrd_data.iter().take(copy_len).enumerate() {
+                        core::ptr::write_volatile(ptr.add(i), byte);
                     }
-                    return ok(copy_len as u64);
                 }
-                ok(args[1])
+                ok(copy_len as u64)
             }
             Syscall::Write => {
-                if args[1] == 0 {
+                if args[1] == 0 || !is_valid_user_ptr(args[0], args[1] as usize) {
                     return err(ERR_INVALID_ARGUMENT);
                 }
                 let ptr = args[0] as *const u8;
                 let len = (args[1] as usize).min(4096);
-                if !ptr.is_null() {
+                #[cfg(all(target_arch = "x86_64", target_os = "none"))]
+                {
                     for i in 0..len {
                         let byte = unsafe { core::ptr::read_volatile(ptr.add(i)) };
-                        #[cfg(target_arch = "x86_64")]
                         crate::arch::x86_64::serial_write_byte(byte);
                     }
+                }
+                #[cfg(not(all(target_arch = "x86_64", target_os = "none")))]
+                {
+                    let _ = ptr;
+                    let _ = len;
                 }
                 ok(args[1])
             }
@@ -159,13 +172,14 @@ mod tests {
     fn io_rejects_zero_length() {
         let mut p = descriptor();
         let mut c = SyscallContext { process: &mut p };
+        let buf = [0u8; 8];
         assert_eq!(
-            c.dispatch(Syscall::Read as u64, [0, 0, 0, 0, 0, 0]).error,
+            c.dispatch(Syscall::Read as u64, [buf.as_ptr() as u64, 0, 0, 0, 0, 0]).error,
             ERR_INVALID_ARGUMENT
         );
         assert_eq!(
-            c.dispatch(Syscall::Write as u64, [0, 8, 0, 0, 0, 0]).error,
-            ERR_OK
+            c.dispatch(Syscall::Write as u64, [buf.as_ptr() as u64, 0, 0, 0, 0, 0]).error,
+            ERR_INVALID_ARGUMENT
         );
     }
     #[test]

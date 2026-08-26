@@ -251,7 +251,7 @@ pub unsafe fn enter_userspace(user_rip: u64, user_rsp: u64) {
 
     let user_cs = USER_CODE_SELECTOR as u64;
     let user_ss = USER_DATA_SELECTOR as u64;
-    let rflags = 0x3202u64; // IOPL = 3 + IF = 1
+    let rflags = 0x0202u64; // IOPL = 0 + IF = 1 (Strict Ring 3 Privilege)
 
     unsafe {
         core::arch::asm!(
