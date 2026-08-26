@@ -191,7 +191,9 @@ impl EndUserRuntime {
     ) -> Result<RuntimeEvent, EndUserRuntimeError> {
         let index = self.find_service(id).ok_or(EndUserRuntimeError::InvalidService)?;
         let record = self.services[index].as_mut().ok_or(EndUserRuntimeError::InvalidService)?;
-        caller.require(record.capabilities)?;
+        caller
+            .require(record.capabilities)
+            .map_err(EndUserRuntimeError::from)?;
         match record.state {
             ServiceState::Declared | ServiceState::Failed => {
                 record.state = ServiceState::Starting;
@@ -206,7 +208,7 @@ impl EndUserRuntime {
     pub fn fail_service(&mut self, id: u16) -> Result<RuntimeEvent, EndUserRuntimeError> {
         let index = self.find_service(id).ok_or(EndUserRuntimeError::InvalidService)?;
         let record = self.services[index].as_mut().ok_or(EndUserRuntimeError::InvalidService)?;
-        if record.state != ServiceState::Running {
+        if record.state != ServiceState::Running && record.state != ServiceState::Failed {
             return Err(EndUserRuntimeError::InvalidTransition);
         }
         record.failures = record.failures.saturating_add(1);
@@ -363,7 +365,7 @@ mod tests {
         rt.install_app(10, CapabilitySet::UI).unwrap();
         assert_eq!(
             rt.start_app(10, RuntimeContext::new(CapabilitySet::NONE)),
-            Err(EndUserRuntimeError::CapabilityDenied)
+            Err(EndUserRuntimeError::Core(RuntimeError::CapabilityDenied))
         );
         assert_eq!(
             rt.start_app(10, RuntimeContext::new(CapabilitySet::UI)),
