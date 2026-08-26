@@ -215,9 +215,9 @@ impl LinuxFdTable {
         write: bool,
         socket: bool,
     ) -> Result<i32, LinuxErrno> {
-        for fd in 3..MAX_FD {
-            if self.fds[fd].is_none() {
-                self.fds[fd] = Some(LinuxFdEntry {
+        for (fd, slot) in self.fds.iter_mut().enumerate().take(MAX_FD).skip(3) {
+            if slot.is_none() {
+                *slot = Some(LinuxFdEntry {
                     fd: fd as i32,
                     path_hash,
                     is_readable: read,
