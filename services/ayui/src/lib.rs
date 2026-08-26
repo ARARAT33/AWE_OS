@@ -523,7 +523,14 @@ impl<'a> Framebuffer<'a> {
         }
     }
 
-    pub fn blit_buffer(&mut self, dest_x: i32, dest_y: i32, src_w: u32, src_h: u32, src_buf: &[u8]) {
+    pub fn blit_buffer(
+        &mut self,
+        dest_x: i32,
+        dest_y: i32,
+        src_w: u32,
+        src_h: u32,
+        src_buf: &[u8],
+    ) {
         for y in 0..src_h {
             let py = dest_y + (y as i32);
             if py < 0 || (py as u32) >= self.height {

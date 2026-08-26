@@ -139,8 +139,8 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
 #[cfg(all(target_arch = "x86_64", target_os = "none"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn userspace_entry() -> ! {
-    use awe_ayui::{AppType, Compositor, Framebuffer, Rect};
     use crate::arch::x86_64::serial_write_str;
+    use awe_ayui::{AppType, Compositor, Framebuffer, Rect};
 
     let msg = b"AWEOS: Ring 3 userspace reached and active!\r\n";
     serial_write_str("AWEOS: Ring 3 userspace reached and active!\r\n");
