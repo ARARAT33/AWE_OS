@@ -7,6 +7,7 @@
 mod end_user;
 pub mod graphics;
 pub mod system;
+pub mod ui_adapter;
 
 pub use end_user::{
     AppRecord, AppState, EndUserRuntime, EndUserRuntimeError, FramebufferInfo, InputEvent,
@@ -14,6 +15,7 @@ pub use end_user::{
 };
 pub use graphics::{DoubleBuffer, Rect as RuntimeRect, Window, WindowError, WindowManager};
 pub use system::SystemRuntime;
+pub use ui_adapter::{AyuiRuntime, UiRuntimeError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CapabilitySet(pub u64);
