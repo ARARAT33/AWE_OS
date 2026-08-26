@@ -3,11 +3,19 @@
 use awe_boot_protocol::{validate, BootInfo};
 use crate::boot_phase::{BootPhase, BootProgress};
 use crate::memory::PhysicalFrameAllocator;
-use crate::runtime::{CapabilitySet, EndUserRuntime, FramebufferInfo, RuntimeContext};
+use crate::runtime::{CapabilitySet, FramebufferInfo, SystemRuntime};
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum KernelBootStatus { Ready = 0, InvalidBootInfo = 1, UnsupportedArchitecture = 2, NoCpu = 3, NoUsableMemory = 4, InvalidFramebuffer = 5 }
+pub enum KernelBootStatus {
+    Ready = 0,
+    InvalidBootInfo = 1,
+    UnsupportedArchitecture = 2,
+    NoCpu = 3,
+    NoUsableMemory = 4,
+    InvalidFramebuffer = 5,
+    RuntimeBringupFailed = 6,
+}
 
 pub struct KernelContext { progress: BootProgress }
 impl Default for KernelContext { fn default() -> Self { Self::new() } }
@@ -42,16 +50,15 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
         let user_stack_top = core::ptr::addr_of_mut!(USER_STACK) as u64 + 16384;
 
         init_gdt(kernel_stack_top);
-        serial_write_str("AWEOS: GDT/TSS initialized\r\n");
         unsafe { init_msr_syscall(userspace_entry as *const () as usize as u64, KERNEL_CODE_SELECTOR, USER_CODE_SELECTOR); }
         let idt_ptr = core::ptr::addr_of_mut!(IDT);
         unsafe { init_idt_stubs(&mut *idt_ptr, KERNEL_CODE_SELECTOR); (*idt_ptr).load(); }
         init_kernel_heap();
         unsafe { init_pic(); }
         if let Some(pit) = Pit::new(1000) { unsafe { pit.program(); } }
-        serial_write_str("AWEOS: core interrupt/timer path initialized\r\n");
+        serial_write_str("AWEOS: hardware/interrupt foundation initialized\r\n");
 
-        let mut runtime = EndUserRuntime::new();
+        let mut system = SystemRuntime::new();
         if info.framebuffer_address != 0 && info.framebuffer_size != 0 {
             let fb = FramebufferInfo {
                 address: info.framebuffer_address,
@@ -61,17 +68,19 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
                 pitch: info.framebuffer_pitch,
                 bytes_per_pixel: 4,
             };
-            if runtime.attach_framebuffer(fb).is_err() { return KernelBootStatus::InvalidFramebuffer; }
-            serial_write_str("AWEOS: BootInfo framebuffer validated\r\n");
+            system.attach_framebuffer(fb).map_err(|_| ()).unwrap_or(());
+            if !system.core.desktop_ready() { return KernelBootStatus::InvalidFramebuffer; }
+            serial_write_str("AWEOS: BootInfo framebuffer accepted by runtime\r\n");
         }
 
-        let _ = runtime.declare_service(1, CapabilitySet::DEVICE.union(CapabilitySet::IPC), 3);
-        let _ = runtime.declare_service(2, CapabilitySet::STORAGE.union(CapabilitySet::IPC), 3);
-        let _ = runtime.declare_service(3, CapabilitySet::NETWORK.union(CapabilitySet::IPC), 3);
-        let _ = runtime.declare_service(4, CapabilitySet::IPC, 3);
-        let _ = runtime.declare_service(5, CapabilitySet::PROCESS.union(CapabilitySet::IPC), 3);
-        let _ = runtime.declare_service(6, CapabilitySet::UI.union(CapabilitySet::IPC), 3);
-        serial_write_str("AWEOS: end-user runtime control plane prepared\r\n");
+        // Bring up the end-user control plane in dependency order.
+        if system.register_core_services().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
+        if system.start_core_services().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
+        if system.mount_core_namespaces(32).is_err() { return KernelBootStatus::RuntimeBringupFailed; }
+        if system.admit_core_apps().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
+        if system.start_core_apps().is_err() { return KernelBootStatus::RuntimeBringupFailed; }
+        serial_write_str("AWEOS: initd/appd/storage/UI runtime control plane started\r\n");
+        serial_write_str("AWEOS: entering Ring 3 with IOPL=0\r\n");
         unsafe { enter_userspace(userspace_entry as *const () as usize as u64, user_stack_top); }
     }
     KernelBootStatus::Ready
@@ -80,21 +89,22 @@ pub fn kernel_entry(info: &BootInfo) -> KernelBootStatus {
 #[cfg(all(target_arch = "x86_64", target_os = "none"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn userspace_entry() -> ! {
-    let message = b"AWEOS: Ring 3 active; device access is mediated by syscall/IPC.\r\n";
+    let message = b"AWEOS: Ring 3 active; privileged device access is mediated by syscall/IPC.\r\n";
     let mut process = crate::process::ProcessDescriptor {
-        id: crate::process::ProcessId(1), state: crate::process::ProcessState::Running,
+        id: crate::process::ProcessId(1),
+        state: crate::process::ProcessState::Running,
         budget: crate::process::ResourceBudget { cpu_ticks: 1000, memory_bytes: 1024 * 1024, ipc_messages: 64 },
     };
     let mut syscall = crate::syscall::SyscallContext { process: &mut process };
     let _ = syscall.dispatch(8, [message.as_ptr() as u64, message.len() as u64, 0, 0, 0, 0]);
-    loop { let _ = syscall.dispatch(0, [0; 6]); unsafe { core::arch::asm!("pause"); } }
+    loop { let _ = syscall.dispatch(0, [0;6]); unsafe { core::arch::asm!("pause"); } }
 }
 
 #[cfg(all(target_arch = "x86_64", target_os = "none"))]
 pub unsafe fn enter_userspace(user_rip: u64, user_rsp: u64) {
     use crate::arch::x86_64::gdt::{USER_CODE_SELECTOR, USER_DATA_SELECTOR};
-    let user_cs = USER_CODE_SELECTOR as u64; let user_ss = USER_DATA_SELECTOR as u64;
-    // IF=1, IOPL=0: Ring 3 cannot execute privileged device I/O.
+    let user_cs = USER_CODE_SELECTOR as u64;
+    let user_ss = USER_DATA_SELECTOR as u64;
     let rflags = 0x0202u64;
     unsafe { core::arch::asm!("push {0}", "push {1}", "push {2}", "push {3}", "push {4}", "iretq", in(reg) user_ss, in(reg) user_rsp, in(reg) rflags, in(reg) user_cs, in(reg) user_rip, options(noreturn)); }
 }
