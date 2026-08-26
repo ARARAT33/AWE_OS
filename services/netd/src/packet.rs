@@ -1,5 +1,3 @@
-#![no_std]
-
 pub const ETH_HEADER: usize = 14;
 pub const IPV4_MIN_HEADER: usize = 20;
 pub const UDP_HEADER: usize = 8;
@@ -26,7 +24,7 @@ impl Ipv4Header {
         let header_len = ((bytes[0] & 0x0f) as usize) * 4;
         if header_len < IPV4_MIN_HEADER || header_len > bytes.len() { return Err(PacketError::InvalidIpv4); }
         let total_length = u16::from_be_bytes([bytes[2], bytes[3]]);
-        if total_length as usize > bytes.len() || total_length as usize < header_len { return Err(PacketError::InvalidLength); }
+        if (total_length as usize) > bytes.len() || (total_length as usize) < header_len { return Err(PacketError::InvalidLength); }
         let expected = u16::from_be_bytes([bytes[10], bytes[11]]);
         let mut header = [0u8; 60];
         header[..header_len].copy_from_slice(&bytes[..header_len]);
@@ -42,7 +40,7 @@ impl UdpHeader {
     pub fn parse(bytes: &[u8]) -> Result<Self, PacketError> {
         if bytes.len() < UDP_HEADER { return Err(PacketError::TooShort); }
         let length = u16::from_be_bytes([bytes[4], bytes[5]]);
-        if length < UDP_HEADER as u16 || length as usize > bytes.len() { return Err(PacketError::InvalidLength); }
+        if length < UDP_HEADER as u16 || (length as usize) > bytes.len() { return Err(PacketError::InvalidLength); }
         Ok(Self { source_port: u16::from_be_bytes([bytes[0], bytes[1]]), destination_port: u16::from_be_bytes([bytes[2], bytes[3]]), length })
     }
 }
@@ -62,7 +60,7 @@ pub fn build_udp_ipv4(out: &mut [u8], source_mac: [u8; 6], destination_mac: [u8;
     out[0..6].copy_from_slice(&destination_mac); out[6..12].copy_from_slice(&source_mac); out[12..14].copy_from_slice(&0x0800u16.to_be_bytes());
     let ip = ETH_HEADER;
     out[ip] = 0x45; out[ip+1] = 0;
-    out[ip+2..ip+4].copy_from_slice(&((total - ETH_HEADER) as u16).to_be_bytes());
+    out[ip+2..ip+4].copy_from_slice(&u16::try_from(total - ETH_HEADER).map_err(|_| PacketError::InvalidLength)?.to_be_bytes());
     out[ip+4..ip+6].fill(0); out[ip+6..ip+8].copy_from_slice(&0x4000u16.to_be_bytes()); out[ip+8] = 64; out[ip+9] = 17; out[ip+10..ip+12].fill(0);
     out[ip+12..ip+16].copy_from_slice(&source_ip); out[ip+16..ip+20].copy_from_slice(&destination_ip);
     let c = checksum16(&out[ip..ip+20]); out[ip+10..ip+12].copy_from_slice(&c.to_be_bytes());
@@ -76,7 +74,8 @@ pub fn build_udp_ipv4(out: &mut [u8], source_mac: [u8; 6], destination_mac: [u8;
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn udp_ipv4_packet_build_and_parse() {
+    #[test]
+    fn udp_ipv4_packet_build_and_parse() {
         let mut packet = [0u8; MAX_PACKET];
         let n = build_udp_ipv4(&mut packet, [1,2,3,4,5,6], [6,5,4,3,2,1], [10,0,0,1], [10,0,0,2], 1000, 2000, b"hello").unwrap();
         assert_eq!(EthernetFrame::parse(&packet[..n]).unwrap().ethertype, 0x0800);
@@ -85,7 +84,8 @@ mod tests {
         let udp = UdpHeader::parse(&packet[ETH_HEADER + ip.header_len..n]).unwrap();
         assert_eq!(udp.destination_port, 2000); assert_eq!(udp.length, 13);
     }
-    #[test] fn rejects_bad_ipv4_checksum() {
+    #[test]
+    fn rejects_bad_ipv4_checksum() {
         let mut packet = [0u8; MAX_PACKET];
         let n = build_udp_ipv4(&mut packet, [1;6], [2;6], [10,0,0,1], [10,0,0,2], 1, 2, b"x").unwrap();
         packet[ETH_HEADER + 8] ^= 1;
