@@ -1,157 +1,92 @@
 # AWE_OS Product Readiness
 
-This document defines the bar for calling AWE_OS a real bootable product rather than an architecture prototype.
+**Project status:** Active development / long-term project #2  
+**Readiness policy:** evidence-based; no percentage is treated as release certification.
 
-## Current product readiness
+## Current readiness position
 
-**90% — AWE_OS 1.0 implementation readiness.**
+AWE_OS CellKernel is an **active development project**, not a finished daily-driver operating system. The repository contains substantial implementation foundations across boot, kernel execution, hardware contracts, storage, networking, userspace, native package admission, update/recovery, and CI.
 
-The 90% checkpoint extends the 85% userspace/native foundation with bounded `.asd` driver-package admission, bounded `.awos` application-package admission/lifecycle, and an atomic A/B update/recovery state machine. This is an implementation milestone; release certification remains a separate evidence gate and cannot be claimed until the required CI/QEMU/runtime/recovery evidence is green.
+The previous **90% implementation checkpoint** is retained as historical context. It must not be interpreted as 90% product completion or release certification. The current project uses executable runtime evidence and milestone gates as the authoritative readiness model.
 
-## Implemented kernel foundations
+## Implemented foundations
 
-- Intent-carrying authorization with required rights, impact class and resource budget.
-- Deterministic security policy engine with explicit allow/deny reasons.
-- Bounded, allocation-free causal provenance journal.
-- Non-escalating capability derivation and explicit revocation state.
-- Process states and consumable CPU, memory and IPC budgets.
-- Allocation-free token-bucket rate limiter.
-- Bounded scheduler queue and fixed-priority scheduling primitive.
-- Saturating deterministic scheduler tick clock.
-- Deterministic allocation-free scheduler dispatcher with explicit current-process rotation and yield semantics.
-- Typed physical/virtual addresses with overflow-safe alignment.
-- Deterministic early page mapper with duplicate-map rejection and fail-closed validation.
-- Bounded early boot identity mapper with overflow and capacity rejection.
-- x86_64 four-level page-table representation and mapping validation.
-- x86_64 bootstrap identity mapping of the first 1 GiB using 2 MiB pages.
-- Real x86_64 CR3 activation from the CellKernel bootstrap path after boot-protocol validation.
-- x86_64 IDT gate encoding and safe early timer-vector installation primitive.
-- x86_64 CR3/RFLAGS/I/O primitives.
-- Monotonic boot phases and terminal failure state.
-- Hardware driver contracts for MMIO, DMA, interrupt mode and device identity.
-- Bounded device-bus registry.
-- VirtIO feature negotiation primitive requiring VirtIO 1.x before activation.
-- Validated syscall dispatch gate with argument/error validation and resource-budget enforcement.
-- AWE Capsule and XenoSense security foundations.
-- Cloud CI security/release gates.
-- Versioned service/process/IPC/capability contracts and bounded canonical service registry.
-- Driver dependency, ownership, health, lifecycle and hardware access boundaries.
-- PCI, ACPI, APIC/IOAPIC and VirtIO hardware execution primitives.
+The current tree contains foundations for:
 
-## 65.0 hardware execution checkpoint — IMPLEMENTED
+- AWE loader and versioned boot information contract.
+- x86_64 paging, early identity mapping, CR3 activation and interrupt primitives.
+- Process, scheduler, syscall, IPC, capability and security foundations.
+- PCI, ACPI, APIC/IOAPIC and VirtIO hardware contracts/execution primitives.
+- Bounded block-device, GPT, VFS, journaling and recovery foundations.
+- IPv4/UDP/TCP transport and bounded socket foundations.
+- Versioned userspace service and identity contracts.
+- AWOSA runtime contracts and native `.asd` / `.awos` package admission/lifecycle foundations.
+- A/B update and recovery state-machine foundations.
+- Automated formatting, compilation, tests, Clippy and boot-related CI workflows.
 
-- [x] PCI enumeration and x86 configuration-space backend.
-- [x] ACPI/RSDP/table validation and MADT parsing.
-- [x] APIC/IOAPIC routing model.
-- [x] VirtIO 1.x transport/queue state machine.
-- [x] Typed block/network/input/display reference devices.
+## Validation gates
 
-## 70.0 storage foundation — IMPLEMENTED
+### Gate A — Boot
 
-- [x] Bounded block-device contract and deterministic RAM disk.
-- [x] GPT metadata parsing and CRC validation.
-- [x] GPT-to-block-device scan with overflow-safe bounded transfers.
-- [x] Fixed-capacity VFS inode/name model.
-- [x] File/directory creation and bounded lookup.
-- [x] Journaling transaction records with explicit commit state.
-- [x] Deterministic clean/replay/rollback recovery decision.
-- [x] Fail-closed fsck invariants.
-- [x] Bounded filesystem I/O validation.
+- [ ] UEFI/QEMU image boots reliably from the current `main` tree.
+- [ ] Boot protocol validation is exercised in runtime.
+- [ ] CellKernel reaches a deterministic initialized state.
+- [ ] Timer/interrupt execution is demonstrated.
 
-## 75.0 networking foundation — IMPLEMENTED
+### Gate B — Kernel execution
 
-- [x] Transport-neutral network-device contract.
-- [x] Bounded IPv4 packet/header parsing and checksum validation.
-- [x] UDP endpoint/payload validation.
-- [x] TCP header/length validation.
-- [x] Fixed-capacity socket table with bind/connect identity checks.
-- [x] Allocation-free Internet checksum primitive.
+- [ ] Memory/paging operations are exercised beyond static unit tests.
+- [ ] Scheduler/process execution is demonstrated.
+- [ ] Syscall and capability enforcement are exercised end-to-end.
+- [ ] IPC behavior is exercised with bounded failure handling.
 
-## 80.0 implementation checkpoint — COMPLETE
+### Gate C — Hardware and I/O
 
-- [x] GPT-backed block boundary.
-- [x] VFS metadata and inode lifecycle.
-- [x] bounded names and handles.
-- [x] journal transaction state and crash recovery decision model.
-- [x] fsck validation.
-- [x] IPv4 transport boundary.
-- [x] UDP/TCP endpoint validation.
-- [x] bounded socket registry and checksum primitive.
+- [ ] VirtIO device execution is demonstrated in QEMU.
+- [ ] Persistent storage path is exercised.
+- [ ] Network runtime path is exercised.
+- [ ] Input/display paths are exercised where supported.
 
-## 85.0 userspace/native checkpoint — IMPLEMENTED
+### Gate D — Userspace/native platform
 
-### Userspace services
-- [x] Versioned init/service-manager ABI.
-- [x] Fixed-capacity service registry with duplicate rejection.
-- [x] Explicit service lifecycle transitions and fail-closed invalid transitions.
-- [x] Per-service capability mask and CPU/memory budgets.
-- [x] Bounded user/group identity model.
-- [x] Capability authorization at the identity boundary.
-- [x] Fixed-capacity, deduplicated group membership.
+- [ ] Init/service manager starts real services.
+- [ ] AWOSA runtime loads a native component.
+- [ ] `.asd` admission is exercised end-to-end.
+- [ ] `.awos` admission/lifecycle is exercised end-to-end.
+- [ ] Cryptographic signing/verification is integrated with trust roots.
 
-### AWOSA
-- [x] Versioned runtime ABI negotiation.
-- [x] Bounded path/message/I/O validation.
-- [x] Explicit process/memory/filesystem/network/UI/device/IPC capability vocabulary.
-- [x] Fail-closed native capability authorization.
+### Gate E — Recovery and release
 
-### Native app admission
-- [x] Versioned application manifest and bounded dependencies/resources.
-- [x] Bounded package header/manifest/payload/signature-length validation.
-- [x] Fail-closed package admission before execution.
+- [ ] A/B update and rollback are exercised in a runtime/recovery path.
+- [ ] Crash/recovery behavior is validated.
+- [ ] Fuzz/stress testing is established for critical parsers and boundaries.
+- [ ] Reproducible release builds are demonstrated.
+- [ ] Hardware compatibility matrix is maintained.
+- [ ] No high/critical unresolved issue blocks release.
 
-## 90.0 product-core checkpoint — IMPLEMENTED
+## Remaining long-term work
 
-### `.asd` native driver ecosystem
-- [x] Versioned canonical `.asd` container header.
-- [x] Architecture and driver ABI fields.
-- [x] Bounded manifest/payload/signature lengths with overflow-safe total-size validation.
-- [x] Signature-presence boundary before admission; cryptographic verification remains delegated to the platform trust service.
-- [x] Explicit install/active/staged/failed/quarantined lifecycle transitions.
-
-### `.awos` native application ecosystem
-- [x] Versioned canonical `.awos` container header.
-- [x] Bounded manifest/code/data/signature lengths.
-- [x] Entry-point and total-size validation before execution.
-- [x] Explicit installed/running/staged/failed/quarantined/removed lifecycle transitions.
-
-### Update and recovery lifecycle
-- [x] New `awe-update` userspace service contract.
-- [x] A/B slot model with active/staged/booting/healthy/failed/quarantined states.
-- [x] Generation monotonicity and downgrade rejection.
-- [x] Atomic promotion only after healthy boot confirmation.
-- [x] Explicit failed-update rollback path.
-
-## 90.0 validation evidence gate — PENDING
-
-The implementation has advanced to the 90% checkpoint, but certification evidence is intentionally not being claimed yet:
-
-- [ ] Quality Gate green on the final 90% checkpoint tree.
-- [ ] Boot Image/QEMU smoke green on the same tree.
-- [ ] `.asd` package admission exercised end-to-end.
-- [ ] `.awos` package admission/lifecycle exercised end-to-end.
-- [ ] A/B update and rollback exercised in a runtime/recovery path.
-- [ ] Persistent storage and network runtime exercises remain green.
-- [ ] No high/critical issue remains.
-
-## Still ahead toward 100%
-
-- [ ] Real DMA/IOMMU enforcement.
-- [ ] Full NVMe/AHCI runtime, xHCI/USB, HID, Ethernet/Wi-Fi/Bluetooth, audio and GPU runtime.
-- [ ] Full VFS/native filesystem persistence, journaling replay and fsck tools.
-- [ ] Ethernet/ARP/IPv4/IPv6/ICMP, UDP/TCP/DNS/DHCP, TLS, firewall and network recovery.
-- [ ] Userspace loader integration, device/filesystem/network managers, logging/security services and crash recovery.
-- [ ] Full AWOSA SDK, headers and bindings.
-- [ ] Cryptographic signing/verification integration for `.asd` and `.awos` trust roots.
-- [ ] AYUI desktop and first-party applications.
-- [ ] Isolated Linux/Windows/Android compatibility.
-- [ ] App Builder/SDK.
-- [ ] Security hardening and complete update/recovery lifecycle integration.
-- [ ] ARM64/RISC-V64 production validation.
-- [ ] Hardware matrix, fuzz/stress and reproducible release certification.
-
-The remaining 90→100 roadmap follows `docs/AWE_OS_100_PERCENT_MASTER_PLAN.md`: runtime integration → full package trust/signing → AYUI → compatibility → App Builder → native ecosystem → security hardening → hardware matrix → release validation.
+- Real DMA/IOMMU enforcement.
+- Full NVMe/AHCI, xHCI/USB, HID, Ethernet/Wi-Fi/Bluetooth, audio and GPU runtime.
+- Persistent native filesystem implementation and recovery tooling.
+- Full network stack services such as ARP/IPv6/ICMP/DNS/DHCP/TLS/firewall/recovery.
+- Userspace loader, device/filesystem/network managers and crash recovery.
+- Complete AWOSA SDK, headers and bindings.
+- Cryptographic trust integration.
+- AYUI desktop and first-party applications.
+- Optional Linux/Windows/Android compatibility layers.
+- App Builder/SDK and native ecosystem tooling.
+- ARM64/RISC-V64 production validation.
+- Full security hardening and release certification.
 
 ## Definition of done
 
-AWE_OS is considered fully product-ready only when the required boot, kernel, driver, storage, networking, userspace, security, recovery and release gates are implemented and their automated CI/QEMU validation is green. Documentation or architectural placeholders alone do not satisfy a gate.
+AWE_OS is fully product-ready only when the required boot, kernel, driver, storage, networking, userspace, security, recovery and release gates are implemented **and backed by reproducible runtime evidence**.
+
+Documentation, architecture diagrams, static compilation, or percentage labels alone do not satisfy a readiness gate.
+
+## Historical records
+
+Dated progress/evidence documents under `docs/` are preserved for traceability. They describe their historical milestone and should not be read as a guarantee about the current `main` tree.
+
+See `PROJECT_STATUS.md` for the current project-state source of truth.
