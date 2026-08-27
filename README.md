@@ -1,102 +1,127 @@
-# AWE_OS
+# AWE_OS CellKernel
 
-AWE_OS is a Rust-first operating-system project focused on a small privileged CellKernel, a dedicated AWE boot chain, capability-oriented security, and modular user-space services.
+**AWE development project #2 — active, preserved, and intended for long-term development.**
 
-## Product architecture
+AWE_OS CellKernel is a Rust-first operating-system project centered on a small privileged CellKernel, a dedicated AWE boot chain, capability-oriented security, modular drivers/services, and a native userspace platform.
+
+> **Status:** Development project — not a finished daily-driver OS.
+>
+> A historical snapshot of the repository before the 2026-08-27 project-state/documentation restructuring is preserved in `archive/pre-restructure-2026-08-27`.
+
+## Project direction
+
+The goal is to turn the existing architecture into a progressively more executable, testable, and reproducible operating-system platform. Development is evidence-driven: a subsystem is not considered complete merely because an interface or design document exists.
 
 ```text
 UEFI / Firmware
       |
  AWE Loader
-  identity • image validation • rollback policy
       |
- AWE Boot Protocol (versioned ABI)
+ AWE Boot Protocol
       |
  CellKernel
-  arch • memory • interrupts • scheduler • processes
-  syscalls • IPC • capabilities • security
+  CPU • memory • interrupts • scheduler
+  processes • syscalls • IPC • capabilities
       |
  Device / System Services
-  PCI • ACPI • storage • network • input • display
+  PCI • ACPI • VirtIO • storage • network • input • display
       |
  AWOSA Runtime
   packages • manifests • sandbox • capabilities
       |
  AWE Capsule
-  executable • permissions • provenance • budgets • recovery
       |
  AYUI + Native Applications
-
-Experimental research layer:
-  AWE XenoSense
-  intent • causal provenance • semantic recovery
-  uncertainty-aware scheduling • hardware contracts
 ```
 
-## What is implemented today
+## Current implementation foundation
 
-- AWE-specific loader with architecture selection, ELF/image validation, identity checks, measurement, rollback controls, security policy and UEFI support.
-- Versioned `BootInfo` protocol with explicit invariants.
-- Kernel module boundaries for architecture, memory, interrupts, process, scheduler, security, synchronization and syscalls.
-- Validated loader-to-kernel entry contract and architecture capability matrix.
-- A typed CellKernel system contract with an explicit ABI version and deterministic capability baseline.
-- Modular PCI/ACPI/APIC/VirtIO device contracts and bounded driver lifecycle supervision.
-- Bounded VFS/GPT/journal/recovery and IPv4/UDP/TCP transport foundations.
-- Versioned userspace service, identity and AWOSA runtime contracts.
-- Bounded `.asd` native-driver package admission and lifecycle states.
-- Bounded `.awos` native-application package admission and lifecycle states.
-- Atomic A/B update/recovery state-machine contract with generation-based downgrade rejection.
-- Automated formatting, workspace compilation, tests, Clippy and UEFI-loader checks in GitHub Actions.
-- Experimental product specifications for AWE Capsule and AWE XenoSense.
+The repository already contains substantial kernel, boot, hardware-contract, storage, networking, userspace, package, update/recovery, and CI foundations. These components are being developed toward end-to-end runtime validation rather than treated as a completed product.
 
-## Product progress
+Important existing areas include:
 
-**90% implementation checkpoint.** This is not a 90% release-certification claim: QEMU/runtime, hardware, cryptographic signing, fuzz/stress and release evidence gates still have to pass before AWE_OS 1.0 is certified.
+- AWE loader and versioned boot information contract.
+- x86_64 paging, early identity mapping, CR3 activation and interrupt primitives.
+- Process, scheduler, syscall, IPC, capability and security foundations.
+- PCI, ACPI, APIC/IOAPIC and VirtIO contracts/execution primitives.
+- Bounded block storage, GPT, VFS, journaling and recovery foundations.
+- IPv4/UDP/TCP transport foundations and bounded socket handling.
+- Versioned userspace service and identity contracts.
+- AWOSA runtime and native `.asd` / `.awos` package-admission foundations.
+- A/B update and recovery state-machine foundations.
+- Automated formatting, compilation, tests, Clippy and boot-related CI workflows.
 
-## Engineering documentation
+These are implementation foundations, not a claim that every subsystem is already production-ready.
 
-- **[ENGINEERING_GUIDE.md](docs/ENGINEERING_GUIDE.md)** — source-of-truth map, invariants, development loop and release evidence requirements.
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** — system layers and long-term architecture.
-- **[PRODUCT_READINESS.md](PRODUCT_READINESS.md)** — evidence-based 1.0 gates and current readiness.
-- **[AWE_OS_100_PERCENT_MASTER_PLAN.md](docs/AWE_OS_100_PERCENT_MASTER_PLAN.md)** — complete 1.0 implementation plan.
-- **[ABI.md](docs/ABI.md)** — boot ABI contract.
-- **[BOOT_ARCHITECTURE.md](docs/BOOT_ARCHITECTURE.md)** — loader and boot flow.
-- **[DRIVER_SYSTEM.md](docs/DRIVER_SYSTEM.md)** — driver architecture.
-- **[AWE_CAPSULE.md](docs/AWE_CAPSULE.md)** — native application security model.
-- **[AWE_XENOSENSE.md](docs/AWE_XENOSENSE.md)** — experimental research concepts.
+## Development status
 
-## New research direction — AWE XenoSense
+The old repository documentation used percentage checkpoints. Those checkpoints are retained as historical engineering context, but the active project now uses **runtime evidence and milestone gates** as the primary measure of progress.
 
-AWE XenoSense is an experimental OS research layer exploring ideas such as Intent-Carrying Execution, Causal Provenance Graphs, Time-Travel Kernel State, Uncertainty-Aware Scheduling, Memory Intent Zones, Self-Describing Hardware Contracts and Proof-Carrying Recovery.
+See **[PROJECT_STATUS.md](PROJECT_STATUS.md)** for the current project state and development rules.
 
-These are **design proposals, not claims of proven technology or claims that nobody else has independently explored similar ideas**. They are deliberately designed to remain subordinate to AWE_OS's deterministic and capability-based security model.
+## Documentation
+
+- **[PROJECT_STATUS.md](PROJECT_STATUS.md)** — current project identity, development direction, preservation point, and next cycle.
+- **[PRODUCT_READINESS.md](PRODUCT_READINESS.md)** — evidence-based readiness gates.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — system architecture and boundaries.
+- **[docs/AWE_OS_100_PERCENT_MASTER_PLAN.md](docs/AWE_OS_100_PERCENT_MASTER_PLAN.md)** — long-term implementation plan.
+- **[docs/ENGINEERING_GUIDE.md](docs/ENGINEERING_GUIDE.md)** — engineering workflow and invariants.
+- **[docs/ABI.md](docs/ABI.md)** — boot ABI contract.
+- **[docs/BOOT_ARCHITECTURE.md](docs/BOOT_ARCHITECTURE.md)** — boot flow.
+- **[docs/DRIVER_SYSTEM.md](docs/DRIVER_SYSTEM.md)** — driver architecture.
+- **[docs/AWE_CAPSULE.md](docs/AWE_CAPSULE.md)** — native application security model.
+- **[docs/AWE_XENOSENSE.md](docs/AWE_XENOSENSE.md)** — experimental research direction.
+
+Historical progress/evidence files under `docs/` remain useful as dated records. They should not override the current status in `PROJECT_STATUS.md` and `PRODUCT_READINESS.md`.
+
+## Roadmap
+
+### Phase 1 — Executable core
+
+- [ ] Reliable x86_64 UEFI/QEMU boot.
+- [ ] Deterministic CellKernel entry and early initialization.
+- [ ] Executed memory/paging and interrupt validation.
+- [ ] Timer/scheduler execution evidence.
+
+### Phase 2 — Hardware and runtime
+
+- [ ] VirtIO end-to-end device exercises.
+- [ ] Persistent storage runtime.
+- [ ] Network runtime and recovery.
+- [ ] Userspace service startup and supervision.
+
+### Phase 3 — Native platform
+
+- [ ] AWOSA loader/runtime integration.
+- [ ] Cryptographic trust for `.asd` and `.awos` packages.
+- [ ] Native application lifecycle and sandbox execution.
+- [ ] A/B update and recovery exercised end-to-end.
+
+### Phase 4 — Desktop and ecosystem
+
+- [ ] AYUI compositor and windowing.
+- [ ] Terminal and first-party applications.
+- [ ] Filesystem and network managers.
+- [ ] SDK/App Builder foundations.
+
+### Phase 5 — Production validation
+
+- [ ] Security hardening.
+- [ ] Fuzz/stress testing.
+- [ ] Reproducible release builds.
+- [ ] Hardware compatibility matrix.
+- [ ] ARM64/RISC-V64 validation.
+- [ ] Release certification based on evidence.
 
 ## Engineering rules
 
-- Rust-first and `no_std` for privileged code.
-- Keep hardware-dependent code behind architecture interfaces.
-- Keep the trusted computing base small; move drivers/services out of the kernel where practical.
-- Treat firmware metadata, memory, process, IPC and capability boundaries as security boundaries.
-- Every feature must have a deterministic test or validation path where possible.
-- Never describe a planned subsystem as implemented until it builds and is exercised.
-- Experimental intelligence/recovery features must never silently rewrite the trusted computing base.
-
-## Roadmap to AWE_OS 1.0
-
-1. **Bootable x86_64** — UEFI/QEMU image and deterministic kernel entry.
-2. **Memory + CPU** — physical frames, paging, heap, GDT/IDT, APIC/timers and SMP.
-3. **Execution** — threads/processes, syscall ABI, IPC and capability enforcement.
-4. **Hardware** — PCI/PCIe, ACPI, VirtIO, storage, input, framebuffer and networking.
-5. **System services** — init/service manager, VFS/AWEFS, device model, time and logging.
-6. **Native platform** — AWOSA package/manifest/signature format, runtime and sandbox.
-7. **AWE Capsule** — native application identity, capability, resource and recovery contract.
-8. **Desktop** — terminal, compositor, AYUI, file manager, settings and system monitor.
-9. **Compatibility** — optional Linux/POSIX/Windows/Android compatibility layers.
-10. **Production** — signed images, reproducible builds, fuzzing, benchmarks, recovery and hardware matrix.
-
-## Status
-
-AWE_OS is **not yet a finished daily-driver OS**. The implementation is at the 90% product-core checkpoint, while final product certification still requires real boot/runtime evidence, broader hardware drivers, persistent storage/network integration, desktop/userspace completion, cryptographic trust integration, compatibility layers, recovery tooling and release validation.
+- Keep privileged code Rust-first and `no_std` where appropriate.
+- Keep the trusted computing base small.
+- Keep hardware-dependent code behind explicit interfaces.
+- Treat firmware, memory, process, IPC, ABI, and capability boundaries as security boundaries.
+- Prefer deterministic validation and bounded resource use.
+- Never describe planned work as implemented without evidence.
+- Experimental intelligence/recovery concepts must remain subordinate to deterministic security and must not silently modify the trusted computing base.
 
 ## License
 
