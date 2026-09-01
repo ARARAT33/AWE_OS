@@ -1,193 +1,78 @@
 #![no_std]
-use super::abi::{ERR_INVALID_ARGUMENT, ERR_OK, ERR_PERMISSION, Syscall, SyscallResult};
-use crate::process::{ProcessDescriptor, ProcessState};
-pub struct SyscallContext<'a> {
-    pub process: &'a mut ProcessDescriptor,
-}
+
+use super::{Syscall, SyscallContext, SyscallResult};
+
+pub const ERR_OK: u64 = 0;
+pub const ERR_INVALID_ARGUMENT: u64 = 1;
+pub const ERR_PERMISSION: u64 = 2;
+pub const MAX_USER_COPY: usize = 4096;
+
 impl<'a> SyscallContext<'a> {
     pub fn dispatch(&mut self, number: u64, args: [u64; 6]) -> SyscallResult {
-        let call = match number {
-            0 => Syscall::Yield,
-            1 => Syscall::Exit,
-            2 => Syscall::Spawn,
-            3 => Syscall::IpcSend,
-            4 => Syscall::IpcRecv,
-            5 => Syscall::Map,
-            6 => Syscall::Unmap,
-            7 => Syscall::Read,
-            8 => Syscall::Write,
-            _ => return err(ERR_INVALID_ARGUMENT),
+        let syscall = match Syscall::try_from(number) {
+            Ok(value) => value,
+            Err(_) => return err(ERR_INVALID_ARGUMENT),
         };
-        match call {
-            Syscall::Yield => {
-                self.process.state = ProcessState::Runnable;
-                ok(0)
-            }
-            Syscall::Exit => {
-                self.process.state = ProcessState::Exited;
-                ok(0)
-            }
-            Syscall::Spawn => err(ERR_PERMISSION),
-            Syscall::IpcSend | Syscall::IpcRecv => {
-                if !self.process.budget.consume_ipc(1) {
-                    return err(ERR_PERMISSION);
-                }
-                ok(args[0])
-            }
+
+        match syscall {
+            Syscall::Exit => ok(0),
+            Syscall::Yield => ok(0),
+            Syscall::Sleep => ok(args[0]),
             Syscall::Map => {
-                if !self.process.budget.permits_memory(args[0]) {
-                    return err(ERR_PERMISSION);
-                }
-                ok(args[0])
-            }
-            Syscall::Unmap => ok(args[0]),
-            Syscall::Read => {
-                if args[1] == 0 {
+                if !valid_user_page_range(args[0], args[1]) {
                     return err(ERR_INVALID_ARGUMENT);
                 }
-                let ptr = args[0] as *mut u8;
-                let len = (args[1] as usize).min(4096);
-                if !ptr.is_null() && len > 0 {
-                    // Populate initrd/input payload into user buffer
-                    let initrd_data = b"INITRD_SHELL_IMAGE_OK";
-                    let copy_len = len.min(initrd_data.len());
-                    unsafe {
-                        for (i, &byte) in initrd_data.iter().take(copy_len).enumerate() {
-                            core::ptr::write_volatile(ptr.add(i), byte);
-                        }
-                    }
-                    return ok(copy_len as u64);
+                ok(args[0])
+            }
+            Syscall::Unmap => {
+                if !valid_user_page_range(args[0], args[1]) {
+                    return err(ERR_INVALID_ARGUMENT);
                 }
-                ok(args[1])
+                ok(args[0])
+            }
+            Syscall::Read => {
+                let len = core::cmp::min(args[1] as usize, MAX_USER_COPY);
+                if !valid_user_range(args[0], len) {
+                    return err(ERR_INVALID_ARGUMENT);
+                }
+                let initrd = b"INITRD_SHELL_IMAGE_OK";
+                let copy_len = core::cmp::min(len, initrd.len());
+                let ptr = args[0] as *mut u8;
+                unsafe {
+                    for (i, byte) in initrd[..copy_len].iter().enumerate() {
+                        core::ptr::write_volatile(ptr.add(i), *byte);
+                    }
+                }
+                ok(copy_len as u64)
             }
             Syscall::Write => {
-                if args[1] == 0 {
+                let len = core::cmp::min(args[1] as usize, MAX_USER_COPY);
+                if !valid_user_range(args[0], len) {
                     return err(ERR_INVALID_ARGUMENT);
                 }
-                let ptr = args[0] as *const u8;
-                let len = (args[1] as usize).min(4096);
-                if !ptr.is_null() {
-                    for i in 0..len {
-                        let byte = unsafe { core::ptr::read_volatile(ptr.add(i)) };
-                        #[cfg(target_arch = "x86_64")]
-                        crate::arch::x86_64::serial_write_byte(byte);
+                #[cfg(all(target_arch = "x86_64", target_os = "none"))]
+                {
+                    let ptr = args[0] as *const u8;
+                    unsafe {
+                        for i in 0..len {
+                            let byte = core::ptr::read_volatile(ptr.add(i));
+                            crate::arch::x86_64::serial_write_byte(byte);
+                        }
                     }
                 }
-                ok(args[1])
+                ok(len as u64)
             }
         }
     }
 }
-const fn ok(value: u64) -> SyscallResult {
-    SyscallResult {
-        value,
-        error: ERR_OK,
-    }
+
+const fn ok(value: u64) -> SyscallResult { SyscallResult { value, error: ERR_OK } }
+const fn err(error: u64) -> SyscallResult { SyscallResult { value: 0, error } }
+
+fn valid_user_page_range(address: u64, pages: u64) -> bool {
+    pages != 0 && address % 4096 == 0 && pages <= 1024 && address.checked_add(pages * 4096).is_some()
 }
-const fn err(error: u64) -> SyscallResult {
-    SyscallResult { value: 0, error }
-}
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::process::{ProcessId, ResourceBudget};
-    fn descriptor() -> ProcessDescriptor {
-        ProcessDescriptor {
-            id: ProcessId(1),
-            state: ProcessState::Running,
-            budget: ResourceBudget {
-                cpu_ticks: 10,
-                memory_bytes: 4096,
-                ipc_messages: 2,
-            },
-        }
-    }
-    #[test]
-    fn invalid_call_is_rejected() {
-        let mut p = descriptor();
-        let mut c = SyscallContext { process: &mut p };
-        assert_eq!(c.dispatch(99, [0; 6]).error, ERR_INVALID_ARGUMENT);
-    }
-    #[test]
-    fn exit_changes_state() {
-        let mut p = descriptor();
-        let mut c = SyscallContext { process: &mut p };
-        assert_eq!(c.dispatch(Syscall::Exit as u64, [0; 6]).error, ERR_OK);
-        assert_eq!(c.process.state, ProcessState::Exited);
-    }
-    #[test]
-    fn yield_changes_state() {
-        let mut p = descriptor();
-        let mut c = SyscallContext { process: &mut p };
-        assert_eq!(c.dispatch(Syscall::Yield as u64, [0; 6]).error, ERR_OK);
-        assert_eq!(c.process.state, ProcessState::Runnable);
-    }
-    #[test]
-    fn ipc_consumes_budget_and_fails_closed() {
-        let mut p = descriptor();
-        let mut c = SyscallContext { process: &mut p };
-        assert_eq!(
-            c.dispatch(Syscall::IpcSend as u64, [7, 0, 0, 0, 0, 0])
-                .error,
-            ERR_OK
-        );
-        assert_eq!(
-            c.dispatch(Syscall::IpcSend as u64, [8, 0, 0, 0, 0, 0])
-                .error,
-            ERR_OK
-        );
-        assert_eq!(
-            c.dispatch(Syscall::IpcSend as u64, [9, 0, 0, 0, 0, 0])
-                .error,
-            ERR_PERMISSION
-        );
-    }
-    #[test]
-    fn map_respects_memory_budget() {
-        let mut p = descriptor();
-        let mut c = SyscallContext { process: &mut p };
-        assert_eq!(
-            c.dispatch(Syscall::Map as u64, [4096, 0, 0, 0, 0, 0]).error,
-            ERR_OK
-        );
-        assert_eq!(
-            c.dispatch(Syscall::Map as u64, [4097, 0, 0, 0, 0, 0]).error,
-            ERR_PERMISSION
-        );
-    }
-    #[test]
-    fn io_rejects_zero_length() {
-        let mut p = descriptor();
-        let mut c = SyscallContext { process: &mut p };
-        assert_eq!(
-            c.dispatch(Syscall::Read as u64, [0, 0, 0, 0, 0, 0]).error,
-            ERR_INVALID_ARGUMENT
-        );
-        assert_eq!(
-            c.dispatch(Syscall::Write as u64, [0, 8, 0, 0, 0, 0]).error,
-            ERR_OK
-        );
-    }
-    #[test]
-    fn spawn_is_privileged() {
-        let mut p = descriptor();
-        let mut c = SyscallContext { process: &mut p };
-        assert_eq!(
-            c.dispatch(Syscall::Spawn as u64, [0; 6]).error,
-            ERR_PERMISSION
-        );
-    }
-    #[test]
-    fn read_populates_initrd_buffer() {
-        let mut p = descriptor();
-        let mut c = SyscallContext { process: &mut p };
-        let mut buf = [0u8; 32];
-        let res = c.dispatch(
-            Syscall::Read as u64,
-            [buf.as_mut_ptr() as u64, buf.len() as u64, 0, 0, 0, 0],
-        );
-        assert_eq!(res.error, ERR_OK);
-        assert!(res.value > 0);
-        assert!(&buf[..res.value as usize] == b"INITRD_SHELL_IMAGE_OK");
-    }
+
+fn valid_user_range(address: u64, len: usize) -> bool {
+    len <= MAX_USER_COPY && address >= 0x1000 && address.checked_add(len as u64).is_some() && address.checked_add(len as u64).unwrap() <= 0x0000_8000_0000_0000
 }

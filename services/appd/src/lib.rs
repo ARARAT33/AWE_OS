@@ -5,6 +5,7 @@
 
 mod awos;
 pub mod catalog;
+pub mod runtime;
 
 pub use awos::{
     AWOS_HEADER_LEN, AWOS_MAGIC, AWOS_MAX_CODE, AWOS_MAX_DATA, AWOS_MAX_MANIFEST,
@@ -13,6 +14,8 @@ pub use awos::{
     PackageDependency, PackageMeta, PublisherIdentity, RepositoryIndex, SandboxProfile,
     package_parts, package_transition, validate_awos,
 };
+
+pub use runtime::{RuntimeApp, RuntimeError as AppRuntimeError, SpawnFn as AppSpawnFn, Supervisor as AppSupervisor, WindowFn as AppWindowFn, MAX_APPS as RUNTIME_MAX_APPS, MAX_FAILURES as APP_MAX_FAILURES};
 
 pub const AWE_APP_ABI_MAJOR: u16 = 1;
 pub const AWE_APP_ABI_MINOR: u16 = 3;

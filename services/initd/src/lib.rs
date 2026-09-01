@@ -4,11 +4,14 @@
 //! primitives needed for isolation; policy and lifecycle stay in userspace.
 
 mod core;
+pub mod runtime;
 pub use core::{
     BoundedPath, CoreError, CoreManager, CoreManagerKind, CoreManagerRegistry, CrashRecord,
     LogLevel, LogRecord, MAX_CORE_MANAGERS, MAX_LOG_MESSAGE, MAX_PATH, RecoveryAction,
     SecurityPolicy, UserImage, recovery_action, start_core_manager, validate_user_image,
 };
+
+pub use runtime::{RuntimeError, RuntimeRecord, ServiceRuntimeSpec, SpawnFn, Supervisor};
 
 pub const INIT_ABI_MAJOR: u16 = 1;
 pub const INIT_ABI_MINOR: u16 = 3;
@@ -221,12 +224,8 @@ mod tests {
         let mut table = ServiceTable::new();
         table.register(SPEC).unwrap();
         assert_eq!(table.len(), 1);
-        table
-            .set_state(ServiceId(1), ServiceState::Starting)
-            .unwrap();
-        table
-            .set_state(ServiceId(1), ServiceState::Running)
-            .unwrap();
+        table.set_state(ServiceId(1), ServiceState::Starting).unwrap();
+        table.set_state(ServiceId(1), ServiceState::Running).unwrap();
         assert_eq!(table.spec(ServiceId(1)), Some(SPEC));
     }
 
@@ -234,9 +233,7 @@ mod tests {
     fn failed_service_restarts_only_when_policy_allows() {
         let mut table = ServiceTable::new();
         table.register(SPEC).unwrap();
-        table
-            .set_state(ServiceId(1), ServiceState::Starting)
-            .unwrap();
+        table.set_state(ServiceId(1), ServiceState::Starting).unwrap();
         table.set_state(ServiceId(1), ServiceState::Failed).unwrap();
         table.restart(ServiceId(1)).unwrap();
         assert_eq!(table.state(ServiceId(1)), Some(ServiceState::Starting));
@@ -246,13 +243,9 @@ mod tests {
     fn quarantined_service_cannot_restart() {
         let mut table = ServiceTable::new();
         table.register(SPEC).unwrap();
-        table
-            .set_state(ServiceId(1), ServiceState::Starting)
-            .unwrap();
+        table.set_state(ServiceId(1), ServiceState::Starting).unwrap();
         table.set_state(ServiceId(1), ServiceState::Failed).unwrap();
-        table
-            .set_state(ServiceId(1), ServiceState::Quarantined)
-            .unwrap();
+        table.set_state(ServiceId(1), ServiceState::Quarantined).unwrap();
         assert_eq!(table.restart(ServiceId(1)), Err(ServiceError::Quarantined));
     }
 
